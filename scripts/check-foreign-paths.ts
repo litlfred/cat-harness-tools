@@ -35,9 +35,10 @@
  * So are a folio block manifest's CITATION FIELDS: the value of a `source` or
  * `provenance` key directly inside a `meta` object, in a file under a `folio/`
  * directory (owner, 2026-11-17, option A). `meta.source.file` names the L1
- * section a block was drawn from (`who-iris/library/<id>/sections/…`): a
+ * section a block was drawn from (`<l1-layer>/library/<id>/sections/…`): a
  * citation of content, not code that looks the path up, and changing it means
- * editing every block through the editing process (149 sites in dth-sfp). Any
+ * editing every block through the editing process (149 sites in one content
+ * layer, cat-harness-tools#2381). Any
  * other literal in the same file, a block's code included, is still counted.
  *
  * ## A ratchet, one way

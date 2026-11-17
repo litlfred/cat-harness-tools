@@ -133,7 +133,7 @@ Feature: Code does not spell paths into another instance's directories
 
   @test:scripts/tests/check-foreign-paths.test.ts::a_folio_block_manifest's_citation_fields_are_not_counted_(owner,_2026-11-17,_option_A)::meta.source_and_meta.provenance_in_a_folio_file_are_skipped
   Scenario: A block manifest's meta.source and meta.provenance are not counted
-    Given a folio block manifest whose meta.source.file and meta.provenance cite an L1 section under who-iris/library
+    Given a folio block manifest whose meta.source.file and meta.provenance cite an L1 section under another layer's library
     When it is scanned
     Then nothing is counted
 

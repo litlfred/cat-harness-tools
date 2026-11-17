@@ -152,15 +152,15 @@ describe("a block that MOVES between files is the same finding (dth-sc#24)", () 
 });
 
 describe("a folio block manifest's citation fields are not counted (owner, 2026-11-17, option A)", () => {
-  // The shape dth-pc and dth-sfp write: meta.source.file cites the L1 section.
-  const L1: InstanceDirs = { name: "who-iris", root: "who-iris", dirs: ["who-iris/library"] };
-  const DTH: InstanceDirs = { name: "dth-x", root: "", dirs: ["folio"] };
+  // The shape the content layers write: meta.source.file cites the L1 section.
+  const L1: InstanceDirs = { name: "l1-layer", root: "l1-layer", dirs: ["l1-layer/library"] };
+  const DTH: InstanceDirs = { name: "content-x", root: "", dirs: ["folio"] };
   const t = foreignTargets(DTH, [DTH, L1]);
   const BLOCK = [
     'import { paragraph } from "../../schema/builders";',
     "export default paragraph({",
     '  label: "p-annexes-page-056",',
-    '  meta: {"title": "Annex 1", "source": {"library": "9789240116191-eng", "section": "page-056", "file": "who-iris/library/9789240116191-eng/sections/page-056.md", "pdfPage": 56}, "provenance": ["who-iris/library/9789240116191-eng/sections/page-057.md"], "glossary": [{"iri": "https://x/ns#a", "prefLabel": "A {b}"}]},',
+    '  meta: {"title": "Annex 1", "source": {"library": "9789240116191-eng", "section": "page-056", "file": "l1-layer/library/9789240116191-eng/sections/page-056.md", "pdfPage": 56}, "provenance": ["l1-layer/library/9789240116191-eng/sections/page-057.md"], "glossary": [{"iri": "https://x/ns#a", "prefLabel": "A {b}"}]},',
     "});",
     "",
   ].join("\n");
@@ -172,17 +172,17 @@ describe("a folio block manifest's citation fields are not counted (owner, 2026-
   test("the same literal elsewhere in the block, or as block code, is still counted", () => {
     const withCode = BLOCK.replace(
       '"glossary":',
-      '"note": "who-iris/library/9789240116191-eng/sections/page-058.md", "glossary":',
-    ) + 'const raw = readFileSync("who-iris/library/9789240116191-eng/sections/page-059.md");\n';
+      '"note": "l1-layer/library/9789240116191-eng/sections/page-058.md", "glossary":',
+    ) + 'const raw = readFileSync("l1-layer/library/9789240116191-eng/sections/page-059.md");\n';
     const r = scanText(withCode, "folio/d/annexes/p-annexes-page-056.ts", "", t);
     expect(r.counted.map((c) => c.literal).sort()).toEqual([
-      "who-iris/library/9789240116191-eng/sections/page-058.md",
-      "who-iris/library/9789240116191-eng/sections/page-059.md",
+      "l1-layer/library/9789240116191-eng/sections/page-058.md",
+      "l1-layer/library/9789240116191-eng/sections/page-059.md",
     ]);
   });
 
   test("a `source` nested deeper than meta's direct children is still counted", () => {
-    const deep = 'export default p({ meta: {"figure": {"source": "who-iris/library/x/sections/a.md"}} });\n';
+    const deep = 'export default p({ meta: {"figure": {"source": "l1-layer/library/x/sections/a.md"}} });\n';
     expect(scanText(deep, "folio/d/c/b.ts", "", t).counted).toHaveLength(1);
   });
 
@@ -191,7 +191,7 @@ describe("a folio block manifest's citation fields are not counted (owner, 2026-
   });
 
   test("bare keys work too", () => {
-    const bare = 'export default p({ meta: { source: { file: "who-iris/library/x/sections/a.md" }, title: "t" } });\n';
+    const bare = 'export default p({ meta: { source: { file: "l1-layer/library/x/sections/a.md" }, title: "t" } });\n';
     expect(scanText(bare, "folio/d/c/b.ts", "", t).counted).toHaveLength(0);
   });
 });
