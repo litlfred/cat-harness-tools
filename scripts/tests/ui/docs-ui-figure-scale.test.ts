@@ -13,11 +13,17 @@
  * The script under test is the harness's site chrome, read from the mounted
  * cat-harness layer: content holds no code, so the test lives here
  * (cat-harness#1369 added it there).
+ *
+ * It needs a Chromium. Where none is installed (the standalone measure, the
+ * test shards that do not install one) the cases are skipped, as
+ * `test/coordinator/regen-writers.test.ts` skips its browser cases; a launch
+ * that fails where a browser IS present still fails.
  */
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Browser, chromium } from "playwright";
+import { chromiumExecutable } from "../../bpmn-render.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const DOCS_UI = readFileSync(join(HARNESS_ROOT, "site-chrome", "assets", "js", "docs-ui.js"), "utf8");
@@ -38,9 +44,22 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 <body><div class="main-content"><div class="fa-doc" id="doc"></div></div>
 <script src="${ORIGIN}/docs-ui.js"></script></body></html>`;
 
+/** A Chromium to launch: the one the image pins, else Playwright's own build if it is installed. */
+function hasBrowser(): boolean {
+  if (chromiumExecutable() !== undefined) return true;
+  try {
+    return existsSync(chromium.executablePath());
+  } catch {
+    return false;
+  }
+}
+const BROWSER = hasBrowser();
+
 let browser: Browser;
 beforeAll(async () => {
-  browser = await chromium.launch();
+  if (!BROWSER) return;
+  const executablePath = chromiumExecutable();
+  browser = await chromium.launch(executablePath ? { executablePath } : {});
 });
 afterAll(async () => {
   await browser?.close();
@@ -88,7 +107,7 @@ async function drawLate(img: string, opts: { svgFails?: boolean } = {}) {
   }
 }
 
-describe("docs-ui: an SVG <img> is not drawn at the browser's default size", () => {
+describe.skipIf(!BROWSER)("docs-ui: an SVG <img> is not drawn at the browser's default size", () => {
   it("inlines a late bpmn-js drawing and text-fits it", async () => {
     const r = await drawLate('<img src="media/bp-1.svg" alt="HRH-BP-01">');
     expect(r.tag).toBe("svg");
