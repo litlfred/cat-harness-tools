@@ -21,7 +21,7 @@ import {
 } from "../lib/code-ref-links.ts";
 
 const FIXTURE = join(import.meta.dir, "fixtures", "code-ref-links");
-const BLOB = "https://example.test/blob/main/scripts/merge-guard.ts";
+const BLOB = "https://example.test/blob/main/scripts/example-gate.ts";
 
 /** A resolver over a handful of known nodes — what `gen-skill-docs` builds from the graph. */
 const resolver: CodeRefResolver = {
@@ -32,7 +32,7 @@ const resolver: CodeRefResolver = {
     const table: Record<string, CodeRefTarget[]> = {
       "sdlc/processes/merge-train.bpmn": [{ kind: "process", href: "../../en/cat-harness/processes/merge-train.html" }],
       "schemas/skills/merge-queue.json": [{ kind: "schema", href: "../skills/merge-queue.html" }],
-      "scripts/merge-guard.ts": [{ kind: "file", href: BLOB }],
+      "scripts/example-gate.ts": [{ kind: "file", href: BLOB }],
       "twice.md": [
         { kind: "file", href: "https://example.test/blob/main/a/twice.md" },
         { kind: "file", href: "https://example.test/blob/main/b/twice.md" },
@@ -57,9 +57,9 @@ describe("probesFor — which registry a span's shape offers it to", () => {
 
   test("paths by extension: process, schema, file", () => {
     expect(probesFor("sdlc/processes/merge-train.bpmn")[0]?.kind).toBe("process");
-    expect(probesFor("schemas/kg/cat-harness.ts")[0]?.kind).toBe("schema");
-    expect(probesFor("scripts/gen-skill-docs.ts")[0]?.kind).toBe("file");
-    expect(probesFor("beans/defs/")[0]?.kind).toBe("file");
+    expect(probesFor("schemas/kg/example.ts")[0]?.kind).toBe("schema");
+    expect(probesFor("scripts/example.ts")[0]?.kind).toBe("file");
+    expect(probesFor("example/dir/")[0]?.kind).toBe("file");
   });
 
   test("dates, URLs, branch names and prose are offered to nobody that would report them", () => {
@@ -98,13 +98,13 @@ describe("resolveCodeRef", () => {
 
 describe("linkInlineCode — the fixture page", () => {
   const findings: CodeRefFinding[] = [];
-  const out = linkInlineCode(readFileSync(join(FIXTURE, "page.md"), "utf-8"), resolver, {
+  const out = linkInlineCode(readFileSync(join(FIXTURE, "page.txt"), "utf-8"), resolver, {
     self: new Set(["merge-queue.html"]),
     onFinding: (f) => findings.push(f),
   });
 
   test("is rewritten exactly as expected", () => {
-    expect(out).toBe(readFileSync(join(FIXTURE, "expected.md"), "utf-8"));
+    expect(out).toBe(readFileSync(join(FIXTURE, "expected.txt"), "utf-8"));
   });
 
   test("reports the shaped misses and the ambiguity, and nothing else", () => {
