@@ -468,12 +468,15 @@ export function mergeGuardCaller(lines: string[], rel: string): Finding[] {
     return findings;
   }
   let wfs = -1;
-  for (let i = wr[0] + 1; i < wr[1]; i++) if (live(i) && /^\s*workflows:/.test(lines[i])) wfs = i;
+  // A flow mapping on the key's own line (`workflow_run: { workflows: [...], types: [completed] }`),
+  // the shape every layer's caller was written in; else a `workflows:` line under the key.
+  if (/^\s*workflow_run:\s*\{.*\bworkflows:\s*\[/.test(lines[wr[0]])) wfs = wr[0];
+  else for (let i = wr[0] + 1; i < wr[1]; i++) if (live(i) && /^\s*workflows:/.test(lines[i])) wfs = i;
   if (wfs < 0) {
     findings.push({ file: rel, line: wr[0] + 1, have: lines[wr[0]].trim(), want: null, why: `${why}: add a \`workflows:\` list by hand`, trailing: true });
     return findings;
   }
-  const inline = lines[wfs].match(/^(\s*workflows:\s*\[)([^\]]*)\](.*)$/);
+  const inline = lines[wfs].match(/^(\s*(?:workflow_run:\s*\{.*?\b)?workflows:\s*\[)([^\]]*)\](.*)$/);
   if (inline) {
     const names = inline[2].split(",").map((x) => x.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
     if (names.includes(MERGE_GUARD_TRIGGER_NAME)) return findings;

@@ -1161,3 +1161,12 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-amels li .jp-have { margin: 4px 0 8px; }
 .jp-countries-in { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; margin-top: 10px; }
 .jp-countries-in label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--s700); }
+
+/* ── How it works: data on the move, from the journey map's technical layer (owner, 2026-11-17) ── */
+.jp-move-scroll { overflow-x: auto; margin-top: 12px; }
+.jp-move-t { width: 100%; border-collapse: collapse; font-size: 13px; }
+.jp-move-t th, .jp-move-t td { text-align: left; vertical-align: top; padding: 10px 12px; border-top: 1px solid var(--s200); }
+.jp-move-t thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--s600); }
+.jp-move-t td b { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.jp-move-t td small { display: block; color: var(--s600); margin-top: 4px; }
+.jp-move-t .jp-net { margin-top: 6px; }

@@ -28,9 +28,11 @@
  * placeholders do not match its `msgid` is not used (`InjectResult.rejected`).
  * Every page, English included, names its other languages with
  * `<link rel="alternate" hreflang>` and the site chrome's
- * `fa-translation-meta` block, so the navbar's language bar and the
+ * `fa-translation-meta` block, so the site's language picker and the
  * presentation frame's own language links (`<!--jv-langs-->`) go to the
- * same page in another language. Translations are agent-made unless a
+ * same page in another language. A journey page, in the site's chrome, has no
+ * links of its own: the site's picker is the one (owner, 2026-11-17); only the
+ * presentation frame, which opts out of the chrome, draws them. Translations are agent-made unless a
  * layer says otherwise: the pages say `unverified`.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
