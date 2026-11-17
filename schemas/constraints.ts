@@ -154,7 +154,7 @@ export const UNRESOLVED_LOCAL = "no block in the document has that label";
  * - a cross-paper `<doc>:<label>` is looked up in `folioLabels`, the labels
  *   of every document in the SAME folio, keyed by document slug. A slug that
  *   is no document there, or a label that document does not carry, is a miss
- *   (folio-assistant-core#841: a toolkit block linking into its guidance
+ *   (a toolkit block linking into its guidance
  *   document). With no index supplied the caller has not looked, and the
  *   entry is NOT judged — the caller must say so rather than read it as a
  *   pass.
@@ -707,7 +707,7 @@ export interface ConstraintContext {
   /**
    * The labels of every document in the same folio, keyed by document slug —
    * what a cross-paper `<slug>:<label>` in `uses[]` / `foreshadows[]` resolves
-   * against (folio-assistant-core#841). Absent when the caller did not build
+   * against. Absent when the caller did not build
    * it; a cross-paper ref is then not judged, and the caller says so.
    */
   folioLabels?: ReadonlyMap<string, ReadonlySet<string>>;
@@ -854,7 +854,7 @@ export const CONSTRAINT_RULES: ConstraintRule[] = [
       // A cross-paper `<doc>:<label>` (e.g. "unital-groebner-bases:cor:pbw")
       // used to be skipped here as "resolved at folio level", and nothing at
       // folio level resolved it: a toolkit block naming a guidance block that
-      // did not exist passed (folio-assistant-core#841). It is now looked up
+      // did not exist passed. It is now looked up
       // in `ctx.folioLabels`, every document's labels in the same folio, and
       // a miss fails. A full URL is a cross-FOLIO ref and is still accepted.
       const missing = block.uses.filter(

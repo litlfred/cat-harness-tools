@@ -1,6 +1,6 @@
 /**
  * Cross-paper `uses[]` / `foreshadows[]` references resolve against the
- * folio-wide label index, and a miss fails (folio-assistant-core#841: a
+ * folio-wide label index, and a miss fails (a
  * Stepwise Toolkit document whose blocks link into a guidance document in the
  * same folio). Before this, `uses-resolve`, `foreshadows-resolve` and
  * `uses-editorial-hygiene` all accepted any `<slug>:<label>` unread, and the

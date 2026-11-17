@@ -85,7 +85,7 @@ export function resetUsesGraphCache(): void {
  * so a bare `sec:x` read as a cross-paper ref and was never looked at.
  *
  * A cross-paper `<slug>:<label>` resolves only in THAT document of the same
- * folio, and a miss is broken (folio-assistant-core#841) — it used to be
+ * folio, and a miss is broken — it used to be
  * "accepted as-is". A full URL is a cross-FOLIO ref and is still accepted.
  */
 export function usesEntryProblem(

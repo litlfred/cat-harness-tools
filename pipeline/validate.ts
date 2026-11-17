@@ -617,7 +617,7 @@ function checkMathLinks(
  * included, and neither is what lies under it.
  *
  * The site renders subsections to any depth; this validator read exactly one
- * level of them (folio-assistant-core#841), so a block listed in a
+ * level of them, so a block listed in a
  * sub-subsection was neither loaded nor validated, and was then reported as
  * unlisted although it renders.
  */
@@ -889,7 +889,7 @@ export async function validateObjects(
   }
 
   // Cross-paper `<slug>:<label>` refs resolve against the labels of every
-  // document in the SAME folio (folio-assistant-core#841). Only when the
+  // document in the SAME folio. Only when the
   // directory being validated is inside this repository's folio: anywhere
   // else there is no folio to speak for, and that is said, not passed.
   let folioRoot: string | undefined;
