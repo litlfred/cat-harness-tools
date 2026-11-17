@@ -1,7 +1,7 @@
 /**
  * Main's STORED answer is used only when it was mounted at the PR's pins.
  *
- * folio-assistant-core#839 (run 44082781993) changed two workflow files and
+ * A layer's PR on 2026-11-17 (run 44082781993) changed two workflow files and
  * was charged with two new failures. Its PR side pinned the lower layers to
  * main's newest CI cone record (06:19Z, cat-harness-tools 1b18760f); its
  * main side was the answer the 11:29Z push stored for its base
@@ -48,7 +48,7 @@ describe("stored-pins.py", () => {
     expect(r.same).toBe("true");
   });
 
-  test("folio-assistant-core#839: another cat-harness-tools is not used, and the why names both", () => {
+  test("a layer PR of 2026-11-17: another cat-harness-tools is not used, and the why names both", () => {
     const r = run({ main: "08a4c3ea", index: INDEX, lower: AT_ANSWER }, AT_RECORD, INDEX);
     expect(r.same).toBe("false");
     expect(r.why).toContain("cat-harness-tools@87cf0f35f53b");

@@ -103,7 +103,7 @@
 # layers and index it mounted (`from.json`), and it is used only when they
 # are the ones this run mounts. The PR side pins to main's newest record,
 # which is found separately and can be an older push's than the answer's
-# (folio-assistant-core#839: the record of 06:19Z, the answer of 11:29Z,
+# (a layer's PR on 2026-11-17: the record of 06:19Z, the answer of 11:29Z,
 # whose record was saved after the PR pinned); judged against it, the PR was
 # charged with what the lower layers fixed in between.
 # Re-running ALL jobs (a second attempt) recomputes main exactly, as before.
@@ -1856,7 +1856,7 @@ jobs:
       # the PR side pins to main's newest record, found separately, and a push
       # that stored the answer for the PR's base may have saved its record
       # after the PR pinned. Judged against another main's lower layers, the
-      # PR was charged with their failures (folio-assistant-core#839, run
+      # PR was charged with their failures (a layer's PR on 2026-11-17, run
       # 44082781993: `check:foreign-paths` and `navbar:assets:check`, both
       # red at the record's cat-harness-tools and green at the answer's).
       - name: Was main's stored answer mounted at this run's pins?

@@ -14,7 +14,7 @@ A PR's first attempt pins the index and the lower layers to main's newest CI
 cone record (the workflow header's "Pinned to main's record"), and is judged
 against the answer a run on main stored for the PR's own base commit (its
 "main's STORED answer"). The two are found separately, and nothing made them
-the same main. On litlfred/folio-assistant-core#839 (run 44082781993) the PR
+the same main. On a layer's PR on 2026-11-17 (run 44082781993) the PR
 side pinned to the 06:19Z record, cat-harness-tools at 1b18760f, while the
 stored answer was the 11:29Z push's, cat-harness-tools at 87cf0f35: its record
 was saved at 12:49Z, after the PR had pinned at 12:24Z. Two gates red at
