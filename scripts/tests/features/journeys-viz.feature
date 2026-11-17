@@ -142,9 +142,9 @@ Feature: The journeys viewer
     When the module M2 page is read
     Then it shows the table row "Trust anchor"
 
-  @test:scripts/tests/journeys-viz.test.ts::the_workshop_layer::the_sheets_page_carries_the_cover_and_one_sheet_per_declared_sheet,_with_its_assessment_strip
-  Scenario: The sheets page carries the cover and one sheet per declared sheet, with its assessment strip
-    Given the sheets page of the policy workshop
+  @test:scripts/tests/journeys-viz.test.ts::the_workshop_layer::the_Table_sheets_panel_carries_the_cover_and_one_sheet_per_declared_sheet,_with_its_assessment_strip
+  Scenario: The Table sheets panel carries the cover and one sheet per declared sheet, with its assessment strip
+    Given the discussion page of the policy workshop
     Then it has 2 sheets, one of them the cover
     And it has an assessment strip
     And it names the capability "A viewer"
@@ -221,9 +221,20 @@ Feature: The journeys viewer
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::every_view_has_a_page,_in_the_frame,_and_the_tabs_link_them
   Scenario: Every view has a page in the frame, and the tabs link them
+    Given the presentation views map, personas, each persona, how, how/wallet, discuss, demo and demo/S2
+
     Given the presentation views personas, each persona, how, how/wallet, discuss, sheets, demo and demo/S2
     Then each opts out of the navbar and shows the name "PilgrimLink"
     And the P2 page links the personas, how and discuss tabs, none disabled, and no journey map
+
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_Table_sheets_are_a_folded_panel_of_the_discussion;_sheets/_redirects_there_and_the_tab_is_gone_(owner,_2026-11-17)
+  Scenario: The Table sheets are a folded panel of the discussion; sheets/ redirects there and the tab is gone
+    Given the discussion page of the policy workshop
+    Then it ends with a folded "sheets" panel holding the cover sheet, and loads journeys.css
+    And no page offers a Table sheets tab or links ../sheets/
+    And sheets/ redirects to ../discuss/#sheets, keeping an old anchor
+    And a module's sheet link opens ../discuss/#sheet-s1
+    And present.js opens the panel an address names and prints the sheets alone
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_journey_map_is_folded_into_How_it_works:_its_tab_is_gone,_map/_redirects,_and_its_hand-offs_are_How_it_works'_Data_on_the_move_(owner,_2026-11-17)
   Scenario: The journey map is folded into How it works
@@ -601,3 +612,12 @@ Feature: The journeys viewer
   Scenario: A step that includes a journey links to it
     When the home page is read
     Then it says the step is the journey "C2 — Away", linked
+
+  @test:scripts/tests/journeys-viz.test.ts::presentation_helpers::JV-06:_a_workshop's_own_canvas_(sheetsSource)_is_the_Table_sheets_panel,_its_files_copied_beside_the_discussion;_the_drawn_sheets_are_the_fallback
+  Scenario: A workshop's own canvas is the Table sheets panel, its files copied beside the discussion
+    Given a workshop whose sheetsSource names a Word file, a PDF URL and three previews, one missing
+    Then the discussion's panel shows the two previews, the Word download and the PDF link, and a print button
+    And the layer's files are copied under discuss/canvas/, none under sheets/, and the URL is not copied
+    And the workshop page links "discuss/#sheets"
+    And the check names the missing preview only
+    And with no file resolving, the drawn sheets come back; a path out of the layer is no file of it; a sheetsSource naming no file is refused

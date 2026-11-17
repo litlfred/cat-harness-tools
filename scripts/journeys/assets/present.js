@@ -556,14 +556,20 @@
     var ws = box.getAttribute("data-jp-lab");
     var steps = box.querySelectorAll("[data-jp-lab-step]");
     var tabs = doc.querySelectorAll("[data-jp-lab-tab]");
-    function show(id, scroll) {
+    // The step an element of the page sits in (`#sheets`, `#sheet-s1`: the Table sheets panel in the summary).
+    function stepOf(id) {
+      var t = id ? doc.getElementById(id) : null;
+      var s = t && t.closest ? t.closest("[data-jp-lab-step]") : null;
+      return s ? s.getAttribute("data-jp-lab-step") : null;
+    }
+    function show(id, scroll, keepHash) {
       var found = false;
       Array.prototype.forEach.call(steps, function (s) {
         var on = s.getAttribute("data-jp-lab-step") === id;
         s.hidden = !on;
         found = found || on;
       });
-      if (!found) return show(steps[0].getAttribute("data-jp-lab-step"), scroll);
+      if (!found) return show(steps[0].getAttribute("data-jp-lab-step"), scroll, keepHash);
       Array.prototype.forEach.call(tabs, function (t) {
         var on = t.getAttribute("data-jp-lab-tab") === id;
         t.classList.toggle("is-on", on);
@@ -571,7 +577,7 @@
         else t.removeAttribute("aria-current");
       });
       store("jp:lab:" + ws, id);
-      if (history.replaceState) history.replaceState(null, "", "#lab-" + id);
+      if (history.replaceState && !keepHash) history.replaceState(null, "", "#lab-" + id);
       if (scroll) {
         var nav = doc.querySelector(".jp-lab-tabs");
         if (nav) nav.scrollIntoView({ block: "start" });
@@ -585,7 +591,13 @@
       });
     });
     var m = /^#lab-(.+)$/.exec(location.hash);
-    show(m ? m[1] : store("jp:lab:" + ws) || steps[0].getAttribute("data-jp-lab-step"), false);
+    var inner = !m && location.hash.length > 1 ? stepOf(decodeURIComponent(location.hash.slice(1))) : null;
+    if (inner) show(inner, false, true);
+    else show(m ? m[1] : store("jp:lab:" + ws) || steps[0].getAttribute("data-jp-lab-step"), false);
+    window.addEventListener("hashchange", function () {
+      var s = stepOf(decodeURIComponent(location.hash.slice(1)));
+      if (s) show(s, false, true);
+    });
 
     // The aside: the statement's first line and the ticked use cases.
     var text = box.querySelector("[data-jp-usecase]");
@@ -910,6 +922,31 @@
       fit();
     });
     each("[data-jp-gapreport]", gapReport);
+    // The Table sheets panel (discuss/#sheets, where sheets/ redirects): an address
+    // naming it, or a sheet in it, opens it; its print button prints the sheets alone.
+    function openTarget() {
+      var id = location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : "";
+      var t = id ? doc.getElementById(id) : null;
+      if (!t || !t.closest) return;
+      var d = t.closest("details");
+      if (d) d.open = true;
+      t.scrollIntoView({ block: "start" });
+    }
+    openTarget();
+    window.addEventListener("hashchange", openTarget);
+    each("[data-jp-sheets-print]", function (b) {
+      b.addEventListener("click", function () {
+        var d = b.closest("details");
+        if (d) d.open = true;
+        root.classList.add("jp-print-sheets");
+        doc.body.classList.add("jv-print-sheets");
+        window.print();
+      });
+    });
+    window.addEventListener("afterprint", function () {
+      root.classList.remove("jp-print-sheets");
+      doc.body.classList.remove("jv-print-sheets");
+    });
     each("[data-jv-print]", function (b) {
       b.addEventListener("click", function () {
         window.print();
