@@ -116,4 +116,4 @@ const find = (suffix: string): string => {
   if (!f) throw new Error(`no page ending ${suffix}; have ${files.map((x) => x.path).join(", ")}`);
   return f.path.replace(/index\.html$/, "");
 };
-put(site, "paths.json", { walkthroughA: find("/workshops/track/walkthrough/J4.0a/index.html"), walkthrough: find("/workshops/track/walkthrough/J4.0b/index.html"), discuss: find("/workshops/track/discuss/index.html") });
+put(site, "paths.json", { walkthroughA: find("/workshops/track/walkthrough/J4.0a/index.html"), walkthrough: find("/workshops/track/walkthrough/J4.0b/index.html"), discuss: find("/workshops/track/discuss/index.html"), map: find("/workshops/track/map/index.html") });

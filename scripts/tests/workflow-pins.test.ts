@@ -185,6 +185,30 @@ describe("workflow-pins: a merge-guard caller leaves pull_request_target", () =>
     expect(judge(none).findings).toHaveLength(0);
   });
 
+  test("the one-line flow style every layer's caller uses is migrated too; a second pass is clean", () => {
+    const flow = [
+      "name: Merge guard",
+      "on:",
+      "  pull_request_target: { types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, labeled, unlabeled, edited] }",
+      "  issue_comment: { types: [created, edited] }",
+      '  workflow_run: { workflows: ["Harness PR checks"], types: [completed] }',
+      "  workflow_dispatch:",
+      "    inputs: { pr: { type: string, required: false } }",
+      "permissions: { statuses: write }",
+      "jobs:",
+      "  guard:",
+      `    uses: litlfred/cat-harness-tools/.github/workflows/layer-merge-guard.yml@${TOOLS} # index.lock.json`,
+      "",
+    ].join("\n");
+    const { findings, text } = judge(flow);
+    expect(findings).toHaveLength(2);
+    expect(findings.every((f) => f.trailing && f.want !== null)).toBe(true);
+    expect(text).not.toContain("pull_request_target");
+    expect(text).toContain(`  workflow_run: { workflows: ["Harness PR checks", "${MERGE_GUARD_TRIGGER_NAME}"], types: [completed] }\n`);
+    expect(text).toContain("  issue_comment: { types: [created, edited] }\n");
+    expect(judge(text).findings).toHaveLength(0);
+  });
+
   test("a workflow that does not call layer-merge-guard is not judged", () => {
     expect(judge(CALLER.replace("layer-merge-guard.yml", "other.yml")).findings).toHaveLength(0);
   });
