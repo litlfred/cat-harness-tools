@@ -18,3 +18,12 @@ Feature: Figure captions written "Fig N." are found
     Then figure "1" is "Public health supply chain partners and processes"
     And figure "4" is "The stepwise approach used in this handbook"
     And no other figure is found
+
+  @test:scripts/tests/figure-caption-forms.test.ts::caption_patterns_accept_`Fig_N.`::declaredFigureCaptions_reads_captions_wrapped_in_Markdown_emphasis,_or_after_a_colon
+  Scenario: declaredFigureCaptions reads captions in Markdown emphasis or after a colon
+    Given a page with captions "**Fig. 1.** ...", "*Figure 2.* ...", "**Fig. 3**. ...", "__Fig. 4.__ ...", "**Fig. 5. ...**" and "Fig. 9: ..."
+    And the lines "**Fig. 6** Monitoring framework", "As **Fig. 7** shows" and "**Figure 8** shows the timeline."
+    When the declared figure captions are read
+    Then figures "1" to "5" and "9" carry their caption text without the emphasis
+    And figures "6" and "8" are declared without a caption
+    And the mid-sentence "Fig. 7" is not declared

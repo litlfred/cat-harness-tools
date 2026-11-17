@@ -490,6 +490,17 @@ test.describe("kg viewer", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 
+  test("at phone width the columns shrink to the viewport whatever the font", async ({ page }) => {
+    // A runner whose fallback font is wider than this machine's widened the
+    // facets column past 390px (398 on CI, DejaVu Sans): a `1fr` track never
+    // shrinks below its content. Enlarging the text on purpose makes that
+    // failure independent of which fonts the machine happens to have.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(PAGE);
+    await page.addStyleTag({ content: "main { font-size: 24px; }" });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  });
+
   test("asking for a language nobody has translated yet gets English, not a blank page", async ({ page }) => {
     // The failure this guards against is the one that ships today: with every
     // catalogue empty, EVERY string takes the fallback path. A lookup that

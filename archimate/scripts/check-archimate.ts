@@ -174,6 +174,7 @@ export function checkCommitted(instanceRoot: string): string[] {
   }
   for (const f of config.figures ?? []) {
     if (!existsSync(join(instanceRoot, f.block))) problems.push(`${f.label}: block ${f.block} is not in the instance`);
+    if (f.asDrawn !== undefined && !existsSync(join(instanceRoot, f.asDrawn))) problems.push(`${f.label}: as-drawn figure ${f.asDrawn} is not in the instance`);
   }
   const walk = (d: string) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
