@@ -924,7 +924,7 @@ const allSkipped = (r: GuardRun) => r.status === "completed" && (r.conclusion ==
  * (`ready-to-merge`, added after the full tier) skips every job, and taken as
  * the latest it would read a red full tier as passed (owner, 2026-11-11,
  * card B); a run cancelled by such a run, taken as the latest, read a green
- * full tier as a `cancelled` defect (smart-trust-phw#24, 2026-11-17). It
+ * full tier as a `cancelled` defect (a layer's PR, 2026-11-17). It
  * stands only when no run of that workflow judged anything.
  */
 function latestByName(runs: readonly GuardRun[]): Map<string, GuardRun> {
