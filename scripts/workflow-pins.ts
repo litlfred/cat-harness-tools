@@ -403,6 +403,10 @@ export const MERGE_GUARD_TRIGGER_TEXT = `# Written by \`bun run cat workflow-pin
 # worst that does is that no signal comes, and the status stays unposted.
 # Why not \`pull_request_target\`: the header of cat-harness-tools'
 # \`.github/workflows/layer-merge-guard.yml\`.
+#
+# TRIGGERS, ACTUAL: \`pull_request\` only, by the owner's decision of 2026-11-17
+# (no \`pull_request_target\`). The \`workflow_run\` named above is the
+# caller's trigger, not this file's.
 
 name: ${MERGE_GUARD_TRIGGER_NAME}
 run-name: "${MERGE_GUARD_TRIGGER_NAME} #\${{ github.event.pull_request.number }}"
