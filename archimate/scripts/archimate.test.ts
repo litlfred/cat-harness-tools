@@ -303,6 +303,53 @@ describe("an instance", () => {
     }
   });
 
+  it("offers the switch between a figure as drawn and the model's view only when the figure names `asDrawn`", () => {
+    const figure = { block: "folio/f-1.md", label: "Figure 1", model: "1.0.0", view: "id-v1", basis: "by-eye" };
+    const drawn = '<?xml version="1.0"?>\n<!-- redrawn --><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><a href="../../element/a/"><text x="1" y="5">Registry</text></a></svg>\n';
+    const withFiles = (root: string) => {
+      mkdirSync(join(root, "folio", "media"), { recursive: true });
+      writeFileSync(join(root, "folio", "f-1.md"), "![Figure](media/f-1.svg)\n");
+      writeFileSync(join(root, "folio", "media", "f-1.svg"), drawn);
+    };
+    expect(ArchimateConfigSchema.safeParse({ ...config, figures: [{ ...figure, asDrawn: "../f.svg" }] }).success).toBe(false);
+    const withDrawn = make({ ...config, figures: [{ ...figure, asDrawn: "folio/media/f-1.svg" }] });
+    const without = make({ ...config, figures: [figure] });
+    try {
+      withFiles(withDrawn);
+      withFiles(without);
+      expect(checkCommitted(withDrawn)).toEqual([]);
+      const site = pagesFor(withDrawn, { site: true });
+      const html = site.files.find((f) => f.path === "1.0.0/view/overview/index.html")!.content;
+      expect(html).toContain('<fieldset class="am-switch"><legend>Show the figure</legend>');
+      expect(html).toMatch(/<input type="radio" name="am-figure" id="am-show-drawn" value="drawn" checked><label for="am-show-drawn">As drawn<\/label>/);
+      expect(html).toMatch(/<input type="radio" name="am-figure" id="am-show-model" value="model"><label for="am-show-model">ArchiMate<\/label>/);
+      // Inlined, so its links work: no prolog, no comment, and no embedded object.
+      expect(html).toContain('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><a href="../../element/a/">');
+      expect(html).not.toContain("<?xml");
+      expect(html).not.toContain("redrawn");
+      expect(html).not.toMatch(/<(object|embed|iframe)\b/);
+      // Copied beside the view's drawing, and linked from the figure.
+      const copy = site.files.find((f) => f.path === "1.0.0/view/id-v1.as-drawn.svg")!;
+      expect(copy.content).toBe(drawn);
+      expect(sitePathOf(site, copy)).toBe("archimate/1.0.0/view/id-v1.as-drawn.svg");
+      expect(html).toContain('<a href="../../../../../../archimate/1.0.0/view/id-v1.as-drawn.svg">the drawing (SVG)</a>');
+      // Without `asDrawn`, the page stays as it was.
+      const plain = pagesFor(without, { site: true }).files;
+      expect(plain.find((f) => f.path === "1.0.0/view/overview/index.html")!.content).not.toContain("am-switch");
+      expect(plain.some((f) => f.path.endsWith(".as-drawn.svg"))).toBe(false);
+      // A drawing that would run or embed something is refused, and a missing one is reported.
+      writeFileSync(join(withDrawn, "folio", "media", "f-1.svg"), '<svg><script>alert(1)</script></svg>');
+      expect(() => pagesFor(withDrawn, { site: true })).toThrow(/a page must not inline/);
+      writeFileSync(join(withDrawn, "folio", "media", "f-1.svg"), '<svg><!<!---->--<text>x</text></svg>');
+      expect(() => pagesFor(withDrawn, { site: true })).toThrow(/unclosed comment/);
+      rmSync(join(withDrawn, "folio", "media", "f-1.svg"));
+      expect(checkCommitted(withDrawn)).toEqual(["Figure 1: as-drawn figure folio/media/f-1.svg is not in the instance"]);
+    } finally {
+      rmSync(withDrawn, { recursive: true, force: true });
+      rmSync(without, { recursive: true, force: true });
+    }
+  });
+
   it("is swept from the checkout when it declares an archimate directory, and a layer that does not is left out", () => {
     const checkout = mkdtempSync(join(tmpdir(), "archimate-checkout-"));
     try {

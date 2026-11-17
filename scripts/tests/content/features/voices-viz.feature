@@ -154,3 +154,14 @@ Feature: Voices graph reader and viewer page
     Given a graph with a rule citing KG node "gone.md" that no resolver knows
     When the graph is projected
     Then that rule has no links
+
+  @test:scripts/tests/content/voices-viz.test.ts::--check_does_not_judge_a_page_the_harness_builds_at_publish::every_page_the_harness_builds_at_publish_with_this_writer_is_skipped_by_--check
+  Scenario: --check skips every page the harness builds at publish with voices:viz
+    Given the harness's builtAtPublish entries whose writer is "voices:viz"
+    When a page under each is asked whether --check judges it
+    Then none is judged
+
+  @test:scripts/tests/content/voices-viz.test.ts::--check_does_not_judge_a_page_the_harness_builds_at_publish::a_page_outside_the_harness_(a_--site_build)_is_still_judged
+  Scenario: A page written into another site is still judged
+    Given a voices page outside the harness's own directory
+    Then --check judges it

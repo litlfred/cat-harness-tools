@@ -63,3 +63,25 @@ Feature: Workflow pins
   @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_layers_under_more_than_one_owner::third-party_actions_are_not_judged
   Scenario: Third-party actions are not judged
     Then steps using actions/checkout and actions/setup-node give no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::--write_adds_`labeled`,_the_no-op_label_group_and_the_job's_if;_a_second_pass_is_clean
+  Scenario: A layer-pr-checks caller without `labeled` is fixed
+    Given a caller whose pull_request types omit "labeled", with a concurrency group keyed by github.ref
+    Then three findings add "labeled", key a no-op label's group by its run, and skip the calling job on a no-op label
+    And judging the rewritten text gives no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_pull_request_with_no_types_gets_a_types_line
+  Scenario: A pull_request with no types gets one
+    Then a types line ending in "labeled" is written under pull_request
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_block_list_of_types_gets_`-_labeled`
+  Scenario: A block list of types gets "- labeled"
+    Then "- labeled" is appended to the list
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_workflow_that_does_not_call_layer-pr-checks,_or_not_on_pull_request,_is_not_judged
+  Scenario: Other workflows are not judged
+    Then a workflow calling another file, or not on pull_request, gives no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_job_if_without_the_label_clause_is_reported_for_a_hand_fix
+  Scenario: A job if without the label clause is left for a hand fix
+    Then the finding on the job's if wants no rewrite

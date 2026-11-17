@@ -124,13 +124,22 @@ export interface CorpusGateOptions {
   labelFor: LabelForPath;
 }
 
-/** The platform's record of `id`, or `undefined` when its store cannot be read here. */
-function platformInstance(platformRoot: string, id: string): ReturnType<typeof loadInstance> {
+/**
+ * A store's record of `id`, or why the store cannot be read here.
+ *
+ * A store whose bean graph is kept on an unmounted branch (in a layer's CI,
+ * `cat/<layer>/beans` is usually not mounted) throws from `workflowDir`. That
+ * is "this store cannot say", not a crash: the caller still refuses a block
+ * with no record, and names the unreadable store so the finding says why
+ * (litlfred/dth-sfp#14, the first full-tier run of a folio content PR). A
+ * malformed record is still an error.
+ */
+export function readInstance(root: string, id: string): { state?: ReturnType<typeof loadInstance>; unreachable?: string } {
   try {
-    return loadInstance(platformRoot, id);
+    return { state: loadInstance(root, id) };
   } catch (e) {
-    // Only an unreachable store; a malformed record is still an error.
-    if (String(e).includes("cannot resolve the workflow instance directory")) return undefined;
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("cannot resolve the workflow instance directory")) return { unreachable: msg };
     throw e;
   }
 }
@@ -224,12 +233,16 @@ export async function checkCorpusGate(
     const { model, relaxations } = await loadEditing();
     const id = instanceId(model.id, label);
     // The repository's own store first: it is where the editing workflow for
-    // its own blocks is recorded. The platform's store is a fallback, and in a
-    // layer's CI it is often kept on an unmounted branch
-    // (`cat/cat-harness/beans`), where reading it throws. An unreachable
-    // platform store then counts as "no record there", which still fails
-    // closed: the block is refused unless the repository has the record.
-    const state = loadInstance(repoRoot, id) ?? platformInstance(opts.platformRoot, id);
+    // its own blocks is recorded. The platform's store is a fallback. In a
+    // layer's CI either may be kept on an unmounted branch
+    // (`cat/<layer>/beans`), where reading it throws. An unreachable store
+    // then counts as "no record there", which still fails closed: the block
+    // is refused, and the finding names the store it could not read.
+    // Either store may be unreadable here; that counts as "no record there".
+    const own = readInstance(repoRoot, id);
+    const platform = own.state ? {} : readInstance(opts.platformRoot, id);
+    const state = own.state ?? platform.state;
+    const unread = [own.unreachable, platform.unreachable].filter((x): x is string => Boolean(x));
     const cover = state && allowedByEditing(model, state, relaxations) ? undefined : changeSetCover(changeSets, label);
     if (cover) {
       seen.set(ts, {
@@ -256,7 +269,11 @@ export async function checkCorpusGate(
           `{ process: "editing-hci-validation", subject: "${label}" }, or list the block in ` +
           `a content-change-review instance for its change set` +
           (near ? ` (${near})` : "") +
-          `.`,
+          `.` +
+          (unread.length
+            ? ` The workflow store could not be read here, so a record kept there was not seen ` +
+              `(${[...new Set(unread)].join("; ")}): mount the bean graph (\`bun run cat state:mount\`) and re-run.`
+            : ""),
       });
       continue;
     }
