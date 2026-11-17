@@ -301,7 +301,7 @@ Feature: The journeys viewer
     And the discuss page has 5 lab tabs numbered from 0, a 5-minute timer, the Discuss prompt and the step note
     And the journey's use case comes ticked, the other not, and the statement starts from the use-case text and can be reset
     And the walkthrough's question keys reappear, readiness rows are grouped and rated, decision rights have holders, and the gap strip's radios are present
-    And the summary model lists the five steps and every answer's name, with the gap report, CSV, closing-question write-in and credit link
+    And the summary model lists the five steps, then the systems the room can mark, and every answer's name, with the gap report, CSV, closing-question write-in and credit link
     And a lab naming a table the workshop does not list is refused by the schema
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_canvas_as_data:_an_on-screen_form_keyed_per_field,_a_journey_question_naming_a_field_shares_its_key,_the_annex,_the_PDF's_model_(owner,_2026-11-17)

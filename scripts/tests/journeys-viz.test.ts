@@ -741,7 +741,8 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(page).toContain('name="policy:viewer:status" value="no"');
     // The summary: one model of every answer, the gap report, the closing questions with a write-in, and the credit.
     const model = JSON.parse(/<script type="application\/json" data-jp-lab-model>([\s\S]*?)<\/script>/.exec(page)![1]!);
-    expect(model.map((x: { id: string }) => x.id)).toEqual(["team", "use-case", "readiness", "decide", "summary"]);
+    // The five steps, then the application components the room can mark "we have this" (the view shows the wallet app).
+    expect(model.map((x: { id: string }) => x.id)).toEqual(["team", "use-case", "readiness", "decide", "summary", "systems"]);
     const names = model.flatMap((x: { items: { name: string }[] }) => x.items.map((i) => i.name));
     expect(names).toEqual(expect.arrayContaining(["policy:lab:team:members", "policy:uc:immz", "policy:lab:use-case", "policy:rate:ready:strategy", "policy:hold:rights:anchor", Q_DECIDES, "policy:viewer:status", "policy:dq:q1"]));
     expect(page).toContain("data-jp-gapreport");
