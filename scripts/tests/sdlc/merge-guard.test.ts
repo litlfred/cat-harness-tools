@@ -572,15 +572,15 @@ describe("check 5 — the head's own pull_request CI", () => {
     if (green.runs.state !== "has-run") throw new Error("fixture");
     for (const r of [...(green.runs.runs as GuardRun[])]) {
       if (r.event === "pull_request") {
-        green.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "cancelled" });
-        green.runs.runs.push({ ...r, id: (r.id ?? 0) + 2_000_000, status: "completed", conclusion: "skipped" });
+        green.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "cancelled" } as GuardRun);
+        green.runs.runs.push({ ...r, id: (r.id ?? 0) + 2_000_000, status: "completed", conclusion: "skipped" } as GuardRun);
       }
     }
     expect(status(green, "ci").status).toBe("pass");
     const red = real(1937);
     if (red.runs.state !== "has-run") throw new Error("fixture");
     for (const r of [...(red.runs.runs as GuardRun[])]) {
-      if (r.event === "pull_request") red.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "cancelled" });
+      if (r.event === "pull_request") red.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "cancelled" } as GuardRun);
     }
     const c = status(red, "ci");
     expect(c.status).toBe("refuse");
