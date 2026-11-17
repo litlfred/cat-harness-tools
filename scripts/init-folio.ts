@@ -52,6 +52,7 @@ import { reexportLine, vocabularyModulesFor } from "./lib/folio-shim.ts";
 import { contentLayerInstance } from "../schemas/kg/graph-typology-registry.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
+import { createStateBranch, hasOrigin, INIT_COMMAND, initRemedy, type CreateState, stateBranchFiles, stateGraphFiles as stateGraphFilesFor, stateSeedCommand } from "./state-branch-init.ts";
 import { parseRemote } from "./pages-bootstrap.ts";
 import { DEFAULT_TODO_GRAPH, DEFAULT_TODO_GRAPH_ROOT, nodeOfKind } from "../schemas/sdlc/todo-graph.js";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
@@ -151,8 +152,9 @@ export interface InitFolioResult {
    * Each STATE graph the layer holds (its work plan and its todos), with
    * the source the one resolver gave it and what the scaffold therefore did:
    * `written` into the checkout, or `branch` — declared, not written, and
-   * kept on `branch` (bean `hp54`). `seed` is the command that creates that
-   * branch, because no platform command creates a new state branch.
+   * kept on `branch` (bean `hp54`). The scaffold creates that branch itself
+   * once `main` is on the remote (`created`); `seed` is the same branch as a
+   * shell command, and `state:seed --init` is the command when it could not.
    */
   stateGraphs: StateGraphOutcome[];
 }
@@ -164,8 +166,10 @@ export interface StateGraphOutcome {
   source: ResolvedSubgraphSource;
   /** Where the answer came from: the declaration this scaffold wrote (or found), or only the entry it computed. */
   declared: boolean;
-  /** For a branch source: the shell that seeds the branch, run once from the new repository. */
+  /** For a branch source: the shell that seeds the branch, for a reader with no Bun (the scaffold creates it itself when it can). */
   seed?: string;
+  /** For a branch source: what the scaffold's own creation of the branch did (`state-branch-init.ts`). Absent when there was no remote to create it on. */
+  created?: CreateState;
 }
 
 /** A slug that is safe as a directory name, a TS module name and a URL path. */
@@ -354,70 +358,9 @@ function stateEntry(slug: string, g: StateGraphDef): {
   };
 }
 
-/**
- * The files a state graph starts with — in the checkout for a `directory`
- * source, on the branch (via the seed command) for a `branch` one. One list,
- * so the two placements cannot start from different content.
- */
+/** The files a state graph starts with — one list with `state-branch-init.ts`, so the scaffold and a later `state:seed --init` start from the same files. */
 function stateGraphFiles(slug: string, g: StateGraphDef): Record<string, string> {
-  // Composed from the graph's OWN entry path, never spelled whole: the paths
-  // below are relative to whatever directory the entry names.
-  const at = (rel: string): string => `${g.path.replace(/\/+$/, "")}/${rel}`;
-  // `beans.json` is the bean graph's own declaration, and it is not optional
-  // once the graph is on a branch: `beans:claim` reads it FROM THE BRANCH to
-  // find the \`bean-defs\` directory and refuses to guess (measured end to end
-  // on a fresh repository, 2026-10-06). Same layout as the platform's own: the
-  // CLI's store at \`defs/\`.
-  if (g.id === "beans") return { [at("beans.json")]: beansGraph(slug), [at("defs/.gitkeep")]: "" };
-  // `retired/` is where a cutover's deposit lands (`state-seed.ts`, the `retired/` pair precedent).
-  if (g.id === "fsh-guts") return { [at("retired/.gitkeep")]: "" };
-  return {
-    [at("todos.json")]: todosGraph(slug),
-    [at("items/.gitkeep")]: "",
-    [at("feedback/.gitkeep")]: "",
-    [at("verdicts/.gitkeep")]: "",
-  };
-}
-
-/**
- * The shell that creates a NEW tip-keyed state branch holding `files` and the
- * `state-manifest/v1` manifest `branch-store` verifies on every read.
- *
- * Emitted, not run: `branch-store` refuses to create a branch ("seeding
- * carries the manifest and is a steward act, so no writer creates one") and
- * `state:seed` only REFRESHES an existing seed. So the scaffold says exactly
- * what to run instead of inventing a second writer. Content travels base64-
- * encoded so no quoting in it can break the command; a throwaway index keeps
- * the checkout's own index untouched. `authoritative: true` because for a new
- * layer there is no `main` copy — the branch is the store from its first
- * commit.
- */
-export function stateSeedCommand(branch: string, id: string, files: Record<string, string>): string {
-  const manifest = JSON.stringify({
-    $schema: "state-manifest/v1",
-    authoritative: true,
-    subgraph: id,
-    keyedBy: "tip",
-    graphs: [{ path: id }],
-    note: `The ${id} subgraph of this instance, kept off main from its first commit (folio_init, bean hp54).`,
-  }, null, 2) + "\n";
-  const readme =
-    `# ${branch}\n\nThe \`${id}\` state subgraph of this repository's instance, kept OFF \`main\`. ` +
-    `Paths mirror the checkout; \`manifest.json\` is what makes this a state branch. ` +
-    `Never merge it. Mount it with \`state:mount\`; write it with \`branch-store push --id ${id}\`.\n`;
-  const all: Record<string, string> = { "manifest.json": manifest, "README.md": readme, ...files };
-  const b64 = (t: string) => Buffer.from(t, "utf-8").toString("base64");
-  const adds = Object.entries(all).map(([path, text]) =>
-    `  git update-index --add --cacheinfo "100644,$(printf %s '${b64(text)}' | base64 -d | git hash-object -w --stdin),${path}"`);
-  return [
-    "(",
-    "  set -e",
-    '  export GIT_INDEX_FILE="$(mktemp -u)"',
-    ...adds,
-    `  git push origin "$(git commit-tree "$(git write-tree)" -m 'Seed ${branch}')":refs/heads/${branch}`,
-    '  rm -f "$GIT_INDEX_FILE"',
-    ")",
-  ].join("\n");
+  return stateGraphFilesFor(slug, g.id, g.path);
 }
 
 // ── Templates ────────────────────────────────────────────────────
@@ -1231,75 +1174,6 @@ function repoSlug(url: string): string {
   return m[1]!;
 }
 
-/**
- * The folio's todos graph: people's outstanding items, and FEEDBACK raised
- * against a block. Bean `423d`.
- *
- * `feedback` (graph typology `todo-feedback`) is where a review-process task
- * commits a reviewer's comment when it decides what happens to it
- * (`folio-review-comment-move`, on the edit-set's feature branch, per the
- * owner's ruling). Without the declaration the first recorded decision on a
- * new folio stops with "declares no directory of graph typology todo-feedback",
- * so a folio gets it from the start.
- *
- * `verdicts` (graph typology `review-verdicts`) is where the review coordinator
- * commits reviewers' per-block verdicts (`folio-review-coverage --commit`,
- * bean `px0t`). Declared from the start for the same reason.
- *
- * No `defaultTheme`: a folio's own theme is the folio's to choose, and a
- * literal here would impose one on every new folio.
- */
-function todosGraph(slug: string): string {
-  return JSON.stringify(
-    {
-      name: slug,
-      directories: [
-        {
-          id: "items",
-          path: "items",
-          graphTypologies: ["todo-items"],
-          description: "One Markdown file per todo, carrying `$schema: todo/1.0.0` in its front matter: a person's outstanding item.",
-        },
-        {
-          id: "feedback",
-          path: "feedback",
-          graphTypologies: ["todo-feedback"],
-          description:
-            "Todos raised against a specific block. Review comments land here as `review-comment/1.0.0` JSON, committed on the edit-set's feature branch by the review-process task that decided them (the `review-comments` skill).",
-        },
-        {
-          id: "verdicts",
-          path: "verdicts",
-          graphTypologies: ["review-verdicts"],
-          description:
-            "Reviewers' per-block verdicts, one `folio-review-verdict/v1` JSON each, pinned to the block's hash and committed on the edit-set's feature branch by the review coordinator (`folio-review-coverage --commit`).",
-        },
-      ],
-    },
-    null,
-    2,
-  ) + "\n";
-}
-
-/** The bean graph's declaration, `beans/beans.json` — the shape `schemas/sdlc/bean-graph.ts` reads. */
-function beansGraph(slug: string): string {
-  return JSON.stringify(
-    {
-      name: slug,
-      directories: [
-        {
-          id: "defs",
-          path: "defs",
-          graphTypologies: ["bean-defs"],
-          description: "Work items — one Markdown file each, in the layout the `beans` CLI reads (`.beans.yml`).",
-        },
-      ],
-    },
-    null,
-    2,
-  ) + "\n";
-}
-
 function beansYml(slug: string): string {
   return `beans:
     path: beans/defs
@@ -1598,10 +1472,12 @@ function writeInstanceFiles(s: Scaffold): void {
       continue;
     }
     if (g.source.kind === "branch") {
-      g.seed = stateSeedCommand(g.source.branch, g.id, stateGraphFiles(o.slug, INSTANCE_STATE_GRAPHS.find((d) => d.id === g.id)!));
+      // The shell twin of what `finishScaffold` creates, kept for a reader
+      // with no Bun: the same files `state:seed --init` would push.
+      g.seed = stateSeedCommand(g.source.branch, stateBranchFiles(g.source.branch, g.id, g.path, o.slug));
       s.result.notes.push(
         `${g.path} is declared on branch ${g.source.branch} (keyedBy ${g.source.keyedBy}) and was NOT written into the checkout. ` +
-          `No platform command creates a new state branch, so seed it once, from this repository, with:\n${g.seed}\n` +
+          `The layer's initialization creates that branch once \`main\` is on the remote; if it did not, create it with \`${INIT_COMMAND}\` ` +
           `then mount it: bun run ${toolsDir(assistant)}/scripts/state-mount.ts`,
       );
     } else {
@@ -1638,6 +1514,21 @@ function finishScaffold(s: Scaffold): void {
     const note = formatRemoteSeed(seed).split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2)).join(" ");
     if (note) result.notes.push(note);
   }
+  // The layer's declared STATE BRANCHES (owner, 2026-11-17: "these state
+  // branches are made upon initialization by the layer that needs them").
+  // After `main` is on the remote — the first branch pushed to an empty
+  // GitHub repository becomes its default — and only where there is an
+  // origin to create them on. Idempotent: an existing branch is left as it is.
+  if (!o.dryRun && hasOrigin(root)) {
+    for (const g of result.stateGraphs) {
+      if (g.source.kind !== "branch" || g.source.keyedBy !== "tip") continue;
+      const c = createStateBranch(g.source.branch, stateBranchFiles(g.source.branch, g.id, g.path, o.slug), { repoRoot: root });
+      g.created = c.state;
+      if (c.state === "created") result.notes.push(`Created the state branch ${g.source.branch} (${g.id}).`);
+      else if (c.state !== "exists") result.notes.push(initRemedy(c));
+    }
+  }
+
   if ((o.skipVcs || o.dryRun) && o.link === "submodule" && !platformPresent) {
     // Only when it is actually absent. Emitting this unconditionally told a
     // caller who had already added the submodule (and passed --skip-vcs
