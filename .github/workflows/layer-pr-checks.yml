@@ -709,6 +709,10 @@ jobs:
               f.unlink()
           (pin / "state.json").write_text(json.dumps(out, sort_keys=True, indent=1) + "\n")
           PY
+          # Kept aside: when main's record's tips replace it below, a branch
+          # the record does not name (seeded after main's last push) is still
+          # served at this read's tip, not as absent (state-pin.sh, dth-sfp#13).
+          cp "$RUNNER_TEMP/pin/state.json" "$RUNNER_TEMP/pin/state-live.json"
           # The index and the lower layers are resolved at `layers-at`: now,
           # or the pin time of main's newest record (restored above, PR only)
           # with its graph tips, when that record carries its pins and is
@@ -1201,7 +1205,7 @@ jobs:
           origin="$(git remote get-url origin)"
           git remote set-url origin "${origin%.git}.git"
           (
-            eval "$(bash ../ci/.github/scripts/layer-pr-checks/state-pin.sh "$RUNNER_TEMP/pin/state.json" "$RUNNER_TEMP/state-mirror")"
+            eval "$(bash ../ci/.github/scripts/layer-pr-checks/state-pin.sh "$RUNNER_TEMP/pin/state.json" "$RUNNER_TEMP/state-mirror" "$RUNNER_TEMP/pin/state-live.json")"
             bun -e '
               import { mountState, report } from "./cat-harness-tools/scripts/state-mount.ts";
               const r = mountState({});
