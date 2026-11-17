@@ -195,6 +195,14 @@ Feature: The journeys viewer
     And it shows "Trust anchor ★" with "— a signature crosses"
     And it has the gap strip input "policy:viewer:status"
 
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::a_journey_page_leaves_the_language_picker_to_the_site's_chrome;_only_the_presentation_frame,_outside_it,_draws_its_own_(owner,_2026-11-17)
+  Scenario: A journey page leaves the language picker to the site's chrome
+    Given the rendered journey pages
+    Then a journey page, in the site's chrome, has no language-links mark of its own
+    And no page outside the workshops has one
+    And the walkthrough's presentation frame, which opts out of the chrome, keeps its own
+    And a journey page asks the site's chrome to leave out the guide's version banner
+
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::a_step:_the_people,_each_with_the_avatar_in_the_card's_header_(never_inside_a_sentence),_and_under_the_hood
   Scenario: A step shows the people with the avatar in the card's header, and under the hood
     Given the P2 walkthrough page
