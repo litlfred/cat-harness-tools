@@ -85,3 +85,23 @@ Feature: Workflow pins
   @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_job_if_without_the_label_clause_is_reported_for_a_hand_fix
   Scenario: A job if without the label clause is left for a hand fix
     Then the finding on the job's if wants no rewrite
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::--write_drops_pull_request_target_and_adds_the_signal_to_workflow_run;_the_findings_trail;_a_second_pass_is_clean
+  Scenario: A merge-guard caller on pull_request_target is moved to the signal
+    Given a caller of layer-merge-guard on pull_request_target, issue_comment and workflow_run of "Layer PR checks"
+    Then two trailing findings drop pull_request_target and add "Merge guard trigger" to workflow_run's workflows
+    And judging the rewritten text gives no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::a_block_list_of_workflows_gets_the_signal;_a_caller_with_no_workflow_run_gets_one
+  Scenario: The signal is added to a block list, or a workflow_run is added
+    Then a block list of workflows gets "- Merge guard trigger", and a caller with no workflow_run gets one listing it
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::a_workflow_that_does_not_call_layer-merge-guard_is_not_judged
+  Scenario: Other workflows are not moved
+    Then a workflow calling another file gives no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::the_signal_file_is_written_when_missing_or_changed,_and_is_then_current
+  Scenario: The signal file is written and kept canonical
+    Given a repository with a merge-guard caller and no merge-guard-trigger.yml
+    Then a trailing finding reports it missing, and --write writes the canonical signal
+    And a signal edited away from the canonical text is reported again

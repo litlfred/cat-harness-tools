@@ -39,6 +39,16 @@
  * `--write` adds all three to the usual caller shape; any other shape is
  * reported for a hand fix.
  *
+ * A caller of `layer-merge-guard.yml` runs only from the default branch: no
+ * `pull_request_target` trigger (owner, 2026-11-17: GitHub is changing that
+ * trigger's default, and its 2026-11-16 brownout failed the guard). The
+ * pull-request events reach it through `.github/workflows/merge-guard-trigger.yml`,
+ * a permissionless `pull_request` signal ({@link MERGE_GUARD_TRIGGER_TEXT})
+ * whose completion the caller hears on `workflow_run`. `--write` drops the
+ * `pull_request_target` block, adds {@link MERGE_GUARD_TRIGGER_NAME} to the
+ * caller's `workflow_run.workflows`, and writes the signal file. These are
+ * trailing findings: they warn and pass until an agent session writes them.
+ *
  * `mount:remote` runs `--write` after it writes the lock, so a re-pin moves
  * the calls with the mounts. In CI (`CI=true`) it does not: the re-pin train's
  * App has no `workflows` permission, so a train cannot push workflow-file
@@ -278,6 +288,7 @@ export function judgeFile(
     }
   }
   findings.push(...labeledTrigger(lines, rel));
+  findings.push(...mergeGuardCaller(lines, rel));
   return { findings, text: lines.filter((x) => x !== "\u0000drop").join("\n") };
 }
 
@@ -372,14 +383,153 @@ export function labeledTrigger(lines: string[], rel: string): Finding[] {
   return findings;
 }
 
+/** The `name:` of the merge guard's pull-request signal; a caller lists it under `workflow_run.workflows`. */
+export const MERGE_GUARD_TRIGGER_NAME = "Merge guard trigger";
+/** Where a layer keeps the merge guard's pull-request signal. */
+export const MERGE_GUARD_TRIGGER_FILE = ".github/workflows/merge-guard-trigger.yml";
+/** The pull-request types the guard re-judges on (those the `pull_request_target` caller listed). */
+export const MERGE_GUARD_PR_TYPES = ["opened", "synchronize", "reopened", "ready_for_review", "converted_to_draft", "labeled", "unlabeled", "edited"] as const;
+/**
+ * The merge guard's pull-request signal, as every layer holds it. It has no
+ * token and decides nothing: a PR may edit it in its own head, and the worst
+ * that does is that no signal comes, which leaves the status unposted.
+ */
+export const MERGE_GUARD_TRIGGER_TEXT = `# Written by \`bun run cat workflow-pins --write\` (cat-harness-tools): do not edit.
+#
+# The merge guard's pull-request signal. It holds no token, checks nothing out
+# and decides nothing: it only finishes, and \`.github/workflows/merge-guard.yml\`,
+# which runs on \`workflow_run\` from the default branch, then judges the PR and
+# posts the \`merge-guard\` status. A PR may edit this file in its own head; the
+# worst that does is that no signal comes, and the status stays unposted.
+# Why not \`pull_request_target\`: the header of cat-harness-tools'
+# \`.github/workflows/layer-merge-guard.yml\`.
+
+name: ${MERGE_GUARD_TRIGGER_NAME}
+run-name: "${MERGE_GUARD_TRIGGER_NAME} #\${{ github.event.pull_request.number }}"
+
+on:
+  pull_request:
+    types: [${MERGE_GUARD_PR_TYPES.join(", ")}]
+
+permissions: {}
+
+jobs:
+  signal:
+    name: Ask the merge guard to judge this PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Signal
+        run: echo "the merge guard judges this PR when this run completes (workflow_run, from the default branch)"
+`;
+
+const CALLS_GUARD = /^\s*(-\s+)?uses:\s*\S*\/layer-merge-guard\.yml(@|\s|$)/;
+
+/**
+ * A caller of `layer-merge-guard.yml` must not run on `pull_request_target`,
+ * and must hear {@link MERGE_GUARD_TRIGGER_NAME} on `workflow_run` (see the
+ * header). Judges `lines` in place, fixing the usual caller shape; every
+ * finding is trailing, since the re-pin train cannot push workflow files.
+ */
+export function mergeGuardCaller(lines: string[], rel: string): Finding[] {
+  const live = (i: number) => lines[i] !== "\u0000drop" && !/^\s*#/.test(lines[i]);
+  if (!lines.some((l, i) => live(i) && CALLS_GUARD.test(l))) return [];
+  const on = lines.findIndex((l, i) => live(i) && /^on:\s*(#.*)?$/.test(l));
+  if (on < 0) {
+    return [{ file: rel, line: 1, have: "on: …", want: null, why: "a merge-guard caller needs a block `on:` with `workflow_run` for the merge guard trigger: fix it by hand", trailing: true }];
+  }
+  /** [start, end) of each event under `on:`. */
+  const events = new Map<string, [number, number]>();
+  let end = on + 1;
+  for (let i = on + 1; i < lines.length; i++) {
+    if (lines[i].trim() === "" || /^\s*#/.test(lines[i])) continue;
+    if (indentOf(lines[i]) === 0) break;
+    end = i + 1;
+    const k = lines[i].match(/^  ([A-Za-z_]+):/);
+    if (k) events.set(k[1], [i, i + 1]);
+    else {
+      const last = [...events.values()].at(-1);
+      if (last) last[1] = i + 1;
+    }
+  }
+  const findings: Finding[] = [];
+  const prt = events.get("pull_request_target");
+  if (prt) {
+    findings.push({ file: rel, line: prt[0] + 1, have: lines[prt[0]].trim(), want: "(removed)", why: `the merge guard no longer runs on \`pull_request_target\`: pull-request events reach it through ${MERGE_GUARD_TRIGGER_FILE} on \`workflow_run\``, trailing: true });
+    for (let i = prt[0]; i < prt[1]; i++) lines[i] = "\u0000drop";
+  }
+  const why = `a merge-guard caller hears \`${MERGE_GUARD_TRIGGER_NAME}\` on \`workflow_run\`, or no label, push or edit of a PR re-judges it`;
+  const wr = events.get("workflow_run");
+  if (!wr) {
+    const add = [`  workflow_run:`, `    workflows: ["${MERGE_GUARD_TRIGGER_NAME}"]`, `    types: [completed]`];
+    findings.push({ file: rel, line: on + 1, have: "on:", want: add.map((x) => x.trim()).join(" "), why, trailing: true });
+    lines.splice(end, 0, ...add);
+    return findings;
+  }
+  let wfs = -1;
+  for (let i = wr[0] + 1; i < wr[1]; i++) if (live(i) && /^\s*workflows:/.test(lines[i])) wfs = i;
+  if (wfs < 0) {
+    findings.push({ file: rel, line: wr[0] + 1, have: lines[wr[0]].trim(), want: null, why: `${why}: add a \`workflows:\` list by hand`, trailing: true });
+    return findings;
+  }
+  const inline = lines[wfs].match(/^(\s*workflows:\s*\[)([^\]]*)\](.*)$/);
+  if (inline) {
+    const names = inline[2].split(",").map((x) => x.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+    if (names.includes(MERGE_GUARD_TRIGGER_NAME)) return findings;
+    const want = `${inline[1]}${[...inline[2].split(",").map((x) => x.trim()).filter(Boolean), `"${MERGE_GUARD_TRIGGER_NAME}"`].join(", ")}]${inline[3]}`;
+    findings.push({ file: rel, line: wfs + 1, have: lines[wfs].trim(), want: want.trim(), why, trailing: true });
+    lines[wfs] = want;
+    return findings;
+  }
+  let last = wfs;
+  let has = false;
+  for (let i = wfs + 1; i < lines.length && /^\s*-\s/.test(lines[i]); i++) {
+    last = i;
+    if (lines[i].replace(/^\s*-\s*/, "").replace(/\s*#.*$/, "").replace(/^["']|["']$/g, "") === MERGE_GUARD_TRIGGER_NAME) has = true;
+  }
+  if (has) return findings;
+  if (last === wfs) {
+    findings.push({ file: rel, line: wfs + 1, have: lines[wfs].trim(), want: null, why: `${why}: list it under \`workflows:\` by hand`, trailing: true });
+    return findings;
+  }
+  const want = lines[last].replace(/-\s*.*$/, `- "${MERGE_GUARD_TRIGGER_NAME}"`);
+  findings.push({ file: rel, line: wfs + 1, have: lines[wfs].trim(), want: want.trim(), why, trailing: true });
+  lines.splice(last + 1, 0, want);
+  return findings;
+}
+
+/**
+ * The signal file a repository with a merge-guard caller must hold: a
+ * trailing finding (with `write`, the file is written) when it is missing or
+ * is not {@link MERGE_GUARD_TRIGGER_TEXT}.
+ */
+export function mergeGuardTrigger(root: string, callsGuard: boolean, write: boolean): Finding[] {
+  if (!callsGuard) return [];
+  const f = join(root, MERGE_GUARD_TRIGGER_FILE);
+  const have = existsSync(f) ? readFileSync(f, "utf8") : null;
+  if (have === MERGE_GUARD_TRIGGER_TEXT) return [];
+  if (write) writeFileSync(f, MERGE_GUARD_TRIGGER_TEXT);
+  return [{
+    file: MERGE_GUARD_TRIGGER_FILE,
+    line: 1,
+    have: have === null ? "(missing)" : "(differs from the canonical signal)",
+    want: "(the canonical merge guard trigger)",
+    why: "the merge guard hears pull-request events through this permissionless `pull_request` signal",
+    trailing: true,
+  }];
+}
+
 export function run(root: string, write: boolean): { findings: Finding[]; fixed: number } {
   const refs = lockedRefs(root);
   const repos = lockedRepos(root);
   const { owner: ownOwner, repo: own } = ownSlug(root);
   const all: Finding[] = [];
   let fixed = 0;
+  let callsGuard = false;
   for (const f of workflowFiles(root)) {
     const before = readFileSync(f, "utf8");
+    if (before.split("\n").some((l) => !/^\s*#/.test(l) && CALLS_GUARD.test(l))) callsGuard = true;
     const { findings, text } = judgeFile(root, f, before, own, refs, repos, ownOwner);
     all.push(...findings);
     if (write && text !== before) {
@@ -387,6 +537,9 @@ export function run(root: string, write: boolean): { findings: Finding[]; fixed:
       fixed += findings.filter((x) => x.want !== null || x.why.startsWith("tools-ref")).length;
     }
   }
+  const trigger = mergeGuardTrigger(root, callsGuard, write);
+  all.push(...trigger);
+  if (write) fixed += trigger.length;
   return { findings: all, fixed };
 }
 

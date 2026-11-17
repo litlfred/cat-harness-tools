@@ -45,6 +45,7 @@ import {
   contentReviewRecord,
   CONTENT_LABEL,
   SELF_WORKFLOW_FILE,
+  SIGNAL_WORKFLOW_FILE,
   NOT_WAITED_FOR_WORKFLOW_FILES,
   DEPLOY_ONLY_STEP,
   AGENT_BUILD_CONTEXT,
@@ -72,6 +73,7 @@ const SCAN: TriggerScan = {
     { file: ".github/workflows/jsonld-gen-check.yml", name: "JSON-LD generated-file drift", requirement: "conditional", filters: ["paths"] },
     { file: ".github/workflows/feature-staging.yml", name: "Feature Staging (GitHub Pages)", requirement: "conditional", filters: ["paths"] },
     { file: SELF_WORKFLOW_FILE, name: "Merge guard", requirement: "conditional", filters: ["types"] },
+    { file: SIGNAL_WORKFLOW_FILE, name: "Merge guard trigger", requirement: "required", filters: [] },
   ],
   unreadable: [],
 };
@@ -520,6 +522,21 @@ describe("check 5 — the head's own pull_request CI", () => {
     const own: GuardRun = { id: 99_999_999_999, name: "Merge guard", event: "pull_request", status: "completed", conclusion: "failure", html_url: "" };
     s.runs.runs.push(own);
     expect(status(s, "ci").status).toBe("pass");
+  });
+
+  test("the guard's signal is never evidence, and never owed: held, running or absent, it holds nothing", () => {
+    for (const st of [
+      { status: "completed", conclusion: "action_required" },
+      { status: "in_progress", conclusion: null },
+      { status: "completed", conclusion: "failure" },
+    ]) {
+      const s = real(1957);
+      if (s.runs.state !== "has-run") throw new Error("fixture");
+      s.runs.runs.push({ id: 99_999_999_997, name: "Merge guard trigger", event: "pull_request", html_url: "", ...st } as GuardRun);
+      expect(status(s, "ci").status).toBe("pass");
+    }
+    // Absent: the fixture's runs have no signal run, and SCAN owes it as `required`.
+    expect(status(real(1957), "ci").status).toBe("pass");
   });
 
   test("a later success supersedes an earlier failure of the same workflow", () => {

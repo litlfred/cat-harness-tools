@@ -153,10 +153,13 @@
  *
  * ## What this does not stop
  *
- * It guards against a CARELESS steward, not a hostile author: a PR may edit
- * `.github/workflows/merge-guard.yml` in its own tree, and every check reads
- * text a session wrote. The workflow runs this script from `main`'s copy for
- * that reason, but a pull_request run still uses the PR's workflow file.
+ * It guards against a CARELESS steward, not a hostile author: every check
+ * reads text a session wrote, and a workflow a PR adds in its own tree runs on
+ * `pull_request` with the token the repository grants. The guard's workflow
+ * runs only from the default branch (`workflow_run`, `issue_comment`,
+ * `workflow_dispatch`; no `pull_request_target` since 2026-11-17), so a PR
+ * cannot edit the judge; the threat model is in the header of
+ * `.github/workflows/layer-merge-guard.yml`.
  */
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -193,6 +196,15 @@ export const AGENT_BUILD_CONTEXT = "preview/agent-build";
 export const MERGE_MAIN_MARKER = "<!-- merge-main-bot -->";
 /** This guard's own workflow. Its runs are never evidence about the head: they are the guard. */
 export const SELF_WORKFLOW_FILE = ".github/workflows/merge-guard.yml";
+/**
+ * The guard's pull-request signal (`MERGE_GUARD_TRIGGER_FILE` in
+ * `workflow-pins.ts`), a `pull_request` workflow that checks nothing. Its runs
+ * are not evidence either, and check 5 does not owe it: a signal held for a
+ * fork's approval must not hold the merge.
+ */
+export const SIGNAL_WORKFLOW_FILE = ".github/workflows/merge-guard-trigger.yml";
+/** The workflows check 5 never reads as evidence about the head: the guard and its signal. */
+export const GUARD_WORKFLOW_FILES: ReadonlySet<string> = new Set([SELF_WORKFLOW_FILE, SIGNAL_WORKFLOW_FILE]);
 /**
  * Workflows check 5 JUDGES once they finish but never WAITS for — bean `gnnj`,
  * owner ruling 2026-10-05 (option 1 of the staging-speed report).
@@ -934,7 +946,7 @@ function checkCi(s: GuardSnapshot): CheckResult {
   // that carries its sha, so a dispatch on another commit can never stand in.
   const onHead = (r: GuardRun) => !r.head_sha || r.head_sha.toLowerCase() === head;
   const all: GuardRun[] = (s.runs.state === "has-run" ? (s.runs.runs as GuardRun[]) : []).filter(onHead);
-  const selfNames = new Set(s.scan.triggers.filter((t) => t.file === SELF_WORKFLOW_FILE).map((t) => t.name));
+  const selfNames = new Set(s.scan.triggers.filter((t) => GUARD_WORKFLOW_FILES.has(t.file)).map((t) => t.name));
   const prRuns = all.filter((r) => r.event === "pull_request" && !selfNames.has(r.name));
   const dispatchRuns = latestByName(all.filter((r) => r.event === "workflow_dispatch" && !selfNames.has(r.name)));
 
@@ -1032,7 +1044,7 @@ function checkCi(s: GuardSnapshot): CheckResult {
 
   // Coverage applies the same substitution: a required workflow whose only
   // `pull_request` runs were held is satisfied by its stand-in, per the rules above.
-  const scan: TriggerScan = { ...s.scan, triggers: s.scan.triggers.filter((t) => t.file !== SELF_WORKFLOW_FILE) };
+  const scan: TriggerScan = { ...s.scan, triggers: s.scan.triggers.filter((t) => !GUARD_WORKFLOW_FILES.has(t.file)) };
   const cov = coverageFor(all, scan, "pull_request");
   for (const w of cov.required) {
     if (w.ran) continue;
