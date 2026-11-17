@@ -570,6 +570,7 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(old).toContain('<meta http-equiv="refresh" content="0; url=../how/">');
     expect(old).toContain('location.replace("../how/" + location.search)');
     expect(old).not.toContain("data-jp-map");
+    expect(renderedByOf(old)).toBe("journeys-viewer");
     expect(files.some((f) => f.path.startsWith(`${base}/map/bpmn/`))).toBe(false);
     // Data on the move: after the grid, before the processes; a hand-off end that is somebody of the cast wears their avatar.
     expect(how).toContain('<section class="jp-card jp-pad jp-move" id="data-on-the-move">');

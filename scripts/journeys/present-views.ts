@@ -29,9 +29,10 @@
 import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
-import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
+import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, TOOL_ID, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
+import { withRenderedBy } from "../viewer-declarations.ts";
 import {
   avatar,
   stepsExampleKeys,
@@ -123,14 +124,14 @@ export function blockUsage(p: Presentation, block: string): { s: PresentedStep; 
  */
 export function mapRedirect(): string {
   const to = "../how/";
-  return `<!doctype html>
+  return withRenderedBy(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Journey map: now in How it works</title>
 <meta name="robots" content="noindex">
 <link rel="canonical" href="${to}">
 <script>location.replace("${to}" + location.search);</script>
 <meta http-equiv="refresh" content="0; url=${to}">
 </head><body><p>The journey map’s technical layer is in <a href="${to}">How it works</a>.</p></body></html>
-`;
+`, TOOL_ID);
 }
 
 /**
