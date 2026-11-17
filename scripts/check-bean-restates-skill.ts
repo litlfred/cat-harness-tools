@@ -70,7 +70,7 @@
 
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
 
-import { OPEN_STATUSES, readBeanStore, type BeanFile } from "./bean-store-read.ts";
+import { emptyStoreNote, OPEN_STATUSES, readBeanStore, storeDeterminedEmpty, type BeanFile } from "./bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { BeanStoreAbsentError, exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
@@ -182,8 +182,10 @@ export interface Restatement {
 export interface RestatesSkillReport {
   /** False when this layer has no bean store at all. Legitimate. */
   store: boolean;
-  /** Open beans read. Zero is `could not check`, never a pass. */
+  /** Open beans read. Zero is `could not check`, unless {@link determinedEmpty}. */
   examined: number;
+  /** The store was read whole and holds no open bean: a pass with a note (`storeDeterminedEmpty`). */
+  determinedEmpty?: { dir: string };
   findings: Restatement[];
 }
 
@@ -210,11 +212,13 @@ export function checkBeanRestatesSkill(root: string): RestatesSkillReport {
       findings.push({ id: b.id, table: t.raw, line: t.line, skills: skillPathsNamed(b.body) });
     }
   }
-  return { store: true, examined: open.length, findings };
+  const isOpen = (b: BeanFile) => !b.archived && OPEN_STATUSES.has(b.status);
+  return { store: true, examined: open.length, findings, ...(storeDeterminedEmpty(store, isOpen) ? { determinedEmpty: { dir: store.dir } } : {}) };
 }
 
 export function formatReport(r: RestatesSkillReport): string {
   if (!r.store) return "Bean restates skill\n  · no bean store — nothing to check";
+  if (r.determinedEmpty) return `Bean restates skill (0 open beans)\n${emptyStoreNote("check:bean-restates-skill", r.determinedEmpty.dir)}`;
   const out = [`Bean restates skill (${r.examined} open bean(s) examined)`];
   if (r.findings.length === 0) {
     out.push("  ✓ no open bean carries a phase-contract table");
@@ -248,7 +252,10 @@ if (import.meta.main) {
     // THE VACUITY GUARD. A store that exists and holds no open bean is not a
     // clean sweep, it is a sweep of nothing — the `xom7` shape, and the one
     // `gates.ts` fails its own extraction over. A filter over nothing passes.
-    if (report.store && report.examined === 0) {
+    // ONE exception (owner, 2026-11-17): the store was read whole and holds no
+    // open bean — a layer whose state branch was just created. That passes,
+    // with a note; an unreadable or unmounted store never reaches here.
+    if (report.store && report.examined === 0 && !report.determinedEmpty) {
       console.error("Bean store read, but it holds no OPEN bean. Nothing was examined.");
       console.error("This is NOT a pass. Treat it as unknown.");
       process.exit(2);
