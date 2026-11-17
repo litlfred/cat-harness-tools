@@ -1858,7 +1858,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
     // layer reached in the same repository, is written as the bare name
     // (cat-harness-tools#2337).
     const sameOwnerRepos = plan.mounts.filter((m) => m.sameOwner === true).map((m) => m.repository);
-    writeFileSync(lockFile, JSON.stringify(relativizeLockRepositories(lock, sameOwnerRepos), null, 2) + "\n");
+    writeFileSync(lockFile, lockTextWithPinnedAt(relativizeLockRepositories(lock, sameOwnerRepos), lockFile));
     syncIgnoreBlock(plan.instanceRoot, blockConfig);
     // The shared-workflow calls follow the lock (owner, 2026-11-01, security
     // audit S1): `uses: litlfred/<layer>/…@<the ref just written>`.
@@ -1945,6 +1945,28 @@ export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], gra
   }
   const { file } = writeDeclaredMounts(instanceRoot, next);
   return { file, mounts: next.filter((m) => specs.some((s) => s.harness === m.harness)) };
+}
+
+/**
+ * The lock's text, with `pinnedAt`: when this content was written. A prior
+ * lock at `file` whose content, `pinnedAt` aside, is the same keeps its
+ * `pinnedAt`, so a mount that changes nothing leaves the bytes alone; any
+ * other content is stamped `now`. `lock:coherence:check` reads it as T, the
+ * time the pins were written (see `pinnedAt` in `MountLockSchema`).
+ */
+export function lockTextWithPinnedAt(lock: MountLock, file: string, now: () => Date = () => new Date()): string {
+  const { pinnedAt: _ignored, ...body } = lock;
+  const { $schema, ...rest } = body;
+  const text = (pinnedAt: string) => JSON.stringify({ $schema, pinnedAt, ...rest }, null, 2) + "\n";
+  let kept: string | undefined;
+  try {
+    const prior = JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>;
+    const { pinnedAt, ...priorBody } = prior;
+    if (typeof pinnedAt === "string" && JSON.stringify(priorBody) === JSON.stringify(body)) kept = pinnedAt;
+  } catch {
+    // Absent or unreadable: this content is new.
+  }
+  return text(kept ?? now().toISOString().replace(/\.\d{3}Z$/, "Z"));
 }
 
 /** Locked layers reached through `harnesses` whose bytes on disk no longer hash to the lock, as `<instance>: <paths>`. */
