@@ -517,6 +517,8 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(String(journey.content)).toContain(NAVBAR_LINKED);
     for (const f of files.filter((x) => x.path.endsWith(".html") && !x.path.includes("/workshops/"))) expect(String(f.content)).not.toContain(LANGS_MARK);
     expect(p2).toContain(`<div class="jp-top-r">${LANGS_MARK}`);
+    // It asks the site's chrome to leave out the guide's version banner ("This page is part of …").
+    expect(String(journey.content)).toContain('<meta name="ig-version-banner" content="none">');
   });
   test("presenter mode is off until the presenter turns it on, and under the hood starts hidden (owner, 2026-11-17)", () => {
     expect(p2).toContain('<html lang="en" data-presenter="off">');

@@ -350,6 +350,13 @@ interface Crumb {
   href?: string;
 }
 
+/**
+ * A journey page asks the site's chrome to leave out its version banner ("This
+ * page is part of …"): the page is the viewer's, not a page of the guide
+ * (owner, 2026-11-17). A site that stamps no banner ignores it.
+ */
+export const IG_BANNER_OPT_OUT = '<meta name="ig-version-banner" content="none">';
+
 function page(o: { title: string; up: string; crumbs: Crumb[]; body: string; kind: string; print?: "sheets" }): string {
   const crumbs = o.crumbs
     .map((c) => (c.href !== undefined ? `<a href="${e(c.href)}">${e(c.label)}</a>` : `<span aria-current="page">${e(c.label)}</span>`))
@@ -362,6 +369,7 @@ function page(o: { title: string; up: string; crumbs: Crumb[]; body: string; kin
 <title>${e(o.title)}</title>
 <link rel="canonical" href="./">
 <link rel="icon" href="${e(DEFAULT_ICON)}">
+${IG_BANNER_OPT_OUT}
 ${NAVBAR_LINKED}
 <link rel="stylesheet" href="${o.up}assets/journeys.css">
 <script src="${o.up}assets/journeys.js" defer></script>
