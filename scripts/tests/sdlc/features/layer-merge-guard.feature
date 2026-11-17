@@ -36,6 +36,12 @@ Feature: The merge-guard status on every layer PR
     When the "Which PRs" step runs
     Then it judges nothing
 
+  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::the_guard's_tools_install_from_the_layer's_committed_lockfile,_never_the_newest_npm
+  Scenario: The guard's tools install from the layer's committed lockfile
+    Given layer-merge-guard.yml
+    When its "Compose the guard" step is read
+    Then it copies cat-harness-tools' bun.lock into tools/ before "bun install"
+
   @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::it_posts_the_`merge-guard`_status_with_--full-tier,_from_the_caller's_default_branch,_and_never_merges
   Scenario: The workflow posts the merge-guard status with --full-tier from the caller's default branch and never merges
     Given layer-merge-guard.yml

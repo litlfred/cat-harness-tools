@@ -97,6 +97,14 @@ describe("layer-merge-guard: which PRs a run judges", () => {
 });
 
 describe("layer-merge-guard: what it runs", () => {
+  test("the guard's tools install from the layer's committed lockfile, never the newest npm", () => {
+    const compose = named("Compose the guard").run!;
+    const seed = compose.indexOf("cp tools/cat-harness-tools/bun.lock tools/bun.lock");
+    const install = compose.indexOf("(cd tools && bun install)");
+    expect(seed).toBeGreaterThan(-1);
+    expect(install).toBeGreaterThan(seed);
+  });
+
   test("it posts the `merge-guard` status with --full-tier, from the caller's default branch, and never merges", () => {
     expect(STATUS_CONTEXT).toBe("merge-guard");
     const post = named("Post the merge-guard status").run!;

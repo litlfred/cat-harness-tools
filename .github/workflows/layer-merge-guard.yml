@@ -159,6 +159,14 @@ jobs:
           cat > tools/package.json <<'JSON'
           { "name": "merge-guard-tools", "private": true, "workspaces": ["bootstrap-tools", "cat-harness", "cat-harness-tools"] }
           JSON
+          # Resolve from cat-harness-tools' committed lockfile, never from the
+          # newest npm: a lockless install pulled typescript-eslint 8.73.0
+          # while it was half-published (only some of its packages on the
+          # registry yet) and turned a layer's guard red, 2026-11-16
+          # 17:09-17:14Z (issue #2383). Not --frozen-lockfile: this composed
+          # root's workspace entries differ from the layer's own, so bun
+          # rewrites those and keeps every locked package version.
+          cp tools/cat-harness-tools/bun.lock tools/bun.lock
           (cd tools && bun install)
       - name: Post the merge-guard status on each PR head
         if: steps.prs.outputs.prs != ''
