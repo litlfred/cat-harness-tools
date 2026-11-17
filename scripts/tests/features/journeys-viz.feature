@@ -329,6 +329,15 @@ Feature: The journeys viewer
     And 132 + 8 × 136 fits within a 1400px window less gutters
     And a chapter name is not cut with an ellipsis
 
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::a_room_marks_an_application_component_"we_have_this",_with_its_own_name_for_it,_and_renames_the_fictional_countries_(owner,_2026-11-17)
+  Scenario: A room marks an application component "we have this", and renames the fictional countries
+    Given a workshop whose architecture panel sets an application component in Taifafeki, beside Onesa, and a lab with a summary
+    Then the component carries a "We have this" tick and an "Our name for it" box, under one key, on the panel, in a view's element list and on its block's page
+    And no other kind of element is marked
+    And the lab's summary lists both marks under "Our systems"
+    And the overview has a box per fictional country, and every page names the countries present.js renames
+    And a workshop with no fictional countries has neither
+
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-13:_How_it_works_opens_with_the_architecture_panel_from_the_ArchiMate_graph,_then_the_views,_then_the_big_ideas
   Scenario: How it works opens with the architecture panel, then the views, then the big ideas
     Given a workshop architecture spec for model "ra" with two countries, a shared group and a note, and site links supplying the panel
