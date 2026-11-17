@@ -815,6 +815,7 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     const w0 = corpus.workshops[0]!;
     const canvas = {
       title: "Country Canvas",
+      size: "A3",
       sheets: [
         {
           id: "cover",
@@ -858,7 +859,8 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(refused({ ...ws, steps: steps.map((st) => ({ ...st, questions: st.questions?.map((q) => ({ ...q, canvas: "cover:std:fhir" })) })) })).toBe(false);
     expect(refused({ ...ws, lab: { steps: [{ id: "canvas", label: "C", title: "C", canvas: ["nowhere"] }] } })).toBe(false);
     expect(refused({ ...ws, canvas: { ...canvas, sheets: [canvas.sheets[0], canvas.sheets[0]] } })).toBe(false);
-    const out = renderJourneyPages({ ...corpus, workshops: [{ ...w0, workshop: ws }] }, LINKS, "top");
+    // The schema checked it above; the literal's field kinds are plain strings to the compiler.
+    const out = renderJourneyPages({ ...corpus, workshops: [{ ...w0, workshop: ws as unknown as typeof w0.workshop }] }, LINKS, "top");
     const page = (path: string) => String(out.find((f) => f.path === `${base}/${path}`)!.content);
     const discuss = page("discuss/index.html");
     // Every field, under <workshop>:cv:<sheet>:<field>[:<row>[:<col>]], in the same store as every answer.

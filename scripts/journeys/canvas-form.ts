@@ -121,12 +121,21 @@ export function canvasModel(ws: string, c: WorkshopCanvas, questions: readonly A
   };
 }
 
+/** One answer of the canvas as the lab's summary lists it. */
+export interface CanvasSummaryItem {
+  label: string;
+  name: string;
+  type: "text" | "choice" | "check";
+  options?: { id: string; label: string }[];
+  group?: string;
+}
+
 /** Every key a canvas keeps, with what the lab's summary calls it. */
-export function canvasSummaryItems(ws: string, c: WorkshopCanvas, scale?: readonly { id: string; label: string }[]): { sheet: WorkshopCanvasSheet; items: { label: string; name: string; type: "text" | "choice" | "check"; options?: { id: string; label: string }[]; group?: string }[] }[] {
+export function canvasSummaryItems(ws: string, c: WorkshopCanvas, scale?: readonly { id: string; label: string }[]): { sheet: WorkshopCanvasSheet; items: CanvasSummaryItem[] }[] {
   return c.sheets.map((s) => ({
     sheet: s,
     items: s.sections.flatMap((x) =>
-      x.fields.flatMap((f) => {
+      x.fields.flatMap((f): CanvasSummaryItem[] => {
         const k = (ref: string) => canvasKey(ws, `${s.id}:${f.id}${ref}`);
         const group = s.label ?? s.title;
         switch (f.type) {
