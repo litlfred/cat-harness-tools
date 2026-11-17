@@ -45,6 +45,7 @@ import {
 import { blockUsage, feelingPoints, stepByRef } from "../journeys/present-views.ts";
 import { NAVBAR_LINKED } from "../lib/harness-rail.ts";
 import { imageSizeOf } from "../journeys/image-size.ts";
+import { LANGS_MARK } from "../journeys/locales.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { clearDeclaredVisualisers, renderedByOf } from "../viewer-declarations.ts";
 
@@ -509,6 +510,13 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(policyAt).toBeGreaterThan(p2.indexOf('<div class="jp-walk-r">'));
     expect(p2.slice(p2.indexOf('<div class="jp-walk-r">'), policyAt)).toMatch(/<\/div>\n<\/div>\n$/);
     expect(policyAt).toBeLessThan(walkEnd);
+  });
+  test("a journey page leaves the language picker to the site's chrome; only the presentation frame, outside it, draws its own (owner, 2026-11-17)", () => {
+    const journey = files.find((f) => f.path.endsWith("/p2-treated/index.html"))!;
+    expect(String(journey.content)).not.toContain(LANGS_MARK);
+    expect(String(journey.content)).toContain(NAVBAR_LINKED);
+    for (const f of files.filter((x) => x.path.endsWith(".html") && !x.path.includes("/workshops/"))) expect(String(f.content)).not.toContain(LANGS_MARK);
+    expect(p2).toContain(`<div class="jp-top-r">${LANGS_MARK}`);
   });
   test("presenter mode is off until the presenter turns it on, and under the hood starts hidden (owner, 2026-11-17)", () => {
     expect(p2).toContain('<html lang="en" data-presenter="off">');
