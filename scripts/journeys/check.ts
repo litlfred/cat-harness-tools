@@ -77,6 +77,7 @@
  * declarations could not be read, which is not a pass.
  */
 import { relative, resolve } from "node:path";
+import { imageSize, previewDpi, SHARP_DPI } from "./image-size.ts";
 import { siteLinks } from "../gen-journeys-viz.ts";
 import { BASE_GRAPH_TYPOLOGIES } from "../../schemas/kg/graph-typology-registry.ts";
 import { dakUserScenario, derivedPersonas, includeConflict, isListedPart, laneExperiences, parentsOf, partsOf } from "./derive.ts";
@@ -123,7 +124,8 @@ export interface RefReport {
    * its journeys do not declare it: no `presentation.story`, a journey with no
    * `scene` or `trustLadder`, a step with no `illustration` or `record`, no
    * device screen. Each one is a part the viewer leaves out silently, so it is
-   * reported (`overview-gap`); it never fails the check.
+   * reported (`overview-gap`); it never fails the check. So is a canvas
+   * preview too coarse for its paper to be sharp on screen (`canvas-preview`).
    */
   warnings: RefFinding[];
   /** Set when the checkout's declarations could not be read: the report is NOT a pass. */
@@ -296,7 +298,18 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
       const root = corpus.instances.get(w.instance)?.root;
       for (const h of named) {
         if (/^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith("/")) continue;
-        if (root === undefined || instanceFile(corpus, w.instance, relative(root, resolve(w.dir, h))) === undefined) add("sheetsSource", `"${h}" is no file of instance ${w.instance} (read from the workshop file's directory)`);
+        const from = root === undefined ? undefined : instanceFile(corpus, w.instance, relative(root, resolve(w.dir, h)));
+        if (from === undefined) {
+          add("sheetsSource", `"${h}" is no file of instance ${w.instance} (read from the workshop file's directory)`);
+          continue;
+        }
+        // A preview too coarse for its paper is soft on screen: the Table sheets view shows it no wider than its pixels.
+        if (!(src.previews ?? []).includes(h)) continue;
+        const px = imageSize(from);
+        const dpi = px ? previewDpi(px, src.size ?? "A3") : undefined;
+        if (px && dpi !== undefined && dpi < SHARP_DPI) {
+          warnings.push({ instance: w.instance, file: w.file, at: "sheetsSource.previews", message: `canvas-preview: "${h}" is ${px.width}×${px.height} px, ${Math.round(dpi)} dpi for an ${src.size ?? "A3"} page, and soft on screen; export it at ${SHARP_DPI} dpi or more (e.g. \`pdftoppm -r 216 -png\` from the PDF)` });
+        }
       }
     }
     // A screen shows steps the workshop teaches: a step id of one of its scenarios.
