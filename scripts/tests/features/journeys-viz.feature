@@ -195,12 +195,19 @@ Feature: The journeys viewer
     And it shows "Trust anchor ★" with "— a signature crosses"
     And it has the gap strip input "policy:viewer:status"
 
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::below_the_journey,_a_toggle_between_the_policy_view_and_the_technical_one;_policy_first_(owner,_2026-11-17)
+  Scenario: Below the journey, a toggle between the policy view and the technical one, policy first
+    Given the P2 walkthrough page
+    Then it has a "Below the journey" tab list with "Policy view", selected, and "Technical view"
+    And the policy pane holds the policy questions, and the hood is hidden, with no separate hood toggle
+    And present.js switches the panes from the tabs, and the full-width questions keep two columns in the pane
+
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::a_step:_the_people,_each_with_the_avatar_in_the_card's_header_(never_inside_a_sentence),_and_under_the_hood
   Scenario: A step shows the people with the avatar in the card's header, and under the hood
     Given the P2 walkthrough page
     Then a who card carries Ana's colour
     And it names "Ben (nurse)" reading the summary, with no avatar inside the name
-    And under the hood it shows "Health wallet" with "shows the QR", the Task_Read highlight and the hood toggle
+    And under the hood it shows "Health wallet" with "shows the QR", the Task_Read highlight and the hood
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::the_workshop_page_links_to_the_presentation,_and_its_discussion_has_an_anchor
   Scenario: The workshop page links to the presentation, and its discussion has an anchor
