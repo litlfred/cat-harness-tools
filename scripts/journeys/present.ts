@@ -864,6 +864,24 @@ export function answerBox(name: string, label: string, lines = 2, value = "", wa
   return `<textarea class="jp-answer" name="${e(name)}" rows="${lines}" data-jv-text${was ? ` data-jv-was="${e(was)}"` : ""} aria-label="${e(`Our answer: ${label}`)}" placeholder="Our answer…">${e(value)}</textarea>`;
 }
 
+/**
+ * What a walkthrough step shows below the journey, in one of two views (owner,
+ * 2026-11-17): **Policy** (the questions for the table, the tables the moment
+ * touches, the gap strip) or **Technical** (under the hood: the standards,
+ * data, logic and processes). A toggle switches them; Policy shows first, and
+ * a browser that last chose Technical (`jp:hood = "on"`, also the T key) gets
+ * that. A step with nothing for the table has only the technical toggle.
+ */
+function belowTheJourney(policy: string, technical: string): string {
+  if (!policy) {
+    return `<div class="jp-hood-toggle"><i></i><button type="button" data-jp-hood-toggle aria-controls="hood" aria-expanded="false">${icon("cpu")}<span class="jp-hood-hide">Hide the technical view</span><span class="jp-hood-show">Show the technical view</span></button><i></i></div>
+${technical}`;
+  }
+  return `<div class="jp-lens jp-noprint" role="tablist" aria-label="Below the journey"><i></i><span class="jp-lens-in"><button type="button" role="tab" id="lens-policy" class="is-on" data-jp-lens="policy" aria-controls="policy" aria-selected="true">${icon("landmark")}<span>Policy view</span></button><button type="button" role="tab" id="lens-technical" data-jp-lens="technical" aria-controls="hood" aria-selected="false">${icon("cpu")}<span>Technical view</span></button></span><i></i></div>
+<div class="jp-lens-pane" id="policy" role="tabpanel" aria-labelledby="lens-policy" data-jp-policy>${policy}</div>
+${technical.replace('<section class="jp-hood" id="hood" data-jp-hood hidden>', '<section class="jp-hood" id="hood" role="tabpanel" aria-labelledby="lens-technical" data-jp-hood hidden>')}`;
+}
+
 function policyPanel(p: Presentation, s: PresentedStep, toWorkshop: string): string {
   const ws = s.ws;
   if (!ws) return "";
@@ -1174,9 +1192,7 @@ ${screens ? `<div class="jp-sees">${screens}</div>` : ""}
 ${record}${ask}${whatIf}${policy}${cue}
 </div>
 </div>
-${policyPanel(p, s, toWorkshop)}
-<div class="jp-hood-toggle"><i></i><button type="button" data-jp-hood-toggle aria-controls="hood" aria-expanded="false">${icon("cpu")}<span class="jp-hood-hide">Hide what’s under the hood</span><span class="jp-hood-show">Show what’s under the hood</span></button><i></i></div>
-${hood(corpus, p, s, links, root)}`;
+${belowTheJourney(policyPanel(p, s, toWorkshop), hood(corpus, p, s, links, root))}`;
   return frame({
     p,
     root,

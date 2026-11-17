@@ -565,6 +565,37 @@ describe("check 5 — the head's own pull_request CI", () => {
     expect(c.detail).toContain("Code-quality gates: failure");
   });
 
+  test("a later cancelled run (superseded on the same head) never displaces an earlier verdict, green or red", () => {
+    // smart-trust-phw#24, 2026-11-17: marked ready (run cancelled by the next)
+    // then labelled `ready-to-merge` (run skipped); the green full tier stood.
+    const green = real(1957);
+    if (green.runs.state !== "has-run") throw new Error("fixture");
+    for (const r of [...(green.runs.runs as GuardRun[])]) {
+      if (r.event === "pull_request") {
+        green.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "cancelled" } as GuardRun);
+        green.runs.runs.push({ ...r, id: (r.id ?? 0) + 2_000_000, status: "completed", conclusion: "skipped" } as GuardRun);
+      }
+    }
+    expect(status(green, "ci").status).toBe("pass");
+    const red = real(1937);
+    if (red.runs.state !== "has-run") throw new Error("fixture");
+    for (const r of [...(red.runs.runs as GuardRun[])]) {
+      if (r.event === "pull_request") red.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "cancelled" } as GuardRun);
+    }
+    const c = status(red, "ci");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toContain("Code-quality gates: failure");
+  });
+
+  test("a cancelled run stands, and is not green, when it is the only run of its workflow", () => {
+    const s = real(1957);
+    if (s.runs.state !== "has-run") throw new Error("fixture");
+    s.runs.runs.push({ id: 99_999_999_996, name: "Cancelled-only checks", event: "pull_request", status: "completed", conclusion: "cancelled", html_url: "" } as GuardRun);
+    const c = status(s, "ci");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toContain("Cancelled-only checks: cancelled");
+  });
+
   test("an all-skipped run stands when it is the only run of its workflow", () => {
     const s = real(1957);
     if (s.runs.state !== "has-run") throw new Error("fixture");

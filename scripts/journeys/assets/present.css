@@ -296,7 +296,7 @@ html[data-presenter="off"] .jp-wf-a { display: block; }
 .jp-tone-indigo > p { font-size: 14px; color: var(--s800); line-height: 1.375; }
 .jp-policy { gap: 16px; }
 /* Below the moment, full width (owner, 2026-11-17): the questions side by side on a wide screen. */
-@media (min-width: 1024px) { .jp-walk ~ .jp-policy .jp-qs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; } }
+@media (min-width: 1024px) { .jp-walk ~ .jp-policy .jp-qs, .jp-walk ~ .jp-lens-pane > .jp-policy .jp-qs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; } }
 .jp-qs { display: flex; flex-direction: column; gap: 10px; }
 .jp-qs li { display: flex; align-items: flex-start; gap: 8px; }
 .jp-qs li > span { font-size: 14px; color: var(--s800); line-height: 1.375; }
@@ -1161,6 +1161,16 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-amels li .jp-have { margin: 4px 0 8px; }
 .jp-countries-in { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; margin-top: 10px; }
 .jp-countries-in label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--s700); }
+
+/* ── below the journey: the policy view or the technical one (owner, 2026-11-17) ── */
+.jp-lens { display: flex; align-items: center; gap: 12px; }
+.jp-lens > i { flex: 1; border-top: 1px solid var(--s200); }
+.jp-lens-in { display: inline-flex; padding: 3px; border-radius: 9999px; border: 1px solid var(--s300); background: var(--s100); }
+.jp-lens button { display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 9999px; font-size: 13px; font-weight: 600; border: 0; background: transparent; color: var(--s700); }
+.jp-lens button .jp-i { width: 14px; height: 14px; }
+.jp-lens button.is-on { background: var(--s900); color: #fff; }
+.jp-lens button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.jp-lens-pane[hidden] { display: none; }
 
 /* ── the Table sheets, an expanding panel of the discussion (owner, 2026-11-17) ── */
 .jp-sheets-panel { padding: 0; margin-top: 16px; }
