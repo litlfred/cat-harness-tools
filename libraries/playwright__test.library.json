@@ -54,6 +54,7 @@
     "test/content/sticky-home.e2e.ts",
     "test/content/sticky-shape.e2e.ts",
     "test/content/table-filter.e2e.ts",
+    "test/draft-banner.e2e.ts",
     "test/folio-scheme.e2e.ts",
     "test/glass-card-metadata.e2e.ts",
     "test/glass-card-open.e2e.ts",
