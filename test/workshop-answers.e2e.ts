@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
  */
 
 let SITE = "";
-let PATHS: { walkthrough: string; discuss: string } = { walkthrough: "", discuss: "" };
+let PATHS: { walkthrough: string; discuss: string; map: string } = { walkthrough: "", discuss: "", map: "" };
 test.beforeAll(() => {
   const out = mkdtempSync(join(tmpdir(), "workshop-answers-"));
   execFileSync("bun", ["run", fileURLToPath(new URL("./workshop-answers-fixture.build.ts", import.meta.url)), out], { stdio: "pipe" });
@@ -79,6 +79,23 @@ test.describe("a question's answer is one answer, on the walkthrough and in the 
     await page.goto(`http://site.test/${PATHS.discuss}#lab-who-decides`);
     for (const b of await box(page).all()) await expect(b).toHaveValue("kept from before");
     expect(await page.evaluate(([n, w]) => [localStorage.getItem(`jv:${n}`), localStorage.getItem(`jv:${w}`)], [name, was])).toEqual(["kept from before", null]);
+  });
+});
+
+/**
+ * THE JOURNEY MAP IS FOLDED INTO HOW IT WORKS — owner, 2026-11-17: map/ and
+ * its tab are gone; the old address lands on how/.
+ */
+test.describe("the journey map, folded into How it works", () => {
+  test.beforeEach(async ({ context }) => serve(context));
+
+  test("the old map/ address lands on How it works, and no page offers a Journey map", async ({ page }) => {
+    await page.goto(`http://site.test/${PATHS.map}`);
+    await expect(page).toHaveURL(/\/workshops\/track\/how\/$/);
+    await expect(page.locator(".jp-tab.is-on")).toContainText("How it works");
+    await expect(page.locator(".jp-tab", { hasText: "Journey map" })).toHaveCount(0);
+    await page.goto(`http://site.test/${PATHS.walkthrough}`);
+    await expect(page.locator(".jp-tab", { hasText: "Journey map" })).toHaveCount(0);
   });
 });
 

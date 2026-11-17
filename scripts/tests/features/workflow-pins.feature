@@ -105,3 +105,9 @@ Feature: Workflow pins
     Given a repository with a merge-guard caller and no merge-guard-trigger.yml
     Then a trailing finding reports it missing, and --write writes the canonical signal
     And a signal edited away from the canonical text is reported again
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::the_one-line_flow_style_every_layer's_caller_uses_is_migrated_too;_a_second_pass_is_clean
+  Scenario: A caller written in one-line flow style is migrated
+    Given a caller whose pull_request_target and workflow_run are each a flow mapping on one line
+    Then two trailing findings drop pull_request_target and add "Merge guard trigger" inside the flow mapping
+    And judging the rewritten text gives no findings
