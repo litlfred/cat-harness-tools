@@ -563,7 +563,7 @@ function discussPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): 
       const qs = p.steps.flatMap((s) => (s.ws?.questions ?? []).filter((q) => q.module === m.id).map((q) => ({ s, q })));
       if (qs.length === 0) return "";
       const sheet = ws.sheets?.find((x) => x.id === m.sheet);
-      return `<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m.id)}<b>${e(m.title)}</b><small>${e([m.day ? `Day ${m.day}` : "", sheet?.label ?? ""].filter(Boolean).join(" · "))}</small></div>${m.carries ? `<p class="jp-dm-c">${e(m.carries)}</p>` : ""}<ul>${qs.map(({ s, q }) => `<li>${stepChip(a, s, s.step.id)}<span>${e(q.text)}</span></li>`).join("")}</ul></div>`;
+      return `<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m.id)}<b>${e(m.title)}</b><small>${m.day ? `<span class="jp-presenter-only">Day ${m.day}${sheet?.label ? " · " : ""}</span>` : ""}${e(sheet?.label ?? "")}</small></div>${m.carries ? `<p class="jp-dm-c">${e(m.carries)}</p>` : ""}<ul>${qs.map(({ s, q }) => `<li>${stepChip(a, s, s.step.id)}<span>${e(q.text)}</span></li>`).join("")}</ul></div>`;
     })
     .join("");
   const tables = (ws.tables ?? [])
@@ -747,7 +747,11 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
       out.push(`<div class="jp-dqs">${cards}</div>`);
     }
     if (st.resources?.length) {
-      const rs = st.resources.map((id) => ws.resources!.find((r) => r.id === id)!).map((r) => (r.href ? ext(fromSite(r.href, a.siteRoot), r.title) : `<span>${e(r.title)}</span>`));
+      // A facilitator's job aid is the presenter's (owner, 2026-11-17).
+      const rs = st.resources.map((id) => ws.resources!.find((r) => r.id === id)!).map((r) => {
+        const link = r.href ? ext(fromSite(r.href, a.siteRoot), r.title) : `<span>${e(r.title)}</span>`;
+        return r.kind === "job-aid" ? `<span class="jp-presenter-only">${link}</span>` : link;
+      });
       out.push(`<p class="jp-lab-res">${icon("book")} ${rs.join(" ")}</p>`);
     }
     return out.join("\n");
@@ -777,11 +781,11 @@ ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("l
     .map(({ st, n, body }) => {
       const next = steps[n + 1];
       return `<section class="jp-card jp-lab-step${st.summary ? " jp-lab-summary" : ""}" id="lab-${e(st.id)}" data-jp-lab-step="${e(st.id)}">
-<div class="jp-lab-head"><div><span class="jp-lab-kick">${n}. ${e(st.label)}</span><h3>${e(st.title)}</h3>${st.lede ? `<p class="jp-lab-lede">${e(st.lede)}</p>` : ""}</div>${st.minutes ? `<button type="button" class="jp-lab-timer jp-noprint" data-jp-timer="${st.minutes}">${icon("clock")} <span>Start ${st.minutes} min timer</span></button>` : ""}</div>
-${st.discuss ? `<div class="jp-lab-discuss"><b>Discuss</b><span>${e(st.discuss)}</span></div>` : ""}
+<div class="jp-lab-head"><div><span class="jp-lab-kick">${n}. ${e(st.label)}</span><h3>${e(st.title)}</h3>${st.lede ? `<p class="jp-lab-lede">${e(st.lede)}</p>` : ""}</div>${st.minutes ? `<button type="button" class="jp-lab-timer jp-noprint jp-presenter-only" data-jp-timer="${st.minutes}">${icon("clock")} <span>Start ${st.minutes} min timer</span></button>` : ""}</div>
+${st.discuss ? `<div class="jp-lab-discuss jp-presenter-only"><b>Discuss</b><span>${e(st.discuss)}</span></div>` : ""}
 ${body}
 ${st.summary ? summaryBody : ""}
-${st.note ? `<p class="jp-lab-note">${e(st.note)}</p>` : ""}
+${st.note ? `<p class="jp-lab-note jp-presenter-only">${e(st.note)}</p>` : ""}
 ${next ? `<div class="jp-lab-nav jp-noprint"><a class="jp-btn-dark" href="#lab-${e(next.st.id)}" data-jp-lab-go="${e(next.st.id)}">${e(next.st.label)} ${icon("right")}</a></div>` : ""}
 </section>`;
     })

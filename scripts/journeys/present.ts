@@ -630,7 +630,7 @@ ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="n
       ? `<a${o.view === "demo" ? ' class="is-on" aria-current="page"' : ""} href="${e(`${o.toWorkshop}demo/`)}">${icon("phone", "jp-sky")}<span>${e(demoLabel(o.p))}</span></a>`
       : `<span class="jp-mode-off" aria-disabled="true" title="No device screen shows a step of this workshop">${icon("phone", "jp-sky")}<span>Device Demo</span></span>`
   }</div>
-<div class="jp-links">${links}<button type="button" class="jp-btn-link jp-reset" data-jp-reset="${e(ws.id)}" data-jp-reset-to="${e(`${o.toWorkshop}overview/`)}" title="Forget this workshop's answers and the presenter's choices in this browser, and go back to the overview">${icon("reset")}<span>Reset Simulation</span></button></div>
+<div class="jp-links">${links}<button type="button" class="jp-btn-link jp-reset jp-presenter-only" data-jp-reset="${e(ws.id)}" data-jp-reset-to="${e(`${o.toWorkshop}overview/`)}" title="Forget this workshop's answers and the presenter's choices in this browser, and go back to the overview">${icon("reset")}<span>Reset Simulation</span></button></div>
 </div>
 </header>
 ${o.band ?? ""}
@@ -776,7 +776,7 @@ function progress(p: Presentation, s: PresentedStep, prev: string | undefined, n
   return `<div class="jp-card jp-prog">
 ${prev ? `<a class="jp-pbtn" href="${e(prev)}" aria-label="Previous moment">${icon("left")}</a>` : `<span class="jp-pbtn is-off" aria-hidden="true">${icon("left")}</span>`}
 <div class="jp-prog-grid" style="grid-template-columns:${cols}">${chapters}</div>
-<span class="jp-keys">${icon("keyboard")} ← → · W · T</span>
+<span class="jp-keys jp-presenter-only">${icon("keyboard")} ← → · W · T</span>
 <a class="jp-pbtn jp-pbtn-next" href="${e(next)}" aria-label="${last ? "Go to discussion" : "Next moment"}" title="${last ? "Go to discussion" : "Next moment"}">${last ? "<span>Discuss</span>" : ""}${icon("right")}</a>
 </div>`;
 }
@@ -1094,7 +1094,7 @@ ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> $
   const ask = s.ws?.askTheRoom ? `<section class="jp-ask jp-presenter-only"><h3 class="jp-h">${icon("message")} Ask the room</h3><p>${e(s.ws.askTheRoom)}</p></section>` : "";
   const whatIf = (st.whatIf ?? [])
     .map(
-      (wf) => `<section class="jp-card jp-pad jp-tone-amber jp-whatif" data-jp-whatif><h3 class="jp-h jp-amber8">${icon("branch")} What if…</h3><p class="jp-wf-q">${e(wf.scenario)}</p><button type="button" class="jp-reveal" data-jp-reveal>Let the room guess, then reveal</button><p class="jp-wf-a">${e(wf.outcome)}</p></section>`,
+      (wf) => `<section class="jp-card jp-pad jp-tone-amber jp-whatif" data-jp-whatif><h3 class="jp-h jp-amber8">${icon("branch")} What if…</h3><p class="jp-wf-q">${e(wf.scenario)}</p><button type="button" class="jp-reveal jp-presenter-only" data-jp-reveal>Let the room guess, then reveal</button><p class="jp-wf-a">${e(wf.outcome)}</p></section>`,
     )
     .join("");
   const policy = st.policy ? `<section class="jp-card jp-pad jp-tone-indigo"><h3 class="jp-h jp-indigo">${icon("landmark")} Policy takeaway</h3><p>${e(st.policy)}</p></section>` : "";
