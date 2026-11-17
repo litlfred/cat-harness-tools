@@ -304,6 +304,17 @@ Feature: The journeys viewer
     And the summary model lists the five steps and every answer's name, with the gap report, CSV, closing-question write-in and credit link
     And a lab naming a table the workshop does not list is refused by the schema
 
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_canvas_as_data:_an_on-screen_form_keyed_per_field,_a_journey_question_naming_a_field_shares_its_key,_the_annex,_the_PDF's_model_(owner,_2026-11-17)
+  Scenario: The canvas as data: an on-screen form keyed per field, shared with the journey question that names a field
+    Given a workshop with a canvas of a cover (a write-in, a choice, ticks) and a sheet (a grid, a gap strip) of module M1
+    And P2's "trust" question naming the grid's write-in cell, and a lab step showing both sheets
+    Then the workshop passes the schema, and refuses a question naming a tick, a lab step naming no sheet, and a sheet twice
+    And the discussion draws each field under policy:cv:<sheet>:<field>[:<row>[:<col>]]
+    And the grid cell, on the discussion and on the walkthrough, is the question's box, moving its answer from the question's own key and its older one
+    And the sheet's annex lists P1's question of M1 under its own key
+    And the PDF's model has both sheets, a radio per option of the choice, and the annex; the writer is loaded and shipped
+    And the lab's summary lists every canvas key once
+
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-07:_every_page's_header_has_Reset_Simulation,_scoped_to_the_workshop,_returning_to_the_overview
   Scenario: Every page's header has Reset Simulation, scoped to the workshop, returning to the overview
     Given the overview, P2, map, how and demo/S2 pages

@@ -453,13 +453,20 @@
   }
   // An answer kept under the question's old key (`data-jv-was`: its step and position)
   // moves to its own key the first time the question is shown.
+  // Several earlier keys, space-separated, are tried in order (a question that has
+  // since become a canvas field: its own key, then its step-and-position key).
   function migrate(el) {
     var was = el.getAttribute("data-jv-was");
     if (!was || store("jv:" + el.name) !== null) return;
-    var old = store("jv:" + was);
-    if (old === null) return;
-    store("jv:" + el.name, old);
-    forget("jv:" + was);
+    var keys = was.split(/\s+/);
+    for (var i = 0; i < keys.length; i++) {
+      if (!keys[i]) continue;
+      var old = store("jv:" + keys[i]);
+      if (old === null) continue;
+      store("jv:" + el.name, old);
+      forget("jv:" + keys[i]);
+      return;
+    }
   }
   function keepText(el) {
     var key = "jv:" + el.name;

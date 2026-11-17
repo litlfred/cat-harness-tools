@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
  */
 
 let SITE = "";
-let PATHS: { walkthrough: string; discuss: string } = { walkthrough: "", discuss: "" };
+let PATHS: { walkthrough: string; walkthroughA: string; discuss: string } = { walkthrough: "", walkthroughA: "", discuss: "" };
 test.beforeAll(() => {
   const out = mkdtempSync(join(tmpdir(), "workshop-answers-"));
   execFileSync("bun", ["run", fileURLToPath(new URL("./workshop-answers-fixture.build.ts", import.meta.url)), out], { stdio: "pipe" });
@@ -79,5 +79,32 @@ test.describe("a question's answer is one answer, on the walkthrough and in the 
     await page.goto(`http://site.test/${PATHS.discuss}#lab-who-decides`);
     for (const b of await box(page).all()) await expect(b).toHaveValue("kept from before");
     expect(await page.evaluate(([n, w]) => [localStorage.getItem(`jv:${n}`), localStorage.getItem(`jv:${w}`)], [name, was])).toEqual(["kept from before", null]);
+  });
+});
+
+/**
+ * THE CANVAS AS DATA — owner, 2026-11-17: the canvas is a form kept in the same
+ * store; a journey question that names a field shares its answer; the export is
+ * an editable PDF filled in from those answers.
+ */
+test.describe("the canvas as a form, and its editable PDF", () => {
+  test.beforeEach(async ({ context }) => serve(context));
+
+  test("typed on the walkthrough, the answer is the canvas field's; ticked on the canvas, it is in the PDF", async ({ page }) => {
+    await page.goto(`http://site.test/${PATHS.walkthroughA}`);
+    await page.locator('textarea[aria-label="Our answer: Who may read it?"]').fill("Only the clinician abroad");
+    await page.goto(`http://site.test/${PATHS.discuss}#lab-canvas`);
+    const who = page.locator('textarea[name="track:cv:rights:who"]').filter({ visible: true });
+    await expect(who).toHaveValue("Only the clinician abroad");
+    await page.locator('input[name="track:cv:rights:stage"][value="scale"]').check();
+    const [download] = await Promise.all([page.waitForEvent("download"), page.locator("[data-jp-canvas-pdf]").filter({ visible: true }).first().click()]);
+    expect(download.suggestedFilename()).toBe("country-canvas.pdf");
+    const pdf = readFileSync((await download.path())!, "latin1");
+    const hex = (s: string) => `<FEFF${[...s].map((c) => c.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")).join("")}>`;
+    expect(pdf.startsWith("%PDF-1.7")).toBe(true);
+    expect(pdf).toContain("/NeedAppearances true");
+    expect(pdf).toContain(`/T ${hex("track:cv:rights:who")}`);
+    expect(pdf).toContain(`/V ${hex("Only the clinician abroad")}`);
+    expect(pdf).toMatch(new RegExp(`/T ${hex("track:cv:rights:stage")}[^\\n]*/V /scale`));
   });
 });

@@ -21,6 +21,7 @@
  * | `assessment` | the scales a capability is rated on at a table (exists / partial / absent; blocks us now / within 12 months / can wait), and the standing line read with them |
  * | `discussion` | closing questions, each in a module and tied to the steps it is about |
  * | `sheets` | the printable canvases (A3 or A4), each filled in one or more modules |
+ * | `canvas` | the canvas as data: its sheets, sections and fields, drawn as the on-screen form and written out as an editable, pre-filled PDF |
  * | `sheetsSource` | the workshop's own canvas files (a Word file, a print PDF, page previews), shown by the Table sheets view in place of the drawn `sheets` |
  * | `matrix` | where each module meets each step, technical and policy, and the overlaps across modules: drawn by a lab step's `matrix` |
  * | `resources` | job aids, handouts, readings, slides and links, each tied to modules or steps |
@@ -118,7 +119,19 @@ export type WorkshopTable = z.infer<typeof WorkshopTableSchema>;
  * text can be reworded and the answers kept), else one derived from its step
  * and its text.
  */
-const QuestionSchema = z.object({ id: Id.optional(), module: ModuleId, text: Text }).strict();
+const QuestionSchema = z
+  .object({
+    id: Id.optional(),
+    module: ModuleId,
+    text: Text,
+    /**
+     * The canvas field that asks the same thing, `<sheet>:<field>[:<row>[:<col>]]`
+     * (`canvas.sheets`): the question then keeps its answer under that field's
+     * key, so the walkthrough, the lab and the canvas show one answer.
+     */
+    canvas: z.string().regex(/^[a-z0-9][a-z0-9-]*(:[a-z0-9][a-z0-9-]*){1,3}$/).optional(),
+  })
+  .strict();
 
 /** Which rows of one table a step touches; `why` when the reason is not obvious. */
 const StepTagSchema = z.object({ table: Id, row: Id, why: Text.optional() }).strict();
@@ -267,6 +280,8 @@ export const WorkshopLabStepSchema = z
     matrix: z.boolean().optional(),
     modules: z.array(ModuleId).optional(),
     discussion: z.boolean().optional(),
+    /** Canvas sheets (`canvas.sheets[].id`) the step shows as the on-screen form. */
+    canvas: z.array(Id).optional(),
     summary: z.boolean().optional(),
     /** Resources (`resources[].id`) linked from the step. */
     resources: z.array(Id).optional(),
@@ -454,6 +469,86 @@ export const WorkshopPresentationSchema = z
   .strict();
 export type WorkshopPresentation = z.infer<typeof WorkshopPresentationSchema>;
 
+/**
+ * The workshop's canvas as data (owner, 2026-11-17): the Country Canvas (a
+ * cover and its sheets) described field by field, so the viewer draws it as an
+ * on-screen form and writes it back out as an editable, pre-filled PDF, both
+ * from the answers kept in the browser. Every field has a stable id; its
+ * answer is kept under `<workshop>:cv:<sheet>:<field>[:<row>[:<col>]]`, the
+ * same store the journey questions use, and a journey question asking the same
+ * thing names the field (`steps[].questions[].canvas`) and shares its key.
+ *
+ * | type | what it is | kept under |
+ * |---|---|---|
+ * | `text` | a write-in of `lines` lines | `…:<field>` |
+ * | `choice` | one of `options` | `…:<field>` = the option id |
+ * | `ticks` | any of `options` | `…:<field>:<option>` = "1" |
+ * | `grid` | `rows` × `columns`, each cell a write-in, or a tick where the column says so | `…:<field>:<row>:<col>` |
+ * | `gap` | the gap strip: each of `rows` rated on `options` (the workshop's first assessment scale when absent) | `…:<field>:<row>` = the option id |
+ */
+const CanvasOptionSchema = z.object({ id: Id, label: Text }).strict();
+const CanvasRowSchema = z.object({ id: Id, label: Text, hint: Text.optional() }).strict();
+const CanvasFieldBase = { id: Id, label: Text, hint: Text.optional() };
+export const WorkshopCanvasFieldSchema = z.discriminatedUnion("type", [
+  z.object({ ...CanvasFieldBase, type: z.literal("text"), lines: z.number().int().min(1).max(12).default(2) }).strict(),
+  z.object({ ...CanvasFieldBase, type: z.literal("choice"), options: z.array(CanvasOptionSchema).min(2) }).strict(),
+  z.object({ ...CanvasFieldBase, type: z.literal("ticks"), options: z.array(CanvasOptionSchema).min(1) }).strict(),
+  z
+    .object({
+      ...CanvasFieldBase,
+      type: z.literal("grid"),
+      rows: z.array(CanvasRowSchema).min(1),
+      columns: z.array(z.object({ id: Id, label: Text, cell: z.enum(["text", "tick"]).default("text") }).strict()).min(1),
+    })
+    .strict(),
+  z.object({ ...CanvasFieldBase, type: z.literal("gap"), rows: z.array(CanvasRowSchema).min(1), options: z.array(CanvasOptionSchema).min(2).optional() }).strict(),
+]);
+export type WorkshopCanvasField = z.infer<typeof WorkshopCanvasFieldSchema>;
+
+export const WorkshopCanvasSheetSchema = z
+  .object({
+    id: Id,
+    /** As the room calls it: "Cover", "Sheet 3". */
+    label: Text.optional(),
+    title: Text,
+    /** One line under the title: what the sheet is for. */
+    intro: Text.optional(),
+    /** The modules whose journey questions are its annex (those not already one of its fields). */
+    modules: z.array(ModuleId).optional(),
+    sections: z.array(z.object({ id: Id, title: Text.optional(), fields: z.array(WorkshopCanvasFieldSchema).min(1) }).strict()).min(1),
+  })
+  .strict();
+export type WorkshopCanvasSheet = z.infer<typeof WorkshopCanvasSheetSchema>;
+
+export const WorkshopCanvasSchema = z
+  .object({
+    /** What the canvas is called ("Country Canvas"). */
+    title: Text,
+    description: Text.optional(),
+    /** The paper of the PDF it is written out to; A3 landscape when absent. */
+    size: z.enum(["A3", "A4"]).default("A3"),
+    /** The cover first, then the sheets, in order. */
+    sheets: z.array(WorkshopCanvasSheetSchema).min(1),
+  })
+  .strict();
+export type WorkshopCanvas = z.infer<typeof WorkshopCanvasSchema>;
+
+/** The keys a canvas field keeps its answer under, after `<workshop>:cv:`: `<sheet>:<field>[:<row>[:<col>]]`. */
+export function canvasFieldRefs(sheet: string, f: WorkshopCanvasField): string[] {
+  const at = `${sheet}:${f.id}`;
+  switch (f.type) {
+    case "text":
+    case "choice":
+      return [at];
+    case "ticks":
+      return f.options.map((o) => `${at}:${o.id}`);
+    case "grid":
+      return f.rows.flatMap((r) => f.columns.map((c) => `${at}:${r.id}:${c.id}`));
+    case "gap":
+      return f.rows.map((r) => `${at}:${r.id}`);
+  }
+}
+
 /** `workshop/0.1.0`, as a node kind. */
 export const WorkshopKind = nodeKind(
   WORKSHOP_V01,
@@ -484,6 +579,7 @@ export const WorkshopKind = nodeKind(
       .optional(),
     sheets: z.array(WorkshopSheetSchema).optional(),
     sheetsSource: WorkshopSheetsSourceSchema.optional(),
+    canvas: WorkshopCanvasSchema.optional(),
     matrix: WorkshopMatrixSchema.optional(),
     resources: z.array(WorkshopResourceSchema).optional(),
     presentation: WorkshopPresentationSchema.optional(),
@@ -528,6 +624,30 @@ export const WorkshopKind = nodeKind(
     for (const d of w.discussion ?? []) mod(`discussion ${d.id}`, d.module);
     for (const s of w.sheets ?? []) for (const m of s.modules) mod(`sheet ${s.id}`, m);
     for (const r of w.resources ?? []) for (const m of r.modules ?? []) mod(`resource ${r.id}`, m);
+    if (w.canvas) {
+      dup("canvas sheet", w.canvas.sheets.map((s) => s.id));
+      const refs = new Set<string>();
+      for (const s of w.canvas.sheets) {
+        dup(`canvas sheet ${s.id} section`, s.sections.map((x) => x.id));
+        dup(`canvas sheet ${s.id} field`, s.sections.flatMap((x) => x.fields.map((f) => f.id)));
+        for (const m of s.modules ?? []) mod(`canvas sheet ${s.id}`, m);
+        for (const f of s.sections.flatMap((x) => x.fields)) {
+          if (f.type === "choice" || f.type === "ticks") dup(`canvas field ${s.id}:${f.id} option`, f.options.map((o) => o.id));
+          if (f.type === "grid" || f.type === "gap") dup(`canvas field ${s.id}:${f.id} row`, f.rows.map((r) => r.id));
+          if (f.type === "grid") dup(`canvas field ${s.id}:${f.id} column`, f.columns.map((c) => c.id));
+          if (f.type === "gap" && !f.options && !w.assessment?.scales.length) issue(`canvas field ${s.id}:${f.id} is a gap strip with no options, and the workshop has no assessment scale`);
+          // A question's write-in may be a text field, or a write-in cell of a grid.
+          if (f.type === "text") refs.add(`${s.id}:${f.id}`);
+          if (f.type === "grid") for (const r of f.rows) for (const c of f.columns) if (c.cell !== "tick") refs.add(`${s.id}:${f.id}:${r.id}:${c.id}`);
+        }
+      }
+      for (const st of w.steps ?? []) for (const q of st.questions ?? []) {
+        if (q.canvas !== undefined && !refs.has(q.canvas)) issue(`step ${st.step} question names canvas field "${q.canvas}", which is no write-in of the canvas (a text field, or a grid's write-in cell)`);
+      }
+    } else {
+      for (const st of w.steps ?? []) for (const q of st.questions ?? []) if (q.canvas !== undefined) issue(`step ${st.step} question names canvas field "${q.canvas}", but the workshop has no canvas`);
+    }
+    for (const s of w.lab?.steps ?? []) for (const c of s.canvas ?? []) if (!w.canvas?.sheets.some((x) => x.id === c)) issue(`lab step ${s.id} shows canvas sheet "${c}", which the workshop's canvas does not have`);
     const src = w.sheetsSource;
     if (src && !src.docx && !src.pdf && !src.previews?.length) issue("sheetsSource names no file: give docx, pdf or previews");
     // A matrix cell or overlap names a step of the workshop: its id, or `<scenario>#<step>`.

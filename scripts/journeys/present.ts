@@ -801,8 +801,19 @@ export function questionId(q: { id?: string; text: string }): string {
  * workshop, the journey and step the question belongs to, and the question's
  * own identity (`questionId`), never by page or position.
  */
-export function questionKey(workshop: string, ws: WorkshopStep, q: { id?: string; text: string }): string {
+export function questionKey(workshop: string, ws: WorkshopStep, q: { id?: string; text: string; canvas?: string }): string {
+  // A question that is a canvas field keeps its answer under the field's key (`canvas-form.ts`).
+  return q.canvas ? `${workshop}:cv:${q.canvas}` : ownQuestionKey(workshop, ws, q);
+}
+
+/** A question's own key, whether or not it names a canvas field: where its answer was kept before it did. */
+export function ownQuestionKey(workshop: string, ws: WorkshopStep, q: { id?: string; text: string }): string {
   return `${workshop}:q:${ws.scenario}:${ws.step}:${questionId(q)}`;
+}
+
+/** The keys an answer may have been kept under before, space-separated, for `data-jv-was`. */
+export function earlierKeys(workshop: string, ws: WorkshopStep, q: { id?: string; text: string; canvas?: string }, legacy?: string): string {
+  return [q.canvas ? ownQuestionKey(workshop, ws, q) : undefined, legacy].filter(Boolean).join(" ");
 }
 
 /**
@@ -826,7 +837,7 @@ function policyPanel(p: Presentation, s: PresentedStep, toWorkshop: string): str
   const mod = (id: string) => w.modules.find((m) => m.id === id);
   // Each question has a write-in: the same answer the Discussion view's lab shows, under one key per question (`questionKey`).
   const qs = (ws.questions ?? [])
-    .map((q, i) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span>${answerBox(questionKey(w.id, ws, q), q.text, 2, "", legacyQuestionKey(w.id, s, i))}</li>`)
+    .map((q, i) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span>${answerBox(questionKey(w.id, ws, q), q.text, 2, "", earlierKeys(w.id, ws, q, legacyQuestionKey(w.id, s, i)))}</li>`)
     .join("");
   // The rows of the card's foot: the workshop's `tagRows` (VaxLink's Forces / Cost driver /
   // If it is missing), else one row per table the step touches, in the workshop's table order.

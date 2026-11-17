@@ -1122,3 +1122,34 @@ a:hover > .jp-cv-dot { fill: var(--c); }
   .jp-print-report .jp-lab-step:not(.jp-lab-summary), .jp-print-report .jp-lab-summary > :not(.jp-gapreport) { display: none !important; }
   .jp-print-report .jp-lab-summary { border: 0; box-shadow: none; padding: 0; }
 }
+
+/* ── the canvas as an on-screen form (owner, 2026-11-17): a sheet per card, in the canvas's paper styling ── */
+.jp-cv { display: flex; flex-direction: column; gap: 24px; }
+.jp-cv-sheet { background: #fffdf7; border: 1px solid #e7e0cf; border-top: 6px solid #3730a3; border-radius: 10px; padding: 20px 24px; box-shadow: var(--shadow-sm); }
+.jp-cv-head { border-bottom: 1px solid #e7e0cf; padding-bottom: 10px; margin-bottom: 14px; }
+.jp-cv-kick { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6b7280; }
+.jp-cv-head h3 { font-size: 20px; font-weight: 800; color: var(--ink); margin: 2px 0; }
+.jp-cv-head p { font-size: 14px; color: var(--s700); }
+.jp-cv-secs { columns: 3 300px; column-gap: 28px; }
+.jp-cv-sec { break-inside: avoid-column; margin-bottom: 18px; }
+.jp-cv-sec h4, .jp-cv-annex h4 { font-size: 14px; font-weight: 700; color: #3730a3; margin: 0 0 8px; }
+.jp-cv-field { break-inside: avoid; margin-bottom: 14px; }
+.jp-cv-fh b { display: block; font-size: 13px; color: var(--ink); }
+.jp-cv-fh small { display: block; font-size: 12px; color: var(--s600); }
+.jp-cv-in { width: 100%; margin-top: 4px; background: #fff; border: 1px solid #cfc7b3; border-radius: 6px; }
+.jp-cv-opts { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.jp-cv-opt { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--s800); }
+.jp-cv-scroll { overflow-x: auto; margin-top: 6px; }
+.jp-cv-t { width: 100%; border-collapse: collapse; font-size: 12px; }
+.jp-cv-t th, .jp-cv-t td { border-top: 1px solid #e7e0cf; padding: 4px 6px; text-align: left; vertical-align: middle; }
+.jp-cv-t thead th { border-top: 0; font-size: 11px; color: var(--s600); font-weight: 600; text-align: center; }
+.jp-cv-t tbody th { font-weight: 500; color: var(--s800); }
+.jp-cv-t tbody th small { display: block; color: var(--s500); font-weight: 400; }
+.jp-cv-t td { text-align: center; }
+.jp-cv-t td .jp-cv-in { margin: 0; min-width: 90px; }
+.jp-cv-annex { border-top: 1px dashed #cfc7b3; margin-top: 8px; padding-top: 12px; }
+.jp-cv-annex ol { display: flex; flex-direction: column; gap: 10px; list-style: none; padding: 0; }
+.jp-cv-annex li { display: flex; gap: 8px; align-items: flex-start; }
+.jp-cv-annex li > div { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.jp-cv-pdf { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 16px; }
+@media print { .jp-cv-sheet { break-after: page; box-shadow: none; } .jp-cv-secs { columns: 3; } }
