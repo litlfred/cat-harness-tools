@@ -214,3 +214,88 @@ test.describe("renaming the fictional countries", () => {
     await expect(main).toContainText("in Taifafeki");
   });
 });
+
+/**
+ * THE DRAWINGS TOO — owner, 2026-11-17: "the smart trust demo archimate
+ * diagram names of countries did not get updated". An ArchiMate view is an
+ * `<object>` SVG, its own document: its labels and titles are renamed with the
+ * page, whether the drawing loads before or after the name is typed, and so is
+ * what a script draws later, and a tooltip or accessible name.
+ */
+test.describe("renaming the fictional countries in the drawings", () => {
+  const SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="40"><title>Taifafeki view</title><g><text id="lbl" x="4" y="20">Taifafeki MoH</text></g></svg>`;
+  test.beforeEach(async ({ context }) => {
+    await serve(context);
+    // After `serve`: the route registered last is the one that answers.
+    await context.route("http://site.test/rename-view.svg", (route) => route.fulfill({ contentType: "image/svg+xml", body: SVG }));
+  });
+
+  const svgText = (page: Page) =>
+    page.evaluate(() => {
+      const d = (document.getElementById("rv") as HTMLObjectElement | null)?.contentDocument;
+      return d ? `${d.querySelector("title")?.textContent} | ${d.getElementById("lbl")?.textContent}` : null;
+    });
+
+  test("a drawing embedded as an <object> SVG, an attribute and a later-drawn node are renamed, and restored when cleared", async ({ page }) => {
+    await page.goto(`http://site.test/${PATHS.overview}`);
+    // A drawing, a tooltip and an accessible name, added after the page has run its script.
+    await page.evaluate(() => {
+      const main = document.querySelector(".jp-main")!;
+      const o = document.createElement("object");
+      o.id = "rv";
+      o.type = "image/svg+xml";
+      o.data = "/rename-view.svg";
+      o.addEventListener("load", () => o.setAttribute("data-loaded", ""));
+      main.appendChild(o);
+      const s = document.createElement("span");
+      s.id = "tip";
+      s.title = "Held in Taifafeki";
+      s.setAttribute("aria-label", "Taifafeki record");
+      s.textContent = "tip";
+      main.appendChild(s);
+    });
+    await expect(page.locator("#rv[data-loaded]")).toHaveCount(1);
+    await expect.poll(() => svgText(page)).toBe("Taifafeki view | Taifafeki MoH");
+
+    await page.locator('input[data-jp-country="Taifafeki"]').fill("Arcadia");
+    await expect.poll(() => svgText(page)).toBe("Arcadia view | Arcadia MoH");
+    await expect(page.locator("#tip")).toHaveAttribute("title", "Held in Arcadia");
+    await expect(page.locator("#tip")).toHaveAttribute("aria-label", "Arcadia record");
+    // The renaming box keeps its own accessible name.
+    await expect(page.locator('input[data-jp-country="Taifafeki"]')).toHaveAttribute("aria-label", "Our name for Taifafeki");
+
+    // Drawn by a script after the rename: renamed once it lands.
+    await page.evaluate(() => {
+      const p = document.createElement("p");
+      p.id = "late";
+      p.textContent = "Later, in Taifafeki";
+      document.querySelector(".jp-main")!.appendChild(p);
+    });
+    await expect(page.locator("#late")).toHaveText("Later, in Arcadia");
+
+    // Cleared, every original comes back.
+    await page.locator('input[data-jp-country="Taifafeki"]').fill("");
+    await expect.poll(() => svgText(page)).toBe("Taifafeki view | Taifafeki MoH");
+    await expect(page.locator("#tip")).toHaveAttribute("title", "Held in Taifafeki");
+    await expect(page.locator("#late")).toHaveText("Later, in Taifafeki");
+  });
+
+  test("a drawing in the page's markup is renamed when it loads, once a name is kept", async ({ page, context }) => {
+    // The page as an ArchiMate view ships it: the <object> in the markup, its SVG
+    // slow to arrive, so it loads after the page's script has run.
+    await context.route(`http://site.test/${PATHS.overview}`, async (route) => {
+      const html = readFileSync(join(SITE, PATHS.overview, "index.html"), "utf8");
+      await route.fulfill({ contentType: "text/html", body: html.replace(/(<main[^>]*class="[^"]*jp-main[^"]*"[^>]*>)/, '$1<object id="rv" type="image/svg+xml" data="/rename-view.svg"></object>') });
+    });
+    await page.goto(`http://site.test/${PATHS.overview}`);
+    await page.locator('input[data-jp-country="Taifafeki"]').fill("Zembla");
+    await expect.poll(() => svgText(page)).toBe("Zembla view | Zembla MoH");
+    // A fresh page, the name already kept: the drawing is renamed on its own load.
+    await context.route("http://site.test/rename-view.svg", async (route) => {
+      await new Promise((r) => setTimeout(r, 300));
+      await route.fulfill({ contentType: "image/svg+xml", body: SVG });
+    });
+    await page.reload();
+    await expect.poll(() => svgText(page)).toBe("Zembla view | Zembla MoH");
+  });
+});
