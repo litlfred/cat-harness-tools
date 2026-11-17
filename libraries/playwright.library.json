@@ -20,6 +20,7 @@
     "scripts/pc-line-numbered-pdf.ts",
     "scripts/regen-after-merge.ts",
     "scripts/render-wait.ts",
+    "scripts/tests/ui/docs-ui-figure-scale.test.ts",
     "scripts/wireframe-check.mjs",
     "test/coordinator/regen-writers.test.ts"
   ]
