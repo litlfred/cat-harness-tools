@@ -195,6 +195,14 @@ Feature: The journeys viewer
     And it shows "Trust anchor ★" with "— a signature crosses"
     And it has the gap strip input "policy:viewer:status"
 
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::a_journey_page_leaves_the_language_picker_to_the_site's_chrome;_only_the_presentation_frame,_outside_it,_draws_its_own_(owner,_2026-11-17)
+  Scenario: A journey page leaves the language picker to the site's chrome
+    Given the rendered journey pages
+    Then a journey page, in the site's chrome, has no language-links mark of its own
+    And no page outside the workshops has one
+    And the walkthrough's presentation frame, which opts out of the chrome, keeps its own
+    And a journey page asks the site's chrome to leave out the guide's version banner
+
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::a_step:_the_people,_each_with_the_avatar_in_the_card's_header_(never_inside_a_sentence),_and_under_the_hood
   Scenario: A step shows the people with the avatar in the card's header, and under the hood
     Given the P2 walkthrough page
@@ -214,9 +222,10 @@ Feature: The journeys viewer
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::every_view_has_a_page,_in_the_frame,_and_the_tabs_link_them
   Scenario: Every view has a page in the frame, and the tabs link them
     Given the presentation views map, personas, each persona, how, how/wallet, discuss, demo and demo/S2
+
+    Given the presentation views personas, each persona, how, how/wallet, discuss, sheets, demo and demo/S2
     Then each opts out of the navbar and shows the name "PilgrimLink"
-    And the P2 page links the map, personas, how and discuss tabs, none disabled
-    And the map's BPMN drawing is emitted as map/bpmn/processes-care.svg
+    And the P2 page links the personas, how and discuss tabs, none disabled, and no journey map
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_Table_sheets_are_a_folded_panel_of_the_discussion;_sheets/_redirects_there_and_the_tab_is_gone_(owner,_2026-11-17)
   Scenario: The Table sheets are a folded panel of the discussion; sheets/ redirects there and the tab is gone
@@ -236,6 +245,15 @@ Feature: The journeys viewer
     And a hand-off to a cast member wears their avatar, "Clinic EMR → Ana"
     And it has a hidden panel, "Open screen S2" and the note "Read across, then down."
 
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_journey_map_is_folded_into_How_it_works:_its_tab_is_gone,_map/_redirects,_and_its_hand-offs_are_How_it_works'_Data_on_the_move_(owner,_2026-11-17)
+  Scenario: The journey map is folded into How it works
+    Given the walkthrough, how, discussion and overview pages
+    Then none offers a Journey map tab or links map/
+    And the overview's second call to action is "See how it works", linking how/
+    And map/ is a redirect to ../how/, with no map grid and no BPMN thumbnails beside it
+    And How it works has "Data on the move" after the building-block grid, where a hand-off to a cast member wears their avatar, "Clinic EMR → Ana"
+    And no map grid is drawn in How it works, and the business processes are listed once
+
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_persona_lens:_needs,_frustrations,_the_curve's_points_linking_to_steps,_the_touchpoints;_a_glyph_for_an_icon
   Scenario: The persona lens shows needs, frustrations, curve points linking to steps, touchpoints, and a glyph for an icon
     Given the persona page of ana
@@ -243,7 +261,7 @@ Feature: The journeys viewer
     And a curve point links to P2 titled "P2 Step P2: Worried"
     And it says "Ana’s touchpoints (2)"
     And the personas index links "ana/"
-    And Cleo, who has an icon, wears it as an icon avatar on her page and the map, while Ana keeps the initial "A"
+    And Cleo, who has an icon, wears it as an icon avatar on her page, while Ana keeps the initial "A" in How it works
     And the curve's axis shows happy, neutral and sad faces
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::how_it_works:_the_big_ideas,_the_grid,_a_block's_detail_with_the_moments_that_use_it
@@ -298,9 +316,9 @@ Feature: The journeys viewer
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-08:_the_drawer's_bar_names_the_active_stage,_and_the_workshop's_inspector_title,_key_and_hint
   Scenario: The drawer's bar names the active stage, and the workshop's inspector title, key and hint
     Given the presentation pages
-    Then the P2 page's chip says "Active Stage: P2", the map's "Active Stage: Journey map" and screen S2's "Active Stage: S2 · P2"
+    Then the P2 page's chip says "Active Stage: P2", How it works' "Active Stage: How it works" and screen S2's "Active Stage: S2 · P2"
     And the default inspector title is "FHIR payload inspector" with no key
-    And with a workshop inspector title, key and hint, the P2, map and S2 pages show the escaped title, the key with its icon, and the hint
+    And with a workshop inspector title, key and hint, the P2, how and S2 pages show the escaped title, the key with its icon, and the hint
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_lab:_the_Discussion_view_as_timed_steps,_the_journey's_questions_answered_under_the_walkthrough's_keys,_a_summary
   Scenario: The lab turns the Discussion view into timed steps, with the journey's questions and a summary
@@ -315,17 +333,10 @@ Feature: The journeys viewer
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-07:_every_page's_header_has_Reset_Simulation,_scoped_to_the_workshop,_returning_to_the_overview
   Scenario: Every page's header has Reset Simulation, scoped to the workshop, returning to the overview
-    Given the overview, P2, map, how and demo/S2 pages
+    Given the overview, P2, personas, how and demo/S2 pages
     Then each has a reset scoped to "policy" pointing back to the overview at its own depth
     And each shows "Reset Simulation"
     And present.js wires every data-jp-reset element
-
-  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-11:_the_map's_moment_columns_are_narrow_enough_on_a_desktop_for_eight,_and_a_chapter's_name_wraps,_never_cut
-  Scenario: The map's moment columns fit eight on a desktop, and a chapter's name wraps, never cut
-    Given present.css
-    Then at min-width 1280px the map grid has a 132px column and steps of at least 136px
-    And 132 + 8 × 136 fits within a 1400px window less gutters
-    And a chapter name is not cut with an ellipsis
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-13:_How_it_works_opens_with_the_architecture_panel_from_the_ArchiMate_graph,_then_the_views,_then_the_big_ideas
   Scenario: How it works opens with the architecture panel, then the views, then the big ideas

@@ -519,7 +519,7 @@ export function highlightJson(json: string): string {
 
 // ── the frame ─────────────────────────────────────────────────────────────
 
-export type View = "overview" | "walkthrough" | "map" | "personas" | "how" | "discuss" | "demo";
+export type View = "overview" | "walkthrough" | "personas" | "how" | "discuss" | "demo";
 
 export interface FrameOpts {
   p: Presentation;
@@ -583,7 +583,6 @@ export function frame(o: FrameOpts): string {
   const tabs: { id: View; label: string; hint: string; ic: keyof typeof ICON; href?: string }[] = [
     { id: "overview", label: "Overview", hint: "The story & the cast", ic: "compass", href: `${o.toWorkshop}overview/` },
     { id: "walkthrough", label: "Walkthrough", hint: "Present one moment at a time", ic: "present", href: o.p.steps[0] ? `${o.toWorkshop}walkthrough/${o.p.steps[0].key}/` : undefined },
-    { id: "map", label: "Journey map", hint: "Everyone, every step", ic: "map", href: o.p.steps.length ? `${o.toWorkshop}map/` : undefined },
     { id: "personas", label: "Persona lens", hint: "One person end-to-end", ic: "user", href: o.p.cast.length ? `${o.toWorkshop}personas/` : undefined },
     { id: "how", label: "How it works", hint: "Standards & tools behind each moment", ic: "cpu", href: `${o.toWorkshop}how/` },
     { id: "discuss", label: "Discussion", hint: "Policy questions to close", ic: "message", href: `${o.toWorkshop}discuss/` },
@@ -734,7 +733,7 @@ ${pic}
 <span class="jp-kicker">${icon("route")} The story in one sentence</span>
 <h2>${e(pr.story ?? ws.description)}</h2>
 ${pr.lede ? `<p>${e(pr.lede)}</p>` : ""}
-<div class="jp-ctas">${first ? `<a class="jp-cta" href="${e(walk(first))}">${icon("play")} Start the walkthrough</a>` : ""}${p.steps.length ? `<a class="jp-cta jp-cta-2" href="../map/">See the whole journey map ${icon("arrow")}</a>` : ""}</div>
+<div class="jp-ctas">${first ? `<a class="jp-cta" href="${e(walk(first))}">${icon("play")} Start the walkthrough</a>` : ""}<a class="jp-cta jp-cta-2" href="../how/">See how it works ${icon("arrow")}</a></div>
 </div>
 </section>
 <section class="jp-moments-sec">
