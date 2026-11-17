@@ -3,7 +3,9 @@
  * PR's first attempt takes main's record's tips, a branch seeded after main's
  * last push is not in the record: it is served at the live read's tip
  * (state-live.json), not by an empty mirror (dth-sfp#13: cat/dth-sfp/beans
- * and todos read "unmounted" on both sides).
+ * and todos read "unmounted" on both sides). A beans branch that moved since
+ * the record is served at the live tip when that tip descends from the
+ * record's (approval records pushed after main's last push).
  *
  * The script is driven through bash, as the workflow does, against local
  * repositories that stand in for GitHub (a `url.<file>.insteadOf` rewrite).
@@ -27,14 +29,19 @@ let remotes: string;
 let oldBeans: string;
 let newBeans: string;
 let todos: string;
+let movedTodos: string;
+let beansRoot: string;
+let beansAhead: string;
+let beansRewritten: string;
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", ["-C", cwd, "-c", "push.negotiate=false", ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, GIT_CONFIG_COUNT: "0" } }).trim();
 
-/** A commit on `branch` of the stand-in remote, returning its sha. */
-function commit(branch: string, file: string): string {
+/** A commit on `branch` of the stand-in remote (a root commit, or a child of `parent`), returning its sha. */
+function commit(branch: string, file: string, parent?: string): string {
   const work = join(dir, "work");
-  git(work, "checkout", "-q", "--orphan", `${branch}-${file}`);
+  if (parent) git(work, "checkout", "-q", "-B", `${branch}-${file}`, parent);
+  else git(work, "checkout", "-q", "--orphan", `${branch}-${file}`);
   writeFileSync(join(work, file), file);
   git(work, "add", file);
   git(work, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", file);
@@ -52,10 +59,16 @@ beforeAll(() => {
   oldBeans = commit("cat/r/beans", "a");
   newBeans = commit("cat/r/beans", "b");
   todos = commit("cat/r/todos", "c");
+  movedTodos = commit("cat/r/todos", "d", todos);
+  // cat/r2/beans: recorded at beansRoot, then two approval records pushed on
+  // top (beansAhead); beansRewritten is a tip that does not descend from it.
+  beansRoot = commit("cat/r2/beans", "e");
+  beansAhead = commit("cat/r2/beans", "g", commit("cat/r2/beans", "f", beansRoot));
+  beansRewritten = commit("cat/r2/rewritten", "h");
 });
 
 /** Run state-pin.sh; return the branches each rewritten repository serves. */
-function pin(state: unknown, live?: unknown): Record<string, Record<string, string>> {
+function pin(state: unknown, live?: unknown, env: Record<string, string> = {}): Record<string, Record<string, string>> {
   const run = mkdtempSync(join(dir, "run-"));
   const pins = join(run, "state.json");
   writeFileSync(pins, JSON.stringify(state));
@@ -70,6 +83,7 @@ function pin(state: unknown, live?: unknown): Record<string, Record<string, stri
     stdio: ["ignore", "pipe", "pipe"],
     env: {
       ...process.env,
+      ...env,
       GIT_CONFIG_COUNT: "1",
       GIT_CONFIG_KEY_0: `url.file://${remotes}/.insteadOf`,
       GIT_CONFIG_VALUE_0: "https://github.com/",
@@ -105,6 +119,30 @@ describe("state-pin.sh and branches seeded after main's record", () => {
     const live = { [REPO]: { "cat/r/beans": newBeans, "cat/r/todos": todos } };
     expect(pin({ [REPO]: { "cat/r/beans": oldBeans } }, live)).toEqual({
       [REPO]: { "cat/r/beans": oldBeans, "cat/r/todos": todos },
+    });
+  });
+
+  test("a beans branch whose live tip descends from the record's is served at the live tip", () => {
+    expect(pin({ [REPO]: { "cat/r2/beans": beansRoot } }, { [REPO]: { "cat/r2/beans": beansAhead } })).toEqual({
+      [REPO]: { "cat/r2/beans": beansAhead },
+    });
+  });
+
+  test("a beans branch whose live tip does not descend from the record's keeps the record's tip", () => {
+    expect(pin({ [REPO]: { "cat/r2/beans": beansRoot } }, { [REPO]: { "cat/r2/beans": beansRewritten } })).toEqual({
+      [REPO]: { "cat/r2/beans": beansRoot },
+    });
+  });
+
+  test("a beans branch whose record tip lies beyond the fetched history keeps the record's tip", () => {
+    expect(
+      pin({ [REPO]: { "cat/r2/beans": beansRoot } }, { [REPO]: { "cat/r2/beans": beansAhead } }, { STATE_PIN_DEPTH: "1" }),
+    ).toEqual({ [REPO]: { "cat/r2/beans": beansRoot } });
+  });
+
+  test("a branch other than beans that moved keeps the record's tip", () => {
+    expect(pin({ [REPO]: { "cat/r/todos": todos } }, { [REPO]: { "cat/r/todos": movedTodos } })).toEqual({
+      [REPO]: { "cat/r/todos": todos },
     });
   });
 
