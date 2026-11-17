@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { UsageError, parseArgs, resolveRun } from "../wireframe-check.mjs";
-import { checkWireframes } from "../check-wireframes.ts";
+import { checkWireframes, coveredKeys } from "../check-wireframes.ts";
 
 /** An index-shaped checkout: one layer holding an as-is wireframe and a design proposal. */
 const ROOT = mkdtempSync(join(tmpdir(), "wireframe-check-"));
@@ -155,5 +155,59 @@ describe("check:wireframes reads each instance's own index (cat-harness-tools#28
     expect(r.incomplete.filter((i) => i.problem.includes("was written for topic"))).toEqual([]);
     expect(names).toContain("page");
     expect(names).toContain("content-layer/page");
+  });
+});
+
+describe("a covers entry may name a renderer (renderedBy:<tool>, owner 2026-11-17)", () => {
+  const declared = ["dpi-h-ra/archimate", "dth-hrh/archimate", "cat-harness/beans"];
+  const renderers = [
+    { key: "dpi-h-ra/archimate", renderedBy: "archimate-pages" },
+    { key: "dth-hrh/archimate", renderedBy: "archimate-pages" },
+    { key: "cat-harness/beans", renderedBy: "state-viewer" },
+  ];
+  const tools = new Set(["archimate-pages", "state-viewer", "openapi-pages"]);
+  const isTool = (t: string) => tools.has(t);
+
+  test("it covers every declared visualiser that Tool draws, and nothing else", () => {
+    expect(coveredKeys("renderedBy:archimate-pages", declared, renderers, isTool)).toEqual([
+      "dpi-h-ra/archimate",
+      "dth-hrh/archimate",
+    ]);
+  });
+
+  test("route-key matching is unchanged", () => {
+    expect(coveredKeys("cat-harness/beans", declared, renderers, isTool)).toEqual(["cat-harness/beans"]);
+    expect(coveredKeys("cat-harness/beans/sub", declared, renderers, isTool)).toEqual(["cat-harness/beans"]);
+    expect(coveredKeys("cat-harness/todos", declared, renderers, isTool)).toBeUndefined();
+  });
+
+  test("a real Tool whose pages no mounted layer declares covers nothing, and is not a stale ref", () => {
+    expect(coveredKeys("renderedBy:openapi-pages", declared, renderers, isTool)).toEqual([]);
+  });
+
+  test("a renderer that is no Tool is an unknown ref", () => {
+    expect(coveredKeys("renderedBy:archimate-pagez", declared, renderers, isTool)).toBeUndefined();
+  });
+
+  test("check:wireframes counts each visualiser the renderer draws as covered by the one wireframe", () => {
+    const dir = join(ROOT, "rb");
+    put(join(dir, "archimate-pages", "as-is.html"));
+    writeFileSync(join(dir, "archimate-pages", "intent.md"), "intent");
+    mkdirSync(join(dir, "archimate-pages", "checks"), { recursive: true });
+    const pass = (viewport: string) => ({ viewport, criterion: "renders", result: "pass" });
+    writeFileSync(
+      join(dir, "archimate-pages", "checks", "report.json"),
+      JSON.stringify({ topic: "archimate-pages", candidates: [{ file: "as-is.html", entries: [pass("web"), pass("mobile")] }] }),
+    );
+    writeFileSync(
+      join(dir, "index.json"),
+      JSON.stringify({ wireframes: { "archimate-pages": { covers: ["renderedBy:archimate-pages", "renderedBy:nope"] } } }),
+    );
+    const r = checkWireframes(ROOT, [{ dir, prefix: "cat-harness-tools/" }], [], renderers, isTool);
+    // The declared list comes from ROOT (no declarations), so judge what the renderer resolved against it.
+    expect(r.unknownRef).toContainEqual({ wireframe: "cat-harness-tools/archimate-pages", ref: "renderedBy:nope" });
+    expect(r.incomplete).toEqual([]);
+    expect(r.failing).toEqual([]);
+    expect(r.missingViewport).toEqual([]);
   });
 });

@@ -13,6 +13,12 @@
  *   ({@link wireframeSources}): which wireframe covers which visualiser. A
  *   `covers` entry is a route key, or a route key and a sub-graph
  *   (`cat-harness/auto-docs/index/skills`); one wireframe may cover several.
+ *   An entry may instead name a RENDERER, `renderedBy:<tool>`: it covers every
+ *   declared visualiser whose `renderedBy` is that Tool, in whichever layer
+ *   declares it ({@link RENDERED_BY}). One shared wireframe then draws a page
+ *   kind every instance gets from one writer — `archimate-pages` for each
+ *   DTH's `<dth>/archimate` and smart-ra's `dpi-h-ra/archimate` — with no
+ *   edit for the next DTH (owner, 2026-11-17, option b).
  * - **Each wireframe directory.** It must hold `intent.md`, at least one
  *   candidate `.html`, and `checks/report.json` written by `wireframe:check`
  *   (the Tool `wireframe-check`).
@@ -118,6 +124,48 @@ export function coveredKey(entry: string, declared: readonly string[]): string |
   return declared.find((k) => entry === k || entry.startsWith(`${k}/`));
 }
 
+/** The prefix of a `covers` entry that names a renderer rather than a route key. */
+export const RENDERED_BY = "renderedBy:";
+
+/** Every declared visualiser's route key, with the Tool its `renderedBy` names. */
+export function declaredRenderers(repoRoot: string = REPO_ROOT): { key: string; renderedBy: string }[] {
+  return harnessVisualisers(repoRoot)
+    .filter((v) => typeof v.renderedBy === "string")
+    .map((v) => ({ key: `${v.harness}/${v.id}`, renderedBy: v.renderedBy as string }));
+}
+
+/**
+ * Whether `tool` names a Tool definition (`cat-harness/tools/<tool>/<tool>.json`).
+ * A renderer entry that matches no visualiser in THIS checkout is not a stale
+ * mapping when the Tool exists: the layers that declare its pages may simply
+ * not be mounted here (cat-harness-tools standing alone mounts no DTH). One
+ * that names no Tool at all is a typo, and is reported as an unknown ref.
+ */
+export function isDeclaredTool(tool: string, harnessRoot: string = HARNESS_ROOT): boolean {
+  return /^[a-z0-9][a-z0-9-]*$/.test(tool) && existsSync(join(harnessRoot, "tools", tool, `${tool}.json`));
+}
+
+/**
+ * The declared route keys a `covers` entry covers: one for a route key (or a
+ * sub-graph under one), every visualiser drawn by the named Tool for a
+ * `renderedBy:<tool>` entry. `undefined` when the entry names nothing that
+ * exists — an undeclared route key, or a renderer that is no Tool.
+ */
+export function coveredKeys(
+  entry: string,
+  declared: readonly string[],
+  renderers: readonly { key: string; renderedBy: string }[],
+  isTool: (tool: string) => boolean = isDeclaredTool,
+): string[] | undefined {
+  if (entry.startsWith(RENDERED_BY)) {
+    const tool = entry.slice(RENDERED_BY.length);
+    const keys = renderers.filter((r) => r.renderedBy === tool && declared.includes(r.key)).map((r) => r.key);
+    return keys.length > 0 || isTool(tool) ? keys : undefined;
+  }
+  const key = coveredKey(entry, declared);
+  return key === undefined ? undefined : [key];
+}
+
 /**
  * Where the wireframes are: this harness's own `<site>/wireframes/`, and the
  * `wireframes/` directory of every declared `docs` directory of every OTHER
@@ -176,6 +224,9 @@ export function checkWireframes(
   dirs: string | { dir: string; prefix: string }[] = wireframeSources(repoRoot),
   /** Harnesses whose own wireframes are left out here ({@link wireframesLeftOut}). */
   leftOut: readonly string[] = wireframesLeftOut(),
+  /** Which Tool draws each declared visualiser, for `renderedBy:` entries ({@link declaredRenderers}). */
+  renderers: readonly { key: string; renderedBy: string }[] = declaredRenderers(repoRoot),
+  isTool: (tool: string) => boolean = isDeclaredTool,
 ): WireframeReport {
   const sources = typeof dirs === "string" ? [{ dir: dirs, prefix: "" }] : dirs;
   const r: WireframeReport = {
@@ -195,9 +246,9 @@ export function checkWireframes(
     for (const [topic, w] of Object.entries(index.wireframes)) {
       const name = `${prefix}${topic}`;
       for (const ref of w.covers) {
-        const key = coveredKey(ref, r.declared);
-        if (key === undefined) r.unknownRef.push({ wireframe: name, ref });
-        else if (!coverer.has(key)) coverer.set(key, name);
+        const keys = coveredKeys(ref, r.declared, renderers, isTool);
+        if (keys === undefined) r.unknownRef.push({ wireframe: name, ref });
+        else for (const key of keys) if (!coverer.has(key)) coverer.set(key, name);
       }
       const wdir = join(dir, topic);
       if (!existsSync(join(wdir, "intent.md"))) r.incomplete.push({ wireframe: name, problem: "no intent.md" });

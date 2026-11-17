@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>As-is wireframe: ArchiMate view page</title>
+<link rel="stylesheet" href="../wireframe.css">
+<style>
+  .wrap { max-width: 64rem; margin: 0 auto; padding: 8px 16px 48px; }
+  h1 { font-size: 24px; margin: 12px 0 4px; }
+  h2 { font-size: 18px; border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-top: 28px; }
+  code { overflow-wrap: anywhere; }
+  .drawing { border: 1px solid var(--line); margin: 16px 0; }
+  .band { background: var(--ink); color: var(--bg); padding: 8px 12px; }
+  .band small { display: block; font-style: italic; opacity: .8; }
+  .canvas { padding: 12px; display: grid; gap: 10px; }
+  .layer { border: 1px dashed var(--mute); padding: 8px; }
+  .layer .wf-mute { margin-bottom: 6px; }
+  .boxes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .boxes .wf-tile { flex: 1 1 8rem; font-size: 12px; text-align: center; }
+  .boxes .wf-tile i { display: block; text-align: right; font-size: 10px; color: var(--mute); }
+  .key { border: 1px solid var(--line); margin: 0 12px 12px; padding: 8px 12px; font-size: 13px; }
+  .key ul { margin: 4px 0 8px; padding-left: 18px; }
+  .cols { columns: 4 12rem; column-gap: 24px; list-style: none; padding: 0; margin: 8px 0; }
+  .cols li { break-inside: avoid; margin: 0 0 6px; }
+  .t { color: var(--mute); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wf-meta">As-is wireframe · archimate-pages · a view's page · covers: renderedBy:archimate-pages (drawn from en/dth-hrh/archimate/0.1.0-draft.1/view/health-workforce-registry-and-nhwa-dth-hrh/)</div>
+<div class="wrap">
+<p><a href="#">← DTH-HRH overlay 0.1.0-draft.1</a></p>
+<h1>Health workforce registry and NHWA (dth-hrh)</h1>
+<p class="wf-mute">View · drawn in the document as fig:nhwa-hwr (<code>folio/dth-hrh/ch07-functional-requirements/f-nhwa-hwr.md</code>)</p>
+<p>smart-ra 0.2.0 view "1. Central Health Workforce Registry" with the NHWA work that dth-hrh owns: CDE-HWR, the NHWA Dataset and the four NHWA modules.</p>
+
+<figure class="drawing" aria-label="The view, drawn as SVG and scaled to the width">
+  <div class="band"><strong>Health workforce registry and NHWA (dth-hrh)</strong><small>Drawn from the ArchiMate model "DTH-HRH overlay on the DPI-H reference architecture"</small></div>
+  <div class="canvas">
+    <div class="layer wf-fill"><div class="wf-mute">Motivation: stakeholders, values, goal, outcomes</div>
+      <div class="boxes"><div class="wf-tile"><i>Stakeholder</i>Health Workers</div><div class="wf-tile"><i>Value</i>Professional Identity &amp; Security</div><div class="wf-tile"><i>Outcome</i>Enabled Health Worker Verification</div><div class="wf-tile"><i>Outcome</i>NHWA Module 1: Stock and flow</div></div>
+    </div>
+    <div class="layer"><div class="wf-mute">Strategy: capabilities</div>
+      <div class="boxes"><div class="wf-tile"><i>Capability</i>Health Workforce Management</div><div class="wf-tile"><i>Capability</i>Interoperability Management</div><div class="wf-tile"><i>Capability</i>Analytics &amp; Business Intelligence</div></div>
+    </div>
+    <div class="layer wf-fill"><div class="wf-mute">Application: components, functions, services, data objects; lines between boxes are the relationships</div>
+      <div class="boxes"><div class="wf-tile"><i>Application Component</i>DPI-H National Health Workforce Directory/Registry</div><div class="wf-tile"><i>Application Component</i>DPI-F Information Mediator</div><div class="wf-tile"><i>Data Object</i>CDE-HWR</div><div class="wf-tile"><i>Data Object</i>NHWA Dataset</div></div>
+    </div>
+  </div>
+  <div class="key"><strong>Key</strong>
+    <div>Colour: which part of the architecture a box belongs to</div>
+    <ul><li>Why: who cares, and the drivers, goals, outcomes and values</li><li>Strategy: what the organisation is able to do</li><li>Software: systems, the services they offer, and the data they hold</li></ul>
+    <div>Shape: what kind of thing a box is · Other marks · Line: how two boxes are related, read from where the line starts</div>
+  </div>
+</figure>
+
+<h2>Elements in this view (46)</h2>
+<ul class="cols">
+  <li><a href="#">Patients</a> <span class="t">Stakeholder</span></li>
+  <li><a href="#">Trust &amp; Safety</a> <span class="t">Value</span></li>
+  <li><a href="#">Establishment of Authoritative National Health Workforce Registry</a> <span class="t">Outcome</span></li>
+  <li><a href="#">Health Workers</a> <span class="t">Stakeholder</span></li>
+  <li><a href="#">DPI-H National Health Workforce Directory/Registry</a> <span class="t">Application Component</span></li>
+  <li><a href="#">Health Worker</a> <span class="t">Data Object</span></li>
+  <li><a href="#">Health Workforce Management</a> <span class="t">Capability</span></li>
+  <li><a href="#">Generate Reports</a> <span class="t">Application Function</span></li>
+  <li class="wf-mute">… and 38 more, in the same form</li>
+</ul>
+
+<p><a href="#">This node as JSON-LD</a> · <a href="#">The drawing (SVG)</a></p>
+</div>
+</body>
+</html>

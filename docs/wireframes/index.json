@@ -1,0 +1,8 @@
+{
+  "_comment": "Which wireframe covers which visualiser, for the pages THIS layer's writers draw. A wireframe sits beside its writer: `archimate-pages` is drawn by `archimate/scripts/gen-archimate-pages.ts`, here, for every layer that declares a visualiser rendered by it (smart-ra's `dpi-h-ra/archimate`, each DTH's `<dth>/archimate`). So it covers them by RENDERER, `renderedBy:archimate-pages`, not by route key: the next DTH is covered with no edit here (owner, 2026-11-17, option b). `wireframe.css` is the shared mid-fidelity stylesheet, copied from folio-assistant-core's docs/wireframes/ so the drawings render here on their own.",
+  "wireframes": {
+    "archimate-pages": {
+      "covers": ["renderedBy:archimate-pages"]
+    }
+  }
+}

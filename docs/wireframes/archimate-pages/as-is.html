@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>As-is wireframe: ArchiMate model page</title>
+<link rel="stylesheet" href="../wireframe.css">
+<style>
+  .wrap { max-width: 60rem; margin: 0 auto; padding: 8px 16px 48px; }
+  h1 { font-size: 24px; margin: 12px 0 4px; }
+  h2 { font-size: 18px; border-bottom: 1px solid var(--line); padding: 4px 0 4px 10px; border-left: 6px solid var(--line); margin-top: 28px; }
+  h2.plain { border-left: 0; padding-left: 0; }
+  .top { display: flex; gap: 24px; align-items: flex-start; }
+  .top .doc { flex: 1; min-width: 0; }
+  .toc { flex: 0 0 16rem; }
+  .toc ul { list-style: none; margin: 0; padding: 0; }
+  .toc li { display: flex; justify-content: space-between; min-height: 32px; align-items: center; }
+  .cols { columns: 3 14rem; column-gap: 24px; list-style: none; padding: 0; margin: 8px 0; }
+  .cols li { break-inside: avoid; margin: 0 0 6px; }
+  .t { color: var(--mute); font-size: 13px; }
+  .n { font-size: 12px; border: 1px solid var(--line); padding: 0 6px; }
+  @media (max-width: 700px) { .top { flex-direction: column-reverse; } .toc { flex: none; width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wf-meta">As-is wireframe · archimate-pages · a model's page · covers: renderedBy:archimate-pages (drawn from en/dth-hrh/archimate/0.1.0-draft.1/)</div>
+<div class="wrap">
+<p><a href="#">← ArchiMate models</a></p>
+<h1>DTH-HRH overlay 0.1.0-draft.1</h1>
+<p class="wf-mute"><a href="#">Metamodel in use</a>: the element types and relationships this model uses, derived from it</p>
+<div class="top">
+  <div class="doc">
+    <p>2 views · 46 elements · 49 relationships</p>
+    <p>Overlay of dth-hrh on smart-ra ArchiMate 0.2.0. Elements tagged overlay:base are reference copies of smart-ra elements (the IRI names the original); elements tagged overlay:owner=dth-hrh are added by this DTH (the NHWA work) and are not part of smart-ra.</p>
+  </div>
+  <nav class="toc wf-box" aria-label="Contents">
+    <div class="wf-mute">CONTENTS</div>
+    <ul>
+      <li><a href="#views">Views</a></li>
+      <li><a href="#strategy">Strategy</a><span class="n">7</span></li>
+      <li><a href="#application">Application</a><span class="n">18</span></li>
+      <li><a href="#motivation">Motivation</a><span class="n">21</span></li>
+    </ul>
+  </nav>
+</div>
+
+<h2 class="plain" id="views">Views</h2>
+<ul class="cols">
+  <li><a href="#">Health workforce registry and NHWA (dth-hrh)</a></li>
+  <li><a href="#">NHWA on the health workforce registry (poster, dth-hrh)</a></li>
+</ul>
+
+<h2 id="strategy">Strategy (7)</h2>
+<ul class="cols">
+  <li><a href="#">Analytics &amp; Business Intelligence</a> <span class="t">Capability</span></li>
+  <li><a href="#">Client Identity Management</a> <span class="t">Capability</span></li>
+  <li><a href="#">Governance, Policy, and Legislation</a> <span class="t">Capability</span></li>
+  <li><a href="#">Health Financing Management</a> <span class="t">Capability</span></li>
+  <li><a href="#">Health Workforce Management</a> <span class="t">Capability</span></li>
+  <li><a href="#">Interoperability Management</a> <span class="t">Capability</span></li>
+  <li><a href="#">Privacy / Concent/ Trust</a> <span class="t">Capability</span></li>
+</ul>
+
+<h2 id="application">Application (18)</h2>
+<ul class="cols">
+  <li><a href="#">DPI-F Information Mediator</a> <span class="t">Application Component</span></li>
+  <li><a href="#">DPI-H National Health Workforce Directory/Registry</a> <span class="t">Application Component</span></li>
+  <li><a href="#">DPI-H: Facility Registry</a> <span class="t">Application Component</span></li>
+  <li><a href="#">CRUD Health Workforce Record</a> <span class="t">Application Function</span></li>
+  <li><a href="#">READ License Status</a> <span class="t">Application Function</span></li>
+  <li><a href="#">Registry Management Service</a> <span class="t">Application Service</span></li>
+  <li><a href="#">Verification &amp; Validation Service</a> <span class="t">Application Service</span></li>
+  <li><a href="#">CDE-HWR: Core Data Elements for the Health Workforce Registry</a> <span class="t">Data Object</span></li>
+  <li><a href="#">Health Worker</a> <span class="t">Data Object</span></li>
+  <li class="wf-mute">… and 9 more, in the same form</li>
+</ul>
+
+<h2 id="motivation">Motivation (21)</h2>
+<ul class="cols">
+  <li><a href="#">A Central Health Workforce Registry</a> <span class="t">Goal</span></li>
+  <li><a href="#">Health worker density at subnational level; distribution by facility ownership and by facility type (1-02, 1-05, 1-06)</a> <span class="t">Outcome</span></li>
+  <li><a href="#">NHWA Module 1: Stock and flow</a> <span class="t">Outcome</span></li>
+  <li><a href="#">Health Workers</a> <span class="t">Stakeholder</span></li>
+  <li><a href="#">Ministry of Health</a> <span class="t">Stakeholder</span></li>
+  <li><a href="#">Trust &amp; Safety</a> <span class="t">Value</span></li>
+  <li class="wf-mute">… and 15 more, in the same form</li>
+</ul>
+
+<p><a href="#">This node as JSON-LD</a> · <a href="#">The Archi model file</a></p>
+</div>
+</body>
+</html>

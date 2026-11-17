@@ -23,6 +23,14 @@
       ]
     },
     {
+      "id": "cat-harness-tools-docs",
+      "path": "docs/",
+      "description": "This layer's docs directory, holding only `wireframes/`: the as-is wireframes of the pages this layer's writers draw, beside their writer. `archimate-pages` (drawn by `archimate/scripts/gen-archimate-pages.ts`) covers every visualiser declared with `renderedBy: archimate-pages` (smart-ra's and each DTH's `archimate`) through `covers: [\"renderedBy:archimate-pages\"]` in `wireframes/index.json` (owner, 2026-11-17, option b). `check:wireframes` reads it through `wireframeSources`. Not composed: there are no reader pages here.",
+      "graphTypologies": [
+        "docs"
+      ]
+    },
+    {
       "id": "cat-harness-tools-validators",
       "path": "validators/",
       "description": "The validators this layer's code provides, one folio-validator/v1 node each naming the graph typology and $schema family it checks, as cat-harness and the layers above it declare theirs. Among them, `dynamic-state.json` checks the `cat-harness-dynamic-state/v1` document `writeDynamicState` writes; its family is listed in the docs typology here, so its node is here too.",
