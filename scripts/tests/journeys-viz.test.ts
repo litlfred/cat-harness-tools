@@ -502,6 +502,22 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(p2).toContain("Trust anchor ★");
     expect(p2).toContain("— a signature crosses");
     expect(p2).toContain('name="policy:viewer:status"');
+    // Owner, 2026-11-17: the room's question is the presenter's; the policy questions are full width, below the moment's two columns.
+    expect(p2).toContain('<section class="jp-ask jp-presenter-only">');
+    const walkEnd = p2.indexOf('<div class="jp-hood-toggle">');
+    const policyAt = p2.indexOf('<section class="jp-card jp-pad jp-tone-indigo jp-policy">');
+    expect(policyAt).toBeGreaterThan(p2.indexOf('<div class="jp-walk-r">'));
+    expect(p2.slice(p2.indexOf('<div class="jp-walk-r">'), policyAt)).toMatch(/<\/div>\n<\/div>\n$/);
+    expect(policyAt).toBeLessThan(walkEnd);
+  });
+  test("presenter mode is off until the presenter turns it on, and under the hood starts hidden (owner, 2026-11-17)", () => {
+    expect(p2).toContain('<html lang="en" data-presenter="off">');
+    expect(p2).toContain('if(localStorage.getItem("jp:presenter")==="on")');
+    expect(p2).toContain('<button type="button" data-jp-hood-toggle aria-controls="hood" aria-expanded="false">');
+    expect(p2).toContain('<section class="jp-hood" id="hood" data-jp-hood hidden>');
+    expect(at("assets/present.js")).toContain('if (store("jp:hood") === "on") setHood(true);');
+    // The journey page's under the hood is folded too.
+    expect(files.some((f) => /<details class="jv-col jv-hood"><summary class="jv-hood-h">Under the hood<\/summary>/.test(String(f.content)))).toBe(true);
   });
   test("a step: the people, each with the avatar in the card's header (never inside a sentence), and under the hood", () => {
     expect(p2).toContain('class="jp-who" style="--c:#123456"');

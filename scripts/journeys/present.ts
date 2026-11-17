@@ -604,14 +604,14 @@ export function frame(o: FrameOpts): string {
     .join("");
   const range = rangeLabel(o.p.steps, pr.scope);
   const html = `<!doctype html>
-<html lang="en" data-presenter="on">
+<html lang="en" data-presenter="off">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${e(o.title)}</title>
 ${NAVBAR_OPT_OUT}
 <link rel="stylesheet" href="${o.root}assets/present.css">
-<script>try{if(localStorage.getItem("jp:presenter")==="off")document.documentElement.setAttribute("data-presenter","off")}catch(_){}</script>
+<script>try{if(localStorage.getItem("jp:presenter")==="on")document.documentElement.setAttribute("data-presenter","on")}catch(_){}</script>
 <script src="${o.root}assets/present.js" defer></script>
 ${panelHead(o.body, `${o.root}assets/`)}
 ${o.head ?? ""}
@@ -1042,7 +1042,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
       return `<div class="jp-box jp-proc">${head}${d ? `${zoom}${fig}` : `<p class="jp-small jp-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`}</div>`;
     })
     .join("");
-  return `<section class="jp-hood" id="hood" data-jp-hood>
+  return `<section class="jp-hood" id="hood" data-jp-hood hidden>
 <div class="jp-hood-h">${icon("cpu", "jp-sky3")}<h3>Under the hood</h3><span>What the standards and tools are doing at this moment</span></div>
 <div class="jp-hood-in">
 ${st.technicalSummary ? `<div class="jp-sowhat">${icon("bulb", "jp-amber jp-i-lg")}<div><span class="jp-label jp-amber8">Technical so-what</span><p>${e(st.technicalSummary)}</p></div></div>` : ""}
@@ -1091,7 +1091,7 @@ ${ladder && level >= 0 ? meter(ladder, level) : ""}
 <p class="jp-small">Held in: ${e(st.record.heldWhere)}</p>
 ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> ${personaText(st.handoff.summary, p.cast, pl)}</span></div>` : ""}</section>`
     : "";
-  const ask = s.ws?.askTheRoom ? `<section class="jp-ask"><h3 class="jp-h">${icon("message")} Ask the room</h3><p>${e(s.ws.askTheRoom)}</p></section>` : "";
+  const ask = s.ws?.askTheRoom ? `<section class="jp-ask jp-presenter-only"><h3 class="jp-h">${icon("message")} Ask the room</h3><p>${e(s.ws.askTheRoom)}</p></section>` : "";
   const whatIf = (st.whatIf ?? [])
     .map(
       (wf) => `<section class="jp-card jp-pad jp-tone-amber jp-whatif" data-jp-whatif><h3 class="jp-h jp-amber8">${icon("branch")} What if…</h3><p class="jp-wf-q">${e(wf.scenario)}</p><button type="button" class="jp-reveal" data-jp-reveal>Let the room guess, then reveal</button><p class="jp-wf-a">${e(wf.outcome)}</p></section>`,
@@ -1125,11 +1125,12 @@ ${meta ? `<div class="jp-meta">${meta}</div>` : ""}
 ${st.painPoint || st.enabler ? `<section class="jp-pe">${st.painPoint ? `<div class="jp-pain"><div class="jp-h">${icon("alert")} Without this</div><p>${personaText(st.painPoint, p.cast, pl)}</p></div>` : ""}${st.enabler ? `<div class="jp-enable"><div class="jp-h">${icon("sparkles")} What makes it work</div><p>${personaText(st.enabler, p.cast, pl)}</p></div>` : ""}</section>` : ""}
 </div>
 <div class="jp-walk-r">
-${record}${ask}${whatIf}${policy}${policyPanel(p, s, toWorkshop)}${cue}
 ${screens ? `<div class="jp-sees">${screens}</div>` : ""}
+${record}${ask}${whatIf}${policy}${cue}
 </div>
 </div>
-<div class="jp-hood-toggle"><i></i><button type="button" class="is-on" data-jp-hood-toggle aria-controls="hood" aria-expanded="true">${icon("cpu")}<span class="jp-hood-hide">Hide what’s under the hood</span><span class="jp-hood-show">Show what’s under the hood</span></button><i></i></div>
+${policyPanel(p, s, toWorkshop)}
+<div class="jp-hood-toggle"><i></i><button type="button" data-jp-hood-toggle aria-controls="hood" aria-expanded="false">${icon("cpu")}<span class="jp-hood-hide">Hide what’s under the hood</span><span class="jp-hood-show">Show what’s under the hood</span></button><i></i></div>
 ${hood(corpus, p, s, links, root)}`;
   return frame({
     p,

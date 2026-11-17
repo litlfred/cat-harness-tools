@@ -866,7 +866,8 @@
         setHood(!b.classList.contains("is-on"));
       });
     });
-    if (store("jp:hood") === "off") setHood(false);
+    // Under the hood starts hidden (owner, 2026-11-17); shown when this browser last showed it.
+    if (store("jp:hood") === "on") setHood(true);
     each(".jp-proc", zoom);
     each("input[data-jv-store]", remember);
     each("[data-jv-text]", keepText);

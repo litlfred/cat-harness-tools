@@ -766,7 +766,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
 ${illustrationHtml(corpus, j, s, personas)}
 <div class="jv-step-body">
 <div class="jv-col">${story}</div>
-<div class="jv-col jv-hood"><h4 class="jv-hood-h">Under the hood</h4>${hood}</div>
+<details class="jv-col jv-hood"><summary class="jv-hood-h">Under the hood</summary>${hood}</details>
 </div>
 ${processes ? `<section class="jv-procs"><h4>Where it happens in the process</h4>${processes}</section>` : ""}
 ${ws}

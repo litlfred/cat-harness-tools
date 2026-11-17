@@ -162,7 +162,9 @@ body.jv {
 .jv-step-body { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; margin-top: 8px; }
 @media (max-width: 860px) { .jv-step-body { grid-template-columns: 1fr; } }
 .jv-hood { background: var(--jv-soft); border-radius: var(--jv-radius); padding: 2px 16px 12px; }
-.jv-hood-h { color: var(--jv-accent) !important; }
+.jv-hood-h { color: var(--jv-accent) !important; font-weight: 700; cursor: pointer; padding: 10px 0; }
+/* Under the hood starts folded (owner, 2026-11-17). */
+.jv-hood:not([open]) { align-self: start; }
 .jv-tech { font-weight: 550; }
 .jv-prose p { margin: 8px 0; }
 .jv-pre { margin: 12px 0; padding: 8px 12px; border: 1px dashed var(--jv-line); border-radius: 8px; }
