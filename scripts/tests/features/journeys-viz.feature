@@ -236,15 +236,6 @@ Feature: The journeys viewer
     And a module's sheet link opens ../discuss/#sheet-s1
     And present.js opens the panel an address names and prints the sheets alone
 
-  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_map:_a_lane_per_person_to_focus_on,_the_two_toggles,_a_column_per_step,_the_technical_layer,_the_per-view_note
-  Scenario: The map has a lane per person to focus on, two toggles, a column per step, the technical layer and the note
-    Given the map page
-    Then it can focus ana and show pain and tech
-    And it has a lane row for cleo
-    And it links the wallet block's page
-    And a hand-off to a cast member wears their avatar, "Clinic EMR → Ana"
-    And it has a hidden panel, "Open screen S2" and the note "Read across, then down."
-
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_journey_map_is_folded_into_How_it_works:_its_tab_is_gone,_map/_redirects,_and_its_hand-offs_are_How_it_works'_Data_on_the_move_(owner,_2026-11-17)
   Scenario: The journey map is folded into How it works
     Given the walkthrough, how, discussion and overview pages
