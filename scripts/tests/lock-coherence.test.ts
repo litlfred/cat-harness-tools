@@ -291,20 +291,21 @@ function g(dir: string, ...args: string[]): string {
   return r.stdout.trim();
 }
 
-function commit(dir: string, file: string, body: string, date?: string): string {
+function commit(dir: string, file: string, body: string, date?: string, authorDate = date): string {
   writeFileSync(join(dir, file), body);
   g(dir, "add", "-A");
   if (date) {
     const r = spawnSync("git", ["-C", dir, "commit", "-q", "-m", file], {
       encoding: "utf-8",
-      env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.org", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.org", GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+      env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.org", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.org", GIT_AUTHOR_DATE: authorDate, GIT_COMMITTER_DATE: date },
     });
     if (r.status !== 0) throw new Error(`git commit: ${r.stderr}`);
   } else g(dir, "commit", "-q", "-m", file);
   return g(dir, "rev-parse", "HEAD");
 }
 
-const lockOf = (pins: Pin[]) => JSON.stringify({ $schema: "cat-harness-mount-lock/v1", mounts: pins, instances: [] }, null, 2);
+const lockOf = (pins: Pin[], pinnedAt?: string) =>
+  JSON.stringify({ $schema: "cat-harness-mount-lock/v1", ...(pinnedAt ? { pinnedAt } : {}), mounts: pins, instances: [] }, null, 2);
 
 describe("the git reader: real commits, real locks", () => {
   let root: string;
@@ -390,7 +391,7 @@ describe("the git reader: real commits, real locks", () => {
     const repinCommit = commit(layer, "index.lock.json", lockOf([pin("dated", p2)]), "2026-01-01T10:15:00Z");
     commit(layer, "other.txt", "x", "2026-01-01T10:30:00Z");
     const T = lockWrittenAt(lock);
-    expect(T).toEqual({ at: Date.parse("2026-01-01T10:15:00Z") / 1000, sha: repinCommit });
+    expect(T).toEqual({ at: Date.parse("2026-01-01T10:15:00Z") / 1000, sha: repinCommit, source: "author" });
 
     const judgeAt = (ref: string, at?: string) => {
       const rd = reader();
@@ -413,7 +414,120 @@ describe("the git reader: real commits, real locks", () => {
 
     // An uncommitted lock is being written now: T is now.
     writeFileSync(lock, lockOf([pin("dated", p3)]));
-    expect(lockWrittenAt(lock, "HEAD", () => 42)).toEqual({ at: 42, sha: "uncommitted" });
+    expect(lockWrittenAt(lock, "HEAD", () => 42)).toEqual({ at: 42, sha: "uncommitted", source: "uncommitted" });
+  });
+
+  describe("a squash merge dates the lock's commit at the MERGE (merge-manager, 2026-11-17)", () => {
+    // harness main: h1 10:00, h2 10:10 (the re-pin pins it), h3 10:20 (merged
+    // while the re-pin's pull request waited). The squash lands at 10:25 with
+    // author and committer dates both 10:25, as GitHub writes them.
+    const at = (hhmm: string) => Date.parse(`2026-01-01T${hhmm}:00Z`) / 1000;
+    let h2 = "";
+    let h3 = "";
+    beforeAll(() => {
+      const dir = join(root, "src", "squashed");
+      spawnSync("mkdir", ["-p", dir]);
+      g(dir, "init", "-q", "-b", "main");
+      urls["litlfred/squashed"] = `file://${dir}`;
+      commit(dir, "a.txt", "1", "2026-01-01T10:00:00Z");
+      h2 = commit(dir, "a.txt", "2", "2026-01-01T10:10:00Z");
+      h3 = commit(dir, "a.txt", "3", "2026-01-01T10:20:00Z");
+    });
+    const layerWith = (name: string, body: string, date: string, authorDate = date) => {
+      const layer = join(root, "src", name);
+      spawnSync("mkdir", ["-p", layer]);
+      g(layer, "init", "-q", "-b", "main");
+      const sha = commit(layer, "index.lock.json", body, date, authorDate);
+      return { lock: join(layer, "index.lock.json"), sha };
+    };
+    const judgeLock = (lock: string, ref = h2) => {
+      const rd = reader();
+      return judgeFreshness(
+        [pin("squashed", ref)],
+        (p) => rd.mainOf(p.repository),
+        (r, a, b) => rd.relate(r, a, b),
+        { writtenAt: lockWrittenAt(lock), mainSince: (p, m) => rd.mainSince(p.repository, p.ref, m), pinAt: (p) => rd.commitAt(p.repository, p.ref) },
+      );
+    };
+
+    test("without pinnedAt, T is the squash's date and the pin loses the race: stale", () => {
+      const { lock, sha } = layerWith("squash-no-pinned-at", lockOf([pin("squashed", h2)]), "2026-01-01T10:25:00Z");
+      expect(lockWrittenAt(lock)).toEqual({ at: at("10:25"), sha, source: "author" });
+      const f = judgeLock(lock);
+      expect(f.stale).toEqual([expect.objectContaining({ ref: h2, main: h3, relation: "behind", hadAtT: expect.objectContaining({ sha: h3 }) })]);
+    });
+
+    test("with pinnedAt written at the re-pin (10:15), main's 10:20 merge is after T: fresh, and the output says why", () => {
+      const { lock, sha } = layerWith("squash-pinned-at", lockOf([pin("squashed", h2)], "2026-01-01T10:15:00Z"), "2026-01-01T10:25:00Z");
+      expect(lockWrittenAt(lock)).toEqual({ at: at("10:15"), sha, source: "recorded", commitAt: at("10:25") });
+      const f = judgeLock(lock);
+      expect(f).toMatchObject({ fresh: 1, stale: [], undetermined: [] });
+      expect(f.freshAtRepin).toEqual([expect.objectContaining({ ref: h2, main: h3, firstAfter: { sha: h3, at: at("10:20") } })]);
+      const text = formatFreshness(f, "fixture");
+      expect(text).toContain("T = 2026-01-01T10:15:00Z (pinnedAt recorded in the lock");
+      expect(text).toContain("but main moved after the lock was written");
+    });
+
+    test("a pin already behind main at pinnedAt is still stale", () => {
+      const { lock } = layerWith("squash-pinned-late", lockOf([pin("squashed", h2)], "2026-01-01T10:21:00Z"), "2026-01-01T10:25:00Z");
+      expect(judgeLock(lock).stale.map((s) => s.ref)).toEqual([h2]);
+    });
+
+    test("without pinnedAt, a rebase merge's author date (the pull request's) is T: fresh", () => {
+      const { lock, sha } = layerWith("rebased", lockOf([pin("squashed", h2)]), "2026-01-01T10:25:00Z", "2026-01-01T10:15:00Z");
+      expect(lockWrittenAt(lock)).toEqual({ at: at("10:15"), sha, source: "author" });
+      expect(judgeLock(lock)).toMatchObject({ fresh: 1, stale: [] });
+    });
+
+    test("a pinnedAt later than the commit that carries the lock is set aside, with a note", () => {
+      const { lock, sha } = layerWith("pinned-at-future", lockOf([pin("squashed", h2)], "2026-01-01T11:00:00Z"), "2026-01-01T10:25:00Z");
+      const t = lockWrittenAt(lock);
+      expect(t).toMatchObject({ at: at("10:25"), sha, source: "author", note: expect.stringContaining("later than the commit") });
+      const f = judgeLock(lock);
+      expect(f.stale).toHaveLength(1);
+      expect(formatFreshness(f, "fixture")).toContain("later than the commit that carries the lock");
+    });
+
+    test("a pinnedAt that is not a date is set aside, with a note", () => {
+      const { lock } = layerWith("pinned-at-junk", lockOf([pin("squashed", h2)], "yesterday"), "2026-01-01T10:25:00Z");
+      expect(lockWrittenAt(lock)).toMatchObject({ at: at("10:25"), source: "author", note: expect.stringContaining("not an ISO 8601") });
+    });
+
+    test("a pinnedAt older than the pin's own commit (a hand-edited ref) judges that pin against the commit's date", () => {
+      // pinnedAt 09:00 predates h3 (10:20): h3 was not main at 09:00.
+      const { lock } = layerWith("pinned-at-hand-edited", lockOf([pin("squashed", h2)], "2026-01-01T09:00:00Z"), "2026-01-01T10:25:00Z");
+      const f = judgeLock(lock);
+      expect(f.pinnedAtIgnored).toEqual([expect.stringContaining("squashed: its commit")]);
+      expect(f.stale.map((s) => s.ref)).toEqual([h2]);
+      expect(formatFreshness(f, "fixture")).toContain("judged against the commit's date instead");
+    });
+
+    test("an uncommitted lock's pinnedAt is T, unless it is in the future", () => {
+      const { lock } = layerWith("uncommitted-pinned-at", lockOf([pin("squashed", h2)]), "2026-01-01T10:25:00Z");
+      writeFileSync(lock, lockOf([pin("squashed", h3)], "2026-01-01T10:30:00Z"));
+      const now = () => at("10:40");
+      expect(lockWrittenAt(lock, "HEAD", now)).toEqual({ at: at("10:30"), sha: "uncommitted", source: "recorded", commitAt: at("10:40") });
+      writeFileSync(lock, lockOf([pin("squashed", h3)], "2026-01-01T12:00:00Z"));
+      expect(lockWrittenAt(lock, "HEAD", now)).toMatchObject({ at: at("10:40"), source: "uncommitted", note: expect.stringContaining("in the future") });
+    });
+
+    test("--repo: the pinnedAt read at the commit is T", () => {
+      const { sha } = layerWith("repo-pinned-at", lockOf([pin("squashed", h2)], "2026-01-01T10:15:00Z"), "2026-01-01T10:25:00Z");
+      const dir = join(root, "src", "repo-pinned-at");
+      g(dir, "config", "uploadpack.allowFilter", "true");
+      g(dir, "config", "uploadpack.allowAnySHA1InWant", "true");
+      urls["litlfred/repo-pinned-at"] = `file://${dir}`;
+      const rd = reader();
+      const l = rd.lockAt("litlfred/repo-pinned-at", sha);
+      expect(l).toMatchObject({ state: "lock", pinnedAt: "2026-01-01T10:15:00Z" });
+      const recorded = l.state === "lock" ? (l.pinnedAt ?? null) : null;
+      expect(lockWrittenAt(join(rd.dirOf("litlfred/repo-pinned-at"), "index.lock.json"), sha, undefined, recorded)).toEqual({
+        at: at("10:15"),
+        sha,
+        source: "recorded",
+        commitAt: at("10:25"),
+      });
+    });
   });
 
   test("T of a lock outside any git repository is unknown", () => {

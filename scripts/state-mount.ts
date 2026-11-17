@@ -42,6 +42,19 @@
  * empty and this reports `not-enabled` and exits 0, so the loud case stays
  * meaningful.
  *
+ * ## A missing OWN branch is created: the mount is the layer's initialization
+ *
+ * Owner, 2026-11-17: the state branches a layer declares are made upon
+ * initialization by the layer that needs them. So the CLI (and the
+ * session-start hook, which runs it) creates a branch the ROOT layer declares
+ * and its own remote lacks, seeded empty with the standard layout
+ * (`state-branch-init.ts`, the same code as `state:seed --init`), and then
+ * mounts it. A mounted dependency's branch is never created here: its miss
+ * names the dependency's repository and the command to run there. A push
+ * this token may not make is one line naming `state:seed --init`. `--no-init`
+ * or `CAT_STATE_INIT=0` turns the creation off; CI's direct `mountState({})`
+ * never creates, because its origin points at pinned mirrors.
+ *
  * ## It never discards work
  *
  * A mount holding unpushed edits is left exactly as it is and reported
@@ -81,6 +94,7 @@ import {
 import { layerRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { tools } from "../tools/discover.js";
 import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
+import { dependencyRemedy, initEnabled, initLocation, initRemedy, ownStateLocations } from "./state-branch-init.ts";
 
 /**
  * One declared graph's outcome in the fan-out. `state` is {@link mountTip}'s
@@ -163,6 +177,16 @@ export interface MountOptions {
    * `.gitignore` block is rewritten only over current layer mounts.
    */
   layerMounts?: Parameters<typeof remoteExitCode>[0];
+  /**
+   * Create a MISSING state branch the root layer itself declares, seeded with
+   * the standard layout (`state-branch-init.ts`), then mount it. Off unless
+   * asked: the CLI (and so the session-start hook) asks, unless
+   * `--no-init` or `CAT_STATE_INIT=0`. CI calls {@link mountState} directly
+   * with its origin rewritten to pinned mirrors, where a push would land in
+   * the mirror, so it does not. A mounted dependency's branch is never created
+   * from here, whatever this says.
+   */
+  initMissing?: boolean;
 }
 
 function git(cwd: string, args: string[]): { status: number; stdout: string; stderr: string } {
@@ -205,7 +229,15 @@ export function mountState(opts: MountOptions = {}): MountResult {
       graphs: [],
     };
   }
-  const result = fanOut(root, locations, opts.store);
+  let own = new Set<string>();
+  if (opts.initMissing) {
+    try {
+      own = new Set(ownStateLocations(root, locations).map((l) => l.path));
+    } catch {
+      // Could not tell which are the root's own: create none, mount as before.
+    }
+  }
+  const result = fanOut(root, locations, opts.store, own);
   // A mount that landed is another branch's bytes in this checkout, so it is
   // ignored here the moment it lands. Without this, `todos/` and
   // `issue-marks/` showed up untracked after every `state:mount` in the index
@@ -302,7 +334,7 @@ export function syncStateIgnores(root: string, locations: readonly Pick<TipLocat
  * leave the rest in the one state bean `1xhc` forbids — not attempted, and
  * indistinguishable from fine.
  */
-function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptions): MountResult {
+function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptions, own: ReadonlySet<string> = new Set()): MountResult {
   const graphs: GraphMount[] = [];
   for (const loc of locations) {
     const base = { id: locationKey(loc), path: loc.path, branch: loc.repository ? `${loc.repository}:${loc.branch}` : loc.branch };
@@ -330,9 +362,22 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
       // Every attempt asks afresh (bean `x5e0`): a remote that has since gained
       // the branch, or a changed origin, must not keep reading absent.
       clearAbsence(root, loc);
-      const r = mountTip(loc, { repoRoot: root, store });
+      let r = mountTip(loc, { repoRoot: root, store });
+      // The root layer's OWN declared branch, missing: the layer's
+      // initialization creates it (owner, 2026-11-17), then it is mounted.
+      let created = "";
+      if (r.state === "miss" && own.has(loc.path)) {
+        const c = initLocation(loc, { repoRoot: root, store });
+        if (c.state === "created" || c.state === "exists") {
+          created = c.state === "created" ? `; ${c.reason} (layer initialization)` : "";
+          r = mountTip(loc, { repoRoot: root, store });
+        } else {
+          graphs.push({ ...base, state: c.state === "unknown" ? "unknown" : "miss", reason: initRemedy(c) });
+          continue;
+        }
+      }
       if (r.state === "mounted") {
-        graphs.push({ ...base, state: "mounted", reason: `${r.files} file(s) at ${r.tip.slice(0, 12)}`, tip: r.tip, files: r.files });
+        graphs.push({ ...base, state: "mounted", reason: `${r.files} file(s) at ${r.tip.slice(0, 12)}${created}`, tip: r.tip, files: r.files });
       } else if (r.state === "miss" && loc.unownedBy !== undefined) {
         const ns = namespaceCarried(loc, root, store);
         if (ns.state === "not-carried") {
@@ -349,6 +394,10 @@ function fanOut(root: string, locations: TipLocation[], store?: BranchStoreOptio
         } else {
           graphs.push({ ...base, state: "unknown", reason: `${r.reason}; and whether this checkout's remote keeps that namespace could not be asked: ${ns.reason}` });
         }
+      } else if (r.state === "miss" && loc.repository !== undefined && /does not exist/.test(r.reason)) {
+        // A MOUNTED layer's branch: never created here. One line that says
+        // whose it is and what to run there.
+        graphs.push({ ...base, state: "miss", reason: `${r.reason}; ${dependencyRemedy(loc)}` });
       } else {
         graphs.push({ ...base, state: r.state, reason: r.reason });
       }
@@ -550,7 +599,13 @@ if (import.meta.main) {
   // then its graphs are mounted into it. The other order mounted the graphs
   // and then re-laid the layer over them.
   const remote = at === -1 ? remoteFanOut(repoRootOf()) : undefined;
-  const r = mountState({ id: at === -1 ? undefined : argv[at + 1], layerMounts: remote?.state });
+  const r = mountState({
+    id: at === -1 ? undefined : argv[at + 1],
+    layerMounts: remote?.state,
+    // The layer's initialization: its own missing state branches are created
+    // here, so a new layer's first session (and the hook) makes them.
+    initMissing: !argv.includes("--no-init") && initEnabled(),
+  });
   if (argv.includes("--json")) console.log(JSON.stringify(remote ? { ...r, remote: { state: remote.state } } : r, null, 2));
   else console.log(report(r) + delegatedReport(delegatedStores()) + (remote ? `\n\n${remote.text}` : ""));
   if (remote && remoteExitCode(remote.state) !== 0) process.exit(remoteExitCode(remote.state));

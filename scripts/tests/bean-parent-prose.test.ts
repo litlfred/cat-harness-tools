@@ -35,7 +35,8 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
@@ -119,5 +120,37 @@ describe("one reader of the store", () => {
     const src = readFileSync(SOURCE, "utf-8");
     expect(src).toContain("no bean-defs node declared");
     expect(src).toContain("rather than reporting no drift");
+  });
+});
+
+/**
+ * Owner, 2026-11-17: a store read whole that holds no bean (a layer whose
+ * state branch was just created) passes with a note; a store holding a bean
+ * whose front matter did not parse still refuses. Run against a scratch root,
+ * as its own cwd, so the real store is never read.
+ */
+describe("a determined-empty store", () => {
+  const scratch = (files: Record<string, string>): string => {
+    const root = mkdtempSync(join(tmpdir(), "parent-prose-empty-"));
+    mkdirSync(join(root, "beans", "defs"), { recursive: true });
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(root, "beans", "defs", name), text);
+    spawnSync("git", ["init", "-q"], { cwd: root });
+    return root;
+  };
+  const runIn = (cwd: string) => {
+    const r = spawnSync("bun", ["run", SOURCE, "--check"], { cwd, encoding: "utf-8" });
+    return { status: r.status ?? -1, out: `${r.stdout ?? ""}${r.stderr ?? ""}` };
+  };
+
+  test("defs/ holding only a .gitkeep passes, and says it examined nothing", () => {
+    const r = runIn(scratch({ ".gitkeep": "" }));
+    expect(r.out).toContain("nothing to examine");
+    expect(r.status).toBe(0);
+  });
+
+  test("a file whose front matter did not parse still refuses", () => {
+    const r = runIn(scratch({ "mangled.md": "--\n# x\nstatus: todo\n--\nbody" }));
+    expect(r.out).toContain("refusing");
+    expect(r.status).toBe(2);
   });
 });

@@ -502,3 +502,28 @@ Feature: Remote layers are mounted at their pins, checked and locked
     Given def overridden with hydrated and tools ["alpha"]
     When it is planned
     Then def is "could-not-determine", saying "`tools` and `hydrated` both asked for"
+
+
+  @test:scripts/tests/remote-mount.test.ts::the_lock_records_when_it_was_written:_pinnedAt_(merge-manager,_2026-11-17)::a_new_lock_is_stamped_now,_in_whole_seconds,_after_$schema,_and_parses
+  Scenario: A new lock is stamped with pinnedAt
+    Given no lock on disk
+    When mount:remote writes one at 10:15:00.123
+    Then it records pinnedAt 10:15:00Z right after $schema, and the lock schema accepts it
+
+  @test:scripts/tests/remote-mount.test.ts::the_lock_records_when_it_was_written:_pinnedAt_(merge-manager,_2026-11-17)::the_same_content_keeps_its_pinnedAt,_so_a_re-run_leaves_the_bytes_alone
+  Scenario: A re-run that writes the same content keeps pinnedAt
+    Given a lock recording pinnedAt 10:15
+    When mount:remote writes the same content at 11:00
+    Then the bytes are unchanged
+
+  @test:scripts/tests/remote-mount.test.ts::the_lock_records_when_it_was_written:_pinnedAt_(merge-manager,_2026-11-17)::changed_pins_are_stamped_anew
+  Scenario: Changed pins are stamped anew
+    Given a lock recording pinnedAt 10:15
+    When mount:remote writes it with a moved pin at 11:00
+    Then it records pinnedAt 11:00
+
+  @test:scripts/tests/remote-mount.test.ts::the_lock_records_when_it_was_written:_pinnedAt_(merge-manager,_2026-11-17)::a_lock_written_before_pinnedAt_existed_is_stamped_at_its_next_write
+  Scenario: A lock without pinnedAt is stamped at its next write
+    Given a lock with no pinnedAt
+    When mount:remote writes the same content at 12:00
+    Then it records pinnedAt 12:00

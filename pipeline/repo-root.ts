@@ -32,7 +32,7 @@
 // It is moot now rather than fixed: #840 made the registration automatic, so
 // there is no longer a command that can forget it (bean `z9ax`).
 import { folioDir } from "../schemas/kg/cat-harness.js";
-import { existsSync, readdirSync, statSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -142,6 +142,80 @@ export function findPapers(repoRoot?: string): string[] {
     if (existsSync(join(d, `${entry}.ts`))) out.push(entry);
   }
   return out.sort();
+}
+
+/**
+ * Every label one document declares: its blocks', its chapters' and its
+ * sections' (at every depth), and the `\label{}` anchors in its `.md` bodies.
+ *
+ * Read off the text rather than by importing each manifest, so the index of a
+ * whole folio costs one read per file and executes nothing. It may collect a
+ * `label:` that names something other than a reference target, which can only
+ * let a reference resolve that should not — never fail one that should not.
+ * QA sidecars (`*.qa.json`) are skipped: their `label`s are criteria, not
+ * content.
+ */
+export function documentLabels(docDir: string): Set<string> {
+  const out = new Set<string>();
+  const fieldRe = /(?:^|[\s,{])"?label"?\s*:\s*"([^"\n]+)"/gm;
+  const texRe = /\\label\{([^}]+)\}/g;
+  const walk = (d: string): void => {
+    let entries: string[];
+    try {
+      entries = readdirSync(d);
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.startsWith(".") || e === "node_modules" || e === "lean") continue;
+      const full = join(d, e);
+      let st;
+      try {
+        st = statSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      const isManifest = (e.endsWith(".ts") && !e.endsWith(".test.ts")) || (e.endsWith(".json") && !e.endsWith(".qa.json"));
+      if (!isManifest && !e.endsWith(".md")) continue;
+      let text: string;
+      try {
+        text = readFileSync(full, "utf-8");
+      } catch {
+        continue;
+      }
+      for (const m of text.matchAll(isManifest ? fieldRe : texRe)) out.add(m[1]!);
+    }
+  };
+  walk(docDir);
+  return out;
+}
+
+/**
+ * The labels of every document in a folio, keyed by document slug — the
+ * `<slug>` of a cross-paper `<slug>:<label>` reference.
+ *
+ * A document is a `<slug>/<slug>.ts` directory directly under `folioRoot`, the
+ * same rule as {@link findPapers}.
+ */
+export function folioLabelIndex(folioRoot: string): Map<string, Set<string>> {
+  const index = new Map<string, Set<string>>();
+  if (!existsSync(folioRoot)) return index;
+  for (const entry of readdirSync(folioRoot).sort()) {
+    if (entry.startsWith(".")) continue;
+    const d = join(folioRoot, entry);
+    try {
+      if (!statSync(d).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    if (!existsSync(join(d, `${entry}.ts`))) continue;
+    index.set(entry, documentLabels(d));
+  }
+  return index;
 }
 
 /**

@@ -576,17 +576,20 @@ export function anchorHeadings(html: string): string {
 }
 
 /**
- * The fictional countries the workshop's journeys are set in (the chapters'
- * `country`, and the architecture panel's country labels), in order, once
- * each: the names a room may rename to its own (owner, 2026-11-17).
+ * The fictional countries the workshop's journeys are set in, in order, once
+ * each: the names a room may rename to its own (owner, 2026-11-17). The
+ * architecture panel's country labels when the workshop declares them, since
+ * those are the countries; otherwise the chapters' `country`, which may also
+ * name a setting that is no country ("Cross-Border").
  */
 export function countriesOf(p: Presentation): string[] {
   const out: string[] = [];
   const add = (c: string | undefined) => {
     if (c && !out.includes(c)) out.push(c);
   };
-  for (const c of p.chapters) add(c.journey.scenario.country);
-  for (const c of p.w.workshop.presentation?.architecture?.countries ?? []) add(c.label);
+  const declared = p.w.workshop.presentation?.architecture?.countries ?? [];
+  if (declared.length) for (const c of declared) add(c.label);
+  else for (const c of p.chapters) add(c.journey.scenario.country);
   return out;
 }
 

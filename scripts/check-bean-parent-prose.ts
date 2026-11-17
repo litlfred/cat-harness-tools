@@ -42,6 +42,7 @@
  * into this count. Re-globbing the directory here would have picked it up.
  */
 import { readBeans } from "./beans.ts";
+import { emptyStoreNote, readBeanStore, storeDeterminedEmpty } from "./bean-store-read.ts";
 import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 const BEAN_ID = "folio-assistant-[a-z0-9]{4}";
@@ -149,6 +150,21 @@ function main(): number {
   }
 
   if (beans === 0) {
+    // ONE exception (owner, 2026-11-17): the store was read whole and holds
+    // no bean at all — a layer whose state branch was just created. Nothing to
+    // compare, so nothing failed. A mangled bean or an unread store is still
+    // a refusal.
+    let empty: { dir: string } | undefined;
+    try {
+      const read = readBeanStore(repoRoot);
+      if (read.state === "read" && storeDeterminedEmpty(read, (b) => !b.archived)) empty = { dir: read.dir };
+    } catch {
+      // Could not tell: the refusal below stands.
+    }
+    if (empty) {
+      console.log(`Bean parent prose (0 beans)\n${emptyStoreNote("check:bean-parent-prose", empty.dir)}`);
+      return 0;
+    }
     console.error("✗ the bean-defs directory holds no bean — refusing.");
     return 2;
   }

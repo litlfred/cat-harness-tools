@@ -514,9 +514,11 @@ jobs:
       # ---- Lock pins agree with each other and are at main ----
       # Every pin of a pull request that changes `index.lock.json` is FRESH: at its
       # repository's main HEAD, or a descendant of it (owner, 2026-11-11), as main
-      # was when the lock was last committed (owner, 2026-11-13, card "Lock gate":
-      # fresh at re-pin time; the script reads that date from the checkout
-      # holding the lock). Only the top-level lock decides (owner, 2026-11-13,
+      # was when the pins were written (owner, 2026-11-13, card "Lock gate":
+      # fresh at re-pin time): the lock's own `pinnedAt`, else the author date,
+      # else the committer date of the commit that last changed it, read from
+      # the checkout holding the lock (a squash merge dates that commit at the
+      # merge, so `pinnedAt` comes first; merge-manager, 2026-11-17). Only the top-level lock decides (owner, 2026-11-13,
       # "3y 1y"): a composition mounts each harness once, at this lock's pin, so
       # whether the pinned harnesses' OWN locks agree with it is reported, not
       # judged; that dropped the serial bottom-up re-pin cascade. One that

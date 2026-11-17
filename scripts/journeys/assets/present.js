@@ -496,6 +496,9 @@
     });
   }
   var COUNTRY_ORIG = typeof WeakMap === "function" ? new WeakMap() : null;
+  // An element's attributes as they were before any renaming: { attr: value }.
+  var COUNTRY_ATTR_ORIG = typeof WeakMap === "function" ? new WeakMap() : null;
+  var COUNTRY_ATTRS = ["title", "aria-label", "alt"];
   function renameCountries() {
     var src = doc.getElementById("jp-countries");
     if (!src || !COUNTRY_ORIG) return;
@@ -517,30 +520,69 @@
     function reEsc(t) {
       return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }
-    var walker = doc.createTreeWalker(doc.body, 4, {
-      acceptNode: function (n) {
-        var p = n.parentNode;
-        if (!p || /^(SCRIPT|STYLE|TEXTAREA|OPTION)$/.test(p.nodeName)) return 2;
-        if (p.closest && p.closest("[data-jp-countries-keep], .jp-countries label > span")) return 2;
-        return 1;
-      },
+    var res = pairs.map(function (pr) {
+      return [new RegExp("(^|[^\\p{L}\\p{N}])" + reEsc(pr[0]) + "(?=$|[^\\p{L}\\p{N}])", "gu"), pr[1]];
     });
-    var n;
-    while ((n = walker.nextNode())) {
-      var orig = COUNTRY_ORIG.get(n);
-      if (orig === undefined) {
-        if (!pairs.length) continue;
-        orig = n.nodeValue;
-      }
+    function sub(orig) {
       var out = orig;
-      pairs.forEach(function (pr) {
-        out = out.replace(new RegExp("(^|[^\\p{L}\\p{N}])" + reEsc(pr[0]) + "(?=$|[^\\p{L}\\p{N}])", "gu"), function (_m, pre) {
-          return pre + pr[1];
+      res.forEach(function (r) {
+        out = out.replace(r[0], function (_m, pre) {
+          return pre + r[1];
         });
       });
-      if (out !== orig) COUNTRY_ORIG.set(n, orig);
-      if (n.nodeValue !== out) n.nodeValue = out;
+      return out;
     }
+    function kept(el) {
+      return el.closest && el.closest("[data-jp-countries-keep], .jp-countries");
+    }
+    // The page's own text, and the text of every drawing embedded as its own
+    // document (an ArchiMate view is an <object> SVG): its labels and titles.
+    var roots = [[doc, doc.body]];
+    each('object[type="image/svg+xml"]', function (o) {
+      var d;
+      try {
+        d = o.contentDocument;
+      } catch (_e) {
+        d = null;
+      }
+      if (d && d.documentElement) roots.push([d, d.documentElement]);
+    });
+    roots.forEach(function (r) {
+      var walker = r[0].createTreeWalker(r[1], 4, {
+        acceptNode: function (n) {
+          var p = n.parentNode;
+          if (!p || /^(SCRIPT|STYLE|TEXTAREA|OPTION|script|style)$/.test(p.nodeName)) return 2;
+          if (p.closest && p.closest("[data-jp-countries-keep], .jp-countries label > span")) return 2;
+          return 1;
+        },
+      });
+      var n;
+      while ((n = walker.nextNode())) {
+        var orig = COUNTRY_ORIG.get(n);
+        if (orig === undefined) {
+          if (!pairs.length) continue;
+          orig = n.nodeValue;
+        }
+        var out = sub(orig);
+        if (out !== orig) COUNTRY_ORIG.set(n, orig);
+        if (n.nodeValue !== out) n.nodeValue = out;
+      }
+      // Tooltips and accessible names: what a reader hovers or a screen reader says.
+      Array.prototype.forEach.call(r[1].querySelectorAll("[title], [aria-label], [alt]"), function (el) {
+        if (kept(el)) return;
+        var was = COUNTRY_ATTR_ORIG.get(el);
+        if (was === undefined && !pairs.length) return;
+        was = was || {};
+        COUNTRY_ATTRS.forEach(function (at) {
+          if (!el.hasAttribute(at)) return;
+          var o = Object.prototype.hasOwnProperty.call(was, at) ? was[at] : el.getAttribute(at);
+          var out = sub(o);
+          if (out !== o) was[at] = o;
+          if (el.getAttribute(at) !== out) el.setAttribute(at, out);
+        });
+        COUNTRY_ATTR_ORIG.set(el, was);
+      });
+    });
   }
   function keepCheck(el) {
     var key = "jv:" + el.name;
@@ -1033,6 +1075,24 @@
     // The room's own names for the fictional countries (owner, 2026-11-17): kept per
     // workshop, put in place of the old names throughout the page's text, live.
     renameCountries();
+    // An embedded drawing's document exists only once it has loaded.
+    each('object[type="image/svg+xml"]', function (o) {
+      o.addEventListener("load", renameCountries);
+    });
+    // What the scripts draw later (the gap report, the lab's summary) is renamed
+    // too: once per frame after nodes are added. Renaming itself changes only
+    // text and attributes, never the node list, so it does not call itself again.
+    if (window.MutationObserver) {
+      var renamePending = false;
+      new MutationObserver(function () {
+        if (renamePending) return;
+        renamePending = true;
+        (window.requestAnimationFrame || setTimeout)(function () {
+          renamePending = false;
+          renameCountries();
+        });
+      }).observe(doc.body, { childList: true, subtree: true });
+    }
     each("[data-jp-country]", function (el) {
       el.addEventListener("input", renameCountries);
     });
