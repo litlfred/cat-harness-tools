@@ -30,6 +30,9 @@
  *   every one of them takes the name of the kind its directory declares
  *   FIRST: `schemas/` declares `["schemas", "cat-harness"]`, so both rows say
  *   "Schemas" ({@link labelVisualisations}).
+ * - **A page a tile covering several kinds draws** is the tile's title, on
+ *   the tile and on every row that opens it: the page belongs to no one of
+ *   its kinds (`namesPage`, set by `viewersOf`).
  * - **A tile** is its declared title when the declaration gives one, with any
  *   harness suffix removed ({@link stripQualifier}), else the display name of
  *   the directory's first kind ({@link tileLabel}).
@@ -112,11 +115,19 @@ export function tileLabel(
  * A row whose page is named for ANOTHER kind gets `sameAs` set to that kind,
  * and every list of destinations skips it.
  *
+ * A page a tile covering SEVERAL kinds names itself is the exception: its
+ * rows take the tile's title, which `pageNames` gives by path. core's
+ * `bibliography` covers `references` and `catalogue` and calls its pages
+ * "Bibliography", so a row naming that page "Catalogue" was a second name
+ * for one destination (owner, 2026-11-16). Which row is listed is unchanged.
+ *
  * @param dirs the layer's directories, in declaration order
+ * @param pageNames the name a multi-kind tile gives its page, by path
  */
 export function labelVisualisations<V extends { kind: string; path?: string | null; label?: string; sameAs?: string }>(
   rows: V[],
   dirs: readonly { graphTypologies?: readonly string[] }[],
+  pageNames: ReadonlyMap<string, string> = new Map(),
 ): V[] {
   const rank = (kind: string): number => {
     let best = Number.POSITIVE_INFINITY;
@@ -134,7 +145,7 @@ export function labelVisualisations<V extends { kind: string; path?: string | nu
   }
   for (const r of rows) {
     const named = r.path ? byPath.get(r.path)! : r.kind;
-    r.label = kindTitle(named);
+    r.label = (r.path ? pageNames.get(r.path) : undefined) ?? kindTitle(named);
     // The SECOND kind on a shared page is the same destination again. It is
     // marked rather than dropped: the data still says the layer declares
     // it, and a surface that lists destinations skips it, so "Schemas" is not
