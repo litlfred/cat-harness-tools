@@ -111,6 +111,7 @@
     "test/ui/kg-viewer.e2e.ts",
     "test/ui/review-visual.e2e.ts",
     "test/ui/state-dashboards.e2e.ts",
-    "test/who-iris-search.e2e.ts"
+    "test/who-iris-search.e2e.ts",
+    "test/workshop-answers.e2e.ts"
   ]
 }
