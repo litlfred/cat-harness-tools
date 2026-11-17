@@ -193,6 +193,10 @@ describe("layer-merge-guard: the signal (`Merge guard trigger`)", () => {
     expect(signal["run-name"]).toBe(`${MERGE_GUARD_TRIGGER_NAME} #\${{ github.event.pull_request.number }}`);
   });
 
+  test("it names no layer, since the layers below this one hold it too (check:reference-direction)", () => {
+    expect(MERGE_GUARD_TRIGGER_TEXT).not.toMatch(/cat-harness|bootstrap|folio/);
+  });
+
   test("it holds no token, uses no action, checks nothing out and reads no secret", () => {
     expect(signal.permissions).toEqual({});
     for (const job of Object.values(signal.jobs)) {

@@ -109,3 +109,8 @@ Feature: The merge-guard status on every layer PR
     Given a guard that says "could not post the merge-guard status" for PRs 7 and 8
     When the step runs under bash -e
     Then it fails, naming "#7 #8"
+
+  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_the_signal_(`Merge_guard_trigger`)::it_names_no_layer,_since_the_layers_below_this_one_hold_it_too_(check:reference-direction)
+  Scenario: The signal names no layer
+    Given the canonical signal text
+    Then it names no layer, so a layer below this one may hold it
