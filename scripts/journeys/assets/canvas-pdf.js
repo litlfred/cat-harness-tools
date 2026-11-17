@@ -40,7 +40,12 @@
   // ── strings ──────────────────────────────────────────────────────────
   // WinAnsi for the characters a page draws; anything else becomes "?".
   var WIN = { 0x20ac: 128, 0x201a: 130, 0x0192: 131, 0x201e: 132, 0x2026: 133, 0x2020: 134, 0x2021: 135, 0x02c6: 136, 0x2030: 137, 0x0160: 138, 0x2039: 139, 0x0152: 140, 0x017d: 142, 0x2018: 145, 0x2019: 146, 0x201c: 147, 0x201d: 148, 0x2022: 149, 0x2013: 150, 0x2014: 151, 0x02dc: 152, 0x2122: 153, 0x0161: 154, 0x203a: 155, 0x0153: 156, 0x017e: 158, 0x0178: 159 };
+  // Symbols the printed sheets use that WinAnsi lacks, as the nearest text.
+  var FALLBACK = { "\u2605": "*", "\u2606": "*", "\u2713": "v", "\u2714": "v", "\u2717": "x", "\u2718": "x", "\u25cb": "o", "\u25cf": "*", "\u25a1": "[ ]", "\u2610": "[ ]", "\u2611": "[x]", "\u2612": "[x]", "\u2192": "->", "\u2190": "<-", "\u2194": "<->", "\u21d2": "=>", "\u2264": "<=", "\u2265": ">=", "\u2260": "!=", "\u2212": "-", "\u00a0": " " };
   function winAnsi(s) {
+    s = String(s).replace(/[\u2605\u2606\u2713\u2714\u2717\u2718\u25cb\u25cf\u25a1\u2610-\u2612\u2190\u2192\u2194\u21d2\u2264\u2265\u2260\u2212\u00a0]/g, function (ch) {
+      return FALLBACK[ch];
+    });
     var out = "";
     for (var i = 0; i < s.length; i++) {
       var c = s.charCodeAt(i);
