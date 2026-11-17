@@ -910,7 +910,7 @@ function workshopPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
 ${ws.audience ? `<p><b>For:</b> ${e(ws.audience)}</p>` : ""}
 ${ws.promise ? `<p class="jv-promise">${e(ws.promise)}</p>` : ""}
 ${ws.useCaseStatement ? `<p class="jv-usecase">${e(ws.useCaseStatement)}</p>` : ""}
-<p><a class="jv-btn" href="overview/">Present it: overview and walkthrough</a>${ws.sheetsSource ? ` <a class="jv-btn" href="sheets/">${e(ws.sheetsSource.title ?? "Table canvas")}</a>` : ws.sheets?.length ? ` <a class="jv-btn" href="sheets/">Printable sheets (${ws.sheets.length})</a>` : ""}</p>
+<p><a class="jv-btn" href="overview/">Present it: overview and walkthrough</a>${ws.sheetsSource ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">${e(ws.sheetsSource.title ?? "Table canvas")}</a>` : ws.sheets?.length ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">Printable sheets (${ws.sheets.length})</a>` : ""}</p>
 </header>
 <section><h2>Taught from</h2><ol class="jv-tree">${scenarios.map((j, i) => (j ? journeyCard(corpus, j, up) : `<li class="jv-unresolved">${e(ws.scenarios[i]!)}: no such journey in this checkout</li>`)).join("\n")}</ol></section>
 <section><h2>Modules</h2>${modulesHtml}</section>
@@ -954,7 +954,7 @@ function modulePage(corpus: JourneyCorpus, w: WorkshopEntry, moduleId: string): 
 ${m.carries ? `<p class="jv-carries">${e(m.carries)}</p>` : ""}
 ${m.description ? `<div class="jv-lede">${mdHtml(m.description)}</div>` : ""}
 ${m.objectives?.length ? `<h2>By the end, a participant can</h2><ul class="jv-objectives">${m.objectives.map((o) => `<li>${e(o)}</li>`).join("")}</ul>` : ""}
-${sheet ? `<p><a class="jv-btn" href="../sheets/#sheet-${e(sheet.id)}">${e(sheet.label ?? sheet.title)}: ${e(sheet.title)} (${e(sheet.size)})</a></p>` : ""}
+${sheet ? `<p><a class="jv-btn" href="../${sheetsAt(corpus, w, `sheet-${sheet.id}`)}">${e(sheet.label ?? sheet.title)}: ${e(sheet.title)} (${e(sheet.size)})</a></p>` : ""}
 </header>
 <section><h2>The questions, along the journey</h2>${qs.length ? `<ol class="jv-modqs">${qs.map((q) => `<li>${stepLink(q, up)}<div><span class="jv-muted">${e(q.ref?.step.title ?? "")}</span><p>${e(q.text)}</p></div></li>`).join("")}</ol>` : `<p class="jv-muted">No step asks a question in this module.</p>`}</section>
 ${tables.length ? `<section><h2>Tables</h2>${tables.map((t) => tableHtml(t)).join("\n")}</section>` : ""}
@@ -975,6 +975,15 @@ function lines(n: number): string {
 }
 
 /** The printable sheets of a workshop, one `<article class="jv-sheet">` each: on the sheets page, framed or not. */
+/**
+ * Where a workshop's sheets are, from its own directory: the Table sheets panel
+ * of the discussion for a presented workshop (`present-views.ts`), the sheets
+ * page otherwise; `anchor` is a sheet on it.
+ */
+export function sheetsAt(corpus: JourneyCorpus, w: WorkshopEntry, anchor?: string): string {
+  return presentationOf(corpus, w).steps.length ? `discuss/#${e(anchor ?? "sheets")}` : `sheets/${anchor ? `#${e(anchor)}` : ""}`;
+}
+
 export function sheetsHtml(corpus: JourneyCorpus, w: WorkshopEntry): string {
   const ws = w.workshop;
   const scales = ws.assessment?.scales ?? [];

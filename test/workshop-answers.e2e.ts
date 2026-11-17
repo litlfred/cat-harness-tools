@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
  */
 
 let SITE = "";
-let PATHS: { walkthrough: string; discuss: string } = { walkthrough: "", discuss: "" };
+let PATHS: { walkthrough: string; discuss: string; sheets: string } = { walkthrough: "", discuss: "", sheets: "" };
 test.beforeAll(() => {
   const out = mkdtempSync(join(tmpdir(), "workshop-answers-"));
   execFileSync("bun", ["run", fileURLToPath(new URL("./workshop-answers-fixture.build.ts", import.meta.url)), out], { stdio: "pipe" });
@@ -79,5 +79,41 @@ test.describe("a question's answer is one answer, on the walkthrough and in the 
     await page.goto(`http://site.test/${PATHS.discuss}#lab-who-decides`);
     for (const b of await box(page).all()) await expect(b).toHaveValue("kept from before");
     expect(await page.evaluate(([n, w]) => [localStorage.getItem(`jv:${n}`), localStorage.getItem(`jv:${w}`)], [name, was])).toEqual(["kept from before", null]);
+  });
+});
+
+/**
+ * THE TABLE SHEETS ARE A PANEL OF THE DISCUSSION — owner, 2026-11-17: the
+ * sheets/ page and its tab are gone, folded into the lab's summary step as an
+ * expanding panel; the old address lands on it, open.
+ */
+test.describe("the Table sheets, folded into the discussion", () => {
+  test.beforeEach(async ({ context }) => serve(context));
+
+  test("the old sheets/ address lands on the summary step with the panel open", async ({ page }) => {
+    await page.goto(`http://site.test/${PATHS.sheets}`);
+    await expect(page).toHaveURL(/\/workshops\/track\/discuss\/#sheets$/);
+    const panel = page.locator("details[data-jp-sheets]");
+    await expect(panel).toHaveJSProperty("open", true);
+    await expect(page.locator('[data-jp-lab-step="summary"]')).toBeVisible();
+    await expect(page.locator('[data-jp-lab-step="who-decides"]')).toBeHidden();
+    await expect(panel.locator("#sheet-s1")).toBeVisible();
+  });
+
+  test("an old anchor to one sheet opens the panel on that sheet", async ({ page }) => {
+    await page.goto(`http://site.test/${PATHS.sheets}#sheet-s1`);
+    await expect(page).toHaveURL(/discuss\/#sheet-s1$/);
+    await expect(page.locator("details[data-jp-sheets]")).toHaveJSProperty("open", true);
+    await expect(page.locator("#sheet-s1")).toBeInViewport();
+  });
+
+  test("on the summary step the panel starts folded, opens on a click, and there is no Table sheets tab", async ({ page }) => {
+    await page.goto(`http://site.test/${PATHS.discuss}#lab-summary`);
+    const panel = page.locator("details[data-jp-sheets]");
+    await expect(panel).toHaveJSProperty("open", false);
+    await expect(panel.locator("#sheet-s1")).toBeHidden();
+    await panel.locator("summary").click();
+    await expect(panel.locator("#sheet-s1")).toBeVisible();
+    await expect(page.locator(".jp-tab", { hasText: "Table sheets" })).toHaveCount(0);
   });
 });

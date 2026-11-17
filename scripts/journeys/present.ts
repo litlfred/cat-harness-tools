@@ -519,7 +519,7 @@ export function highlightJson(json: string): string {
 
 // ── the frame ─────────────────────────────────────────────────────────────
 
-export type View = "overview" | "walkthrough" | "map" | "personas" | "how" | "discuss" | "sheets" | "demo";
+export type View = "overview" | "walkthrough" | "map" | "personas" | "how" | "discuss" | "demo";
 
 export interface FrameOpts {
   p: Presentation;
@@ -587,7 +587,6 @@ export function frame(o: FrameOpts): string {
     { id: "personas", label: "Persona lens", hint: "One person end-to-end", ic: "user", href: o.p.cast.length ? `${o.toWorkshop}personas/` : undefined },
     { id: "how", label: "How it works", hint: "Standards & tools behind each moment", ic: "cpu", href: `${o.toWorkshop}how/` },
     { id: "discuss", label: "Discussion", hint: "Policy questions to close", ic: "message", href: `${o.toWorkshop}discuss/` },
-    { id: "sheets", label: "Table sheets", hint: "Print the A3 canvas", ic: "printer", href: ws.sheets?.length || ws.sheetsSource ? `${o.toWorkshop}sheets/` : undefined },
   ];
   void firstJourney;
   const nav = tabs
