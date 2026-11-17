@@ -3,7 +3,7 @@
  * Write the workshop pages `workshop-answers.e2e.ts` serves: a journey of two
  * steps and a workshop whose lab shows module M5's questions in two of its
  * steps ("Who decides" and "Map"), as a content layer's policy track
- * may, and a canvas sheet whose field J4.0a's question is. Drawn by the REAL journeys viewer (`renderJourneyPages`), so the
+ * may, with a summary step and a drawn sheet (the Table sheets panel), and a canvas sheet whose field J4.0a's question is. Drawn by the REAL journeys viewer (`renderJourneyPages`), so the
  * browser runs the shipped `present.js` against the shipped markup.
  *
  *   bun run cat-harness-tools/test/workshop-answers-fixture.build.ts <out-dir>
@@ -61,7 +61,7 @@ put(repo, "demo/workshops/track.json", {
   description: "Taught from Ana's journey.",
   scenarios: ["j4-home"],
   modules: [
-    { id: "M1", title: "Capabilities" },
+    { id: "M1", title: "Capabilities", sheet: "s1" },
     { id: "M5", title: "Governance, decision rights and the legal basis" },
   ],
   steps: [
@@ -75,6 +75,7 @@ put(repo, "demo/workshops/track.json", {
       ],
     },
   ],
+  sheets: [{ id: "s1", label: "Sheet 1", title: "Our journey", size: "A3", modules: ["M1"] }],
   canvas: {
     title: "Country Canvas",
     sheets: [
@@ -99,6 +100,7 @@ put(repo, "demo/workshops/track.json", {
       { id: "canvas", label: "Canvas", title: "Our canvas", canvas: ["rights"] },
       { id: "who-decides", label: "Who decides", title: "Who holds it?", modules: ["M5"] },
       { id: "map", label: "Map", title: "Where it meets", modules: ["M1", "M5"] },
+      { id: "summary", label: "Summary", title: "Our summary", summary: true },
     ],
   },
 });
@@ -117,4 +119,4 @@ const find = (suffix: string): string => {
   if (!f) throw new Error(`no page ending ${suffix}; have ${files.map((x) => x.path).join(", ")}`);
   return f.path.replace(/index\.html$/, "");
 };
-put(site, "paths.json", { overview: find("/workshops/track/overview/index.html"), walkthroughA: find("/workshops/track/walkthrough/J4.0a/index.html"), walkthrough: find("/workshops/track/walkthrough/J4.0b/index.html"), discuss: find("/workshops/track/discuss/index.html"), map: find("/workshops/track/map/index.html") });
+put(site, "paths.json", { overview: find("/workshops/track/overview/index.html"), walkthroughA: find("/workshops/track/walkthrough/J4.0a/index.html"), walkthrough: find("/workshops/track/walkthrough/J4.0b/index.html"), discuss: find("/workshops/track/discuss/index.html"), sheets: find("/workshops/track/sheets/index.html"), map: find("/workshops/track/map/index.html") });

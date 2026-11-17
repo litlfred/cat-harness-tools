@@ -442,8 +442,8 @@ describe("the workshop layer", () => {
   test("a module's tables are drawn on its page", () => {
     expect(at("top/workshops/policy/m2/index.html")).toContain("Trust anchor");
   });
-  test("the sheets page carries the cover and one sheet per declared sheet, with its assessment strip", () => {
-    const sheets = at("top/workshops/policy/sheets/index.html");
+  test("the Table sheets panel carries the cover and one sheet per declared sheet, with its assessment strip", () => {
+    const sheets = at("top/workshops/policy/discuss/index.html");
     expect((sheets.match(/class="jv-sheet /g) ?? []).length).toBe(2);
     expect((sheets.match(/class="jv-sheet [^"]*jv-cover"/g) ?? []).length).toBe(1);
     expect(sheets).toContain('class="jv-strip"');
@@ -559,7 +559,7 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
   const discuss = at(`${base}/discuss/index.html`);
   const p2 = at(`${base}/walkthrough/P2/index.html`);
   test("every view has a page, in the frame, and the tabs link them", () => {
-    for (const path of ["personas", "personas/ana", "personas/cleo", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
+    for (const path of ["personas", "personas/ana", "personas/cleo", "how", "how/wallet", "discuss", "demo", "demo/S2"]) {
       const page = at(`${base}/${path}/index.html`);
       expect(page).toContain(NAVBAR_OPT_OUT);
       expect(page).toContain('<span class="jp-name">PilgrimLink</span>');
@@ -662,8 +662,36 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     const other = files.find((f) => f.path.startsWith(`${base}/how/`) && f.path !== `${base}/how/wallet/index.html` && f.path !== `${base}/how/index.html`);
     if (other) expect(String(other.content)).not.toContain("In the architecture (ArchiMate)");
   });
+  test("the Table sheets are a folded panel of the discussion; sheets/ redirects there and the tab is gone (owner, 2026-11-17)", () => {
+    // A folded <details>, after the discussion's own content.
+    expect(discuss).toMatch(/<details class="jp-card jp-sheets-panel" id="sheets" data-jp-sheets><summary class="jp-sheets-sum jp-noprint">/);
+    expect(discuss).not.toMatch(/jp-sheets-panel"[^>]* open/);
+    expect(discuss.indexOf('id="sheets"')).toBeGreaterThan(discuss.indexOf("jp-dhero"));
+    expect(discuss).toContain('id="sheet-cover"');
+    expect(discuss).toContain("assets/journeys.css");
+    // No tab, on any page.
+    for (const page of [p2, how, discuss]) {
+      expect(page).not.toMatch(/<a class="jp-tab[^"]*" href="(\.\.\/)*sheets\/"/);
+      expect(page).not.toContain('href="../sheets/"');
+    }
+    // The redirect says which Tool drew it, as every page does.
+    expect(renderedByOf(at(`${base}/sheets/index.html`))).toBe("journeys-viewer");
+    // The old address redirects, carrying its anchor, to the panel.
+    const old = at(`${base}/sheets/index.html`);
+    expect(old).toContain('<meta http-equiv="refresh" content="0; url=../discuss/#sheets">');
+    expect(old).toContain('location.replace("../discuss/" + location.search + (location.hash || "#sheets"))');
+    expect(old).not.toContain("jv-sheet");
+    // A module's sheet link opens its sheet in the panel.
+    expect(at(`${base}/m1/index.html`)).toContain('href="../discuss/#sheet-s1"');
+    // The client opens the panel the address names, and prints the sheets alone.
+    const js = at("assets/present.js");
+    expect(js).toContain("function openTarget()");
+    expect(js).toContain('root.classList.add("jp-print-sheets")');
+    const css = at("assets/present.css");
+    expect(css).toContain(".jp-print-sheets .jp-wrap > :not(.jp-lab):not(.jp-sheets-panel)");
+  });
   test("JV-02: every view has the payload drawer; a view page loads each payload from one shared file, a step page carries it", () => {
-    for (const path of ["overview", "personas", "personas/ana", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
+    for (const path of ["overview", "personas", "personas/ana", "how", "how/wallet", "discuss", "demo", "demo/S2"]) {
       const page = at(`${base}/${path}/index.html`);
       expect(page).toContain("data-jp-drawer");
       expect(page).toContain('data-jp-tab="Bundle/ana-ips"');
@@ -762,6 +790,11 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(names).toEqual(expect.arrayContaining(["policy:lab:team:members", "policy:uc:immz", "policy:lab:use-case", "policy:rate:ready:strategy", "policy:hold:rights:anchor", Q_DECIDES, "policy:viewer:status", "policy:dq:q1"]));
     expect(page).toContain("data-jp-gapreport");
     expect(page).toContain("data-jp-lab-csv");
+    // The Table sheets fold into the summary step, after the summary and before the aside (owner, 2026-11-17).
+    const sum = page.indexOf('id="lab-summary"');
+    expect(page.indexOf('id="sheets"')).toBeGreaterThan(page.indexOf("data-jp-lab-summary", sum));
+    expect(page.indexOf('id="sheets"')).toBeLessThan(page.indexOf('class="jp-card jp-lab-aside"'));
+    expect(page.match(/data-jp-sheets>/g)).toHaveLength(1);
     expect(page).toContain('name="policy:dq:q1"');
     expect(page).toContain('href="https://example.org/lab/"');
     expect(page).toMatch(/Adapted from a lab, CC BY 4\.0\. <a class="jp-ext" href="https:\/\/example\.org\/lab\/"[^>]*>The lab/);
@@ -1138,7 +1171,7 @@ describe("presentation helpers", () => {
     expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", presentation: { ...w.workshop.presentation, tagRows: [{ label: "Forces", icon: "scale", tables: ["rights"] }] } }).success).toBe(true);
   });
   test("JV-14: the sheets open with a cover, its own page: the blanks, the scope promise, the ways to start", () => {
-    const sheets = at("top/workshops/policy/sheets/index.html");
+    const sheets = at("top/workshops/policy/discuss/index.html");
     // The default cover: the four blanks, before Sheet 1, the size of the first sheet.
     expect(sheets).toContain('<article class="jv-sheet jv-sheet-a3 jv-cover" id="sheet-cover">');
     expect(sheets.indexOf('id="sheet-cover"')).toBeLessThan(sheets.indexOf('id="sheet-s1"'));
@@ -1147,7 +1180,7 @@ describe("presentation helpers", () => {
     const w0 = corpus.workshops[0]!;
     const w = { ...w0, workshop: { ...w0.workshop, promise: "You will leave knowing where you stand.", presentation: { ...w0.workshop.presentation, cover: { fields: ["Country", "Table"], table: "rights" } } } };
     const out = renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top");
-    const page = String(out.find((f) => f.path === "top/workshops/policy/sheets/index.html")!.content);
+    const page = String(out.find((f) => f.path === "top/workshops/policy/discuss/index.html")!.content);
     expect(page).toContain('<p class="jv-promise"><b>The scope promise.</b> You will leave knowing where you stand.</p>');
     expect(page).toContain('<section class="jv-ways" aria-label="Decision rights"><div class="jv-way"><b>Trust anchor</b>');
     expect(page).not.toContain("<span>Delegation</span>");
@@ -1167,7 +1200,7 @@ describe("presentation helpers", () => {
     expect(screen).not.toMatch(/\.jv-sheet-a4 \{[^}]*aspect-ratio/);
     expect(css).toMatch(/\.jv-print-sheets \.jv-sheet \{[^}]*width: 400mm; height: 277mm; overflow: hidden;/);
   });
-  test("JV-06: a workshop's own canvas (sheetsSource) is the Table sheets view, its files copied beside it; the drawn sheets are the fallback", () => {
+  test("JV-06: a workshop's own canvas (sheetsSource) is the Table sheets panel, its files copied beside the discussion; the drawn sheets are the fallback", () => {
     put("top/canvas/country-canvas.docx", "docx bytes");
     put("top/canvas/country-canvas.pdf", "%PDF-1.7");
     put("top/canvas/pages/page-1.png", "png 1");
@@ -1183,7 +1216,7 @@ describe("presentation helpers", () => {
     expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(true);
     const out = renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top");
     const file = (path: string) => out.find((f) => f.path === path);
-    const page = String(file("top/workshops/policy/sheets/index.html")!.content);
+    const page = String(file("top/workshops/policy/discuss/index.html")!.content);
     // The previews in place of the drawn sheets, a page each, with the downloads and a print button.
     expect(page).not.toContain('class="jv-sheet ');
     expect(page).toContain('<h2 id="country-canvas">Country Canvas</h2>');
@@ -1193,13 +1226,16 @@ describe("presentation helpers", () => {
     expect(page).toMatch(/<a class="jp-btn-line" href="canvas\/country-canvas\.docx" download>[\s\S]*?Download Word \(\.docx\)<\/a>/);
     // A URL is linked as given, not copied.
     expect(page).toMatch(/<a class="jp-btn-line" href="https:\/\/example\.org\/canvas\.pdf">[\s\S]*?Download PDF<\/a>/);
-    expect(page).toContain("data-jv-print");
+    expect(page).toContain("data-jp-sheets-print");
+    expect(page).toContain('<summary class="jp-sheets-sum jp-noprint">');
+    expect(page).toContain("<b>Country Canvas</b>");
     // The layer's files are copied beside the page, byte for byte; the URL is not.
-    expect(new TextDecoder().decode(file("top/workshops/policy/sheets/canvas/page-1.png")!.content as Uint8Array)).toBe("png 1");
-    expect(file("top/workshops/policy/sheets/canvas/country-canvas.docx")).toBeDefined();
+    expect(new TextDecoder().decode(file("top/workshops/policy/discuss/canvas/page-1.png")!.content as Uint8Array)).toBe("png 1");
+    expect(file("top/workshops/policy/discuss/canvas/country-canvas.docx")).toBeDefined();
+    expect(out.some((f) => f.path.startsWith("top/workshops/policy/sheets/canvas/"))).toBe(false);
     expect(out.some((f) => f.path.endsWith("canvas.pdf"))).toBe(false);
-    // The tab still opens the sheets; printed, a page image fills its page.
-    expect(String(file("top/workshops/policy/overview/index.html")!.content)).toContain('href="../sheets/"');
+    // The workshop's page links the panel; printed, a page image fills its page.
+    expect(String(file("top/workshops/policy/index.html")!.content)).toContain('href="discuss/#sheets">Country Canvas</a>');
     expect(at("assets/journeys.css")).toContain(".jv-print-sheets .jv-canvas-page { break-after: page;");
     // The check names the file that is not there, and only that one.
     const refs = checkJourneyRefs({ ...corpus, workshops: [w] });
@@ -1207,7 +1243,7 @@ describe("presentation helpers", () => {
     expect(canvasFindings.map((f) => f.message)).toEqual(['"../canvas/pages/missing.png" is no file of instance top (read from the workshop file\'s directory)']);
     // None of its files resolves: the drawn sheets again.
     const none = { ...w0, workshop: { ...w0.workshop, sheetsSource: { previews: ["../nowhere.png"] } } };
-    const fallback = String(renderJourneyPages({ ...corpus, workshops: [none] }, LINKS, "top").find((f) => f.path === "top/workshops/policy/sheets/index.html")!.content);
+    const fallback = String(renderJourneyPages({ ...corpus, workshops: [none] }, LINKS, "top").find((f) => f.path === "top/workshops/policy/discuss/index.html")!.content);
     expect(fallback).toContain('id="sheet-s1"');
     // A path out of the layer is no file of it.
     const out2 = { ...w0, workshop: { ...w0.workshop, sheetsSource: { docx: "../../../etc/passwd" } } };
@@ -1230,7 +1266,7 @@ describe("presentation helpers", () => {
     writeFileSync(join(REPO, "top/canvas/sharp/fine.png"), png(3572, 2526));
     const w0 = corpus.workshops[0]!;
     const w = { ...w0, workshop: { ...w0.workshop, sheetsSource: { title: "Country Canvas", previews: ["../canvas/sharp/coarse.png", "../canvas/sharp/fine.png"] } } };
-    const page = String(renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top").find((f) => f.path === "top/workshops/policy/sheets/index.html")!.content);
+    const page = String(renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top").find((f) => f.path === "top/workshops/policy/discuss/index.html")!.content);
     expect(page).toContain('<img src="canvas/coarse.png" width="1191" height="842" style="max-width:1191px" alt="Country Canvas, page 1 of 2"');
     expect(page).toContain('<img src="canvas/fine.png" width="3572" height="2526" style="max-width:3572px"');
     // Printed, an image fills its sheet whatever its pixels.
