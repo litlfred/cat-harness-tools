@@ -63,3 +63,51 @@ Feature: Workflow pins
   @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_layers_under_more_than_one_owner::third-party_actions_are_not_judged
   Scenario: Third-party actions are not judged
     Then steps using actions/checkout and actions/setup-node give no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::--write_adds_`labeled`,_the_no-op_label_group_and_the_job's_if;_a_second_pass_is_clean
+  Scenario: A layer-pr-checks caller without `labeled` is fixed
+    Given a caller whose pull_request types omit "labeled", with a concurrency group keyed by github.ref
+    Then three findings add "labeled", key a no-op label's group by its run, and skip the calling job on a no-op label
+    And judging the rewritten text gives no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_pull_request_with_no_types_gets_a_types_line
+  Scenario: A pull_request with no types gets one
+    Then a types line ending in "labeled" is written under pull_request
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_block_list_of_types_gets_`-_labeled`
+  Scenario: A block list of types gets "- labeled"
+    Then "- labeled" is appended to the list
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_workflow_that_does_not_call_layer-pr-checks,_or_not_on_pull_request,_is_not_judged
+  Scenario: Other workflows are not judged
+    Then a workflow calling another file, or not on pull_request, gives no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_layer-pr-checks_caller_starts_on_`labeled`::a_job_if_without_the_label_clause_is_reported_for_a_hand_fix
+  Scenario: A job if without the label clause is left for a hand fix
+    Then the finding on the job's if wants no rewrite
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::--write_drops_pull_request_target_and_adds_the_signal_to_workflow_run;_the_findings_trail;_a_second_pass_is_clean
+  Scenario: A merge-guard caller on pull_request_target is moved to the signal
+    Given a caller of layer-merge-guard on pull_request_target, issue_comment and workflow_run of "Layer PR checks"
+    Then two trailing findings drop pull_request_target and add "Merge guard trigger" to workflow_run's workflows
+    And judging the rewritten text gives no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::a_block_list_of_workflows_gets_the_signal;_a_caller_with_no_workflow_run_gets_one
+  Scenario: The signal is added to a block list, or a workflow_run is added
+    Then a block list of workflows gets "- Merge guard trigger", and a caller with no workflow_run gets one listing it
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::a_workflow_that_does_not_call_layer-merge-guard_is_not_judged
+  Scenario: Other workflows are not moved
+    Then a workflow calling another file gives no findings
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::the_signal_file_is_written_when_missing_or_changed,_and_is_then_current
+  Scenario: The signal file is written and kept canonical
+    Given a repository with a merge-guard caller and no merge-guard-trigger.yml
+    Then a trailing finding reports it missing, and --write writes the canonical signal
+    And a signal edited away from the canonical text is reported again
+
+  @test:scripts/tests/workflow-pins.test.ts::workflow-pins:_a_merge-guard_caller_leaves_pull_request_target::the_one-line_flow_style_every_layer's_caller_uses_is_migrated_too;_a_second_pass_is_clean
+  Scenario: A caller written in one-line flow style is migrated
+    Given a caller whose pull_request_target and workflow_run are each a flow mapping on one line
+    Then two trailing findings drop pull_request_target and add "Merge guard trigger" inside the flow mapping
+    And judging the rewritten text gives no findings

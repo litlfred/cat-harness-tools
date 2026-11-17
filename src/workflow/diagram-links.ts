@@ -34,7 +34,24 @@ export const MIN_TARGET = 24;
 const attr = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const text = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const oneLine = (s: string): string => s.replace(/\s+/g, " ").trim();
+/**
+ * A step's name as one line of plain text. A name read straight from BPMN XML
+ * still carries its character references (`member&#x27;s`); they are decoded
+ * here, once, because `attr` and `text` escape again, and an undecoded one
+ * reached the accessible name as the literal "&#x27;".
+ */
+const oneLine = (s: string): string =>
+  s
+    .replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (m, e: string) => {
+      const k = e.toLowerCase();
+      if (k[0] === "#") {
+        const cp = k[1] === "x" ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10);
+        return Number.isFinite(cp) ? String.fromCodePoint(cp) : m;
+      }
+      return ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" } as Record<string, string>)[k] ?? m;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
 
 /** Where shape `id`'s `<g>` opens and closes in `svg`, counting nested `<g>`s. */
 export function shapeSpan(svg: string, id: string): { start: number; end: number } | undefined {

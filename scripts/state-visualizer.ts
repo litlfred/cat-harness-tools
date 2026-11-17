@@ -176,6 +176,7 @@ import { wrapRaw } from "./lib/liquid-raw.ts";
 import { siteTarget } from "./lib/site-target.ts";
 import { subjectIri } from "./lib/subject-pages.ts";
 import { describeAttestation } from "./lib/attestation-nodes.ts";
+import { SOFTWARE_LIBRARY_KIND, SOFTWARE_LIBRARY_SUBJECT_KIND, SOFTWARE_LIBRARY_SUFFIX, describeLibrary } from "./lib/software-library-nodes.ts";
 import { ATTESTATIONS_SUFFIX, QA_ATTESTATIONS_SCHEMA, QaAttestationsKind } from "../schemas/sdlc/qa-attestations.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { readLockFile } from "../schemas/kg/repo-owner.ts";
@@ -1069,9 +1070,11 @@ export function qaPanelsOf(
  * (`<id>.substrate.json`, written by `kg:subscribe` and not committed).
  * `attestations` is listed too (owner, 2026-11-13, node-kind audit): its page
  * was a census of `$schema` families that named no attestation, so each file
- * is now a row linking its page and its IRI (`QaAttestationsKind`).
+ * is now a row linking its page and its IRI (`QaAttestationsKind`). So is
+ * `software-library` (same audit): it had no viewer "by design", and each
+ * library is now a row linking its node-kind page, its IRI and its `.jsonld`.
  */
-export const LISTED_KINDS: readonly string[] = ["scenarios", "policies", "test-plan", "tool-release", "vocab-mapping", "substrate-snapshot", "attestations"];
+export const LISTED_KINDS: readonly string[] = ["scenarios", "policies", "test-plan", "tool-release", "vocab-mapping", "substrate-snapshot", "attestations", SOFTWARE_LIBRARY_KIND];
 
 /**
  * The file endings a listed node is read from: JSON, and JSON-LD, which is
@@ -1173,6 +1176,17 @@ export interface SubjectRows {
  * named `actors/admin.json` and linked nothing).
  */
 export const SUBJECT_ROWS: Readonly<Record<string, readonly SubjectRows[]>> = {
+  // `<id>.library.json`, minted `softwareLibrary/<id>` (`software-library-nodes.ts`).
+  // Its page is the node-kind page `gen-node-kind-pages` writes: the kind's
+  // validator nodes are declared by the harness that declares this
+  // visualiser, so the page is a sibling of it, `<locale>/<harness>/<kind>/`.
+  [SOFTWARE_LIBRARY_KIND]: [
+    {
+      kind: SOFTWARE_LIBRARY_SUBJECT_KIND,
+      id: (r) => (r.file.endsWith(SOFTWARE_LIBRARY_SUFFIX) && !r.file.includes("/") ? r.file.slice(0, -SOFTWARE_LIBRARY_SUFFIX.length) : undefined),
+      page: (r, instance, layerPath) => `../../${SOFTWARE_LIBRARY_KIND}/${instance}/${posix.join(layerPath, r.file.replace(/\.json$/, ""))}/`,
+    },
+  ],
   scenarios: [
     { dir: "actors", kind: "actor" },
     { dir: "capabilities", kind: "capability" },
@@ -1236,6 +1250,10 @@ export function registryRowsOf(absPath: string): RegistryRow[] {
         const sub = r["subject"] as { kind?: unknown; id?: unknown; path?: unknown } | undefined;
         const subject = sub && typeof sub.kind === "string" && typeof sub.id === "string" ? { kind: sub.kind, id: sub.id, path: typeof sub.path === "string" ? sub.path : null } : undefined;
         return { file, schema: QA_ATTESTATIONS_SCHEMA, id: file.slice(0, -ATTESTATIONS_SUFFIX.length), text: describeAttestation(String(r["family"] ?? ""), subject).title };
+      }
+      // A library names a package, not a title: its row reads `name@version` (`software-library-nodes.ts`).
+      if (typeof r["$schema"] === "string" && r["$schema"].startsWith(`${SOFTWARE_LIBRARY_KIND}/`) && file.endsWith(SOFTWARE_LIBRARY_SUFFIX)) {
+        return { file, schema: r["$schema"], id: file.slice(0, -SOFTWARE_LIBRARY_SUFFIX.length), text: describeLibrary(r, file).title };
       }
       const text = str(r["title"]) ?? str(r["label"]) ?? str(r["summary"]) ?? str(r["description"]) ?? str(r["rationale"]);
       return {

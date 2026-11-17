@@ -600,9 +600,23 @@ describe("the own-docs axis — an instance owes documentation of its own", () =
     // `auditAll` under bun's 5 s default, the coin-flip `lpcs` removed from
     // the others (it went red on cat-harness-tools#451, which made the audit a
     // little slower).
-    const report = formatReport(realAuditAll(resolve(".")));
-    expect(report).toContain("no `docs/` OF THEIR OWN");
-    expect(report).toContain("advisory, not gated");
+    // The line is asserted on a probe with no docs/ of its own, not on the
+    // corpus: a checkout whose every instance has one (this layer alone,
+    // once it declared docs/ for its wireframes) prints no such line, and
+    // that is the axis working, not failing.
+    // Its own root as the repository: the default walks the temp directory's
+    // parent (`/tmp` on a runner holds unreadable systemd directories, EACCES).
+    const probeRoot = inst();
+    const probe = formatReport([auditInstance(probeRoot, probeRoot)]);
+    expect(probe).toContain("1 instance(s) have no `docs/` OF THEIR OWN");
+    expect(probe).toContain("advisory, not gated");
+    expect(probe).not.toContain("no `docs/` OF THEIR OWN — an instance a reader cannot enter");
+    // Over the REAL corpus the line appears exactly when an instance owes it.
+    const rs = realAuditAll(resolve("."));
+    const owed = rs.filter((r) => r.ownDocs !== undefined).length;
+    const report = formatReport(rs);
+    if (owed) expect(report).toContain(`${owed} instance(s) have no \`docs/\` OF THEIR OWN`);
+    else expect(report).not.toContain("OF THEIR OWN — advisory");
   }, CORPUS_TIMEOUT);
 });
 

@@ -345,7 +345,7 @@ describe("every site writes its node-kind pages (who-iris schemas page, owner 20
       return i;
     };
     const step = at("${NODE_KIND_PAGES} --root . --out ${s}");
-    expect(at("o.siteSteps ?? []) run(")).toBeLessThan(step);
+    expect(at("for (const st of o.siteSteps ?? [])")).toBeLessThan(step);
     for (const after of ["rail-standalone-pages.ts", "checkLinks(site,"]) expect(at(after)).toBeGreaterThan(step);
   });
 });
@@ -388,7 +388,7 @@ describe("every site build writes its search scopes (who-iris search, owner 2026
       return i;
     };
     const split = at("splitSite(site, root)");
-    for (const before of ["rail-standalone-pages.ts", "o.finalSteps ?? []) run(", "writeForwardingPages(site, root)"]) expect(at(before)).toBeLessThan(split);
+    for (const before of ["rail-standalone-pages.ts", "for (const st of o.finalSteps ?? [])", "writeForwardingPages(site, root)"]) expect(at(before)).toBeLessThan(split);
     for (const after of ['join(site, ".nojekyll")', "siteCoverageShortfall(", "parityReport("]) expect(at(after)).toBeGreaterThan(split);
   });
 });

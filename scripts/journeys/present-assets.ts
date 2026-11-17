@@ -9,4 +9,4 @@
  * @module scripts/journeys/present-assets
  * @covers none — a constant list of asset file names
  */
-export const PRESENT_ASSETS = ["present.css", "present.js", "gap-report.js"] as const;
+export const PRESENT_ASSETS = ["present.css", "present.js", "gap-report.js", "canvas-pdf.js"] as const;

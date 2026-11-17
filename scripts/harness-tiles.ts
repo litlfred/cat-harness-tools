@@ -59,7 +59,7 @@ import {
   instanceDirectories,
   nestedDirectories,
 } from "../schemas/kg/cat-harness.js";
-import { declaredVisualisers, existingPageDir, pageParts, withViewers } from "./viewer-declarations.js";
+import { declaredVisualisers, existingPageDir, namesPage, pageParts, withViewers } from "./viewer-declarations.js";
 import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { subscribedHarnesses, subscribedTile } from "./subscribed-harnesses.js";
 import { labelVisualisations, nameInstanceRoot } from "./lib/nav-label.js";
@@ -728,6 +728,9 @@ function tileFor(
     generatedSite ? generatedPageOf(repoRoot, v) : undefined;
 
   const declared = new Map<string, string>();
+  // The pages a tile covering several kinds names itself (`namesPage`): the
+  // rows opening one print the tile's title, as the tile does.
+  const pageNames = new Map<string, string>();
   for (const d of dirs) {
     for (const v of visualisationsOf(d.coverage, d.id)) {
       // Built at publish (bean 0b8c) counts as present: its page is never
@@ -735,6 +738,7 @@ function tileFor(
       if (!visualisationResolves(v, (p) => existsSync(join(repoRoot, p)))) continue;
       const page = publishedRefOf(v.ref) ?? generatedRefOf(v);
       if (page === undefined) continue;
+      if (namesPage(v) && !pageNames.has(page)) pageNames.set(page, v.title);
       for (const kind of d.graphTypologies ?? []) {
         if (!declared.has(kind)) declared.set(kind, page);
       }
@@ -933,7 +937,7 @@ function tileFor(
 
   // ONE NAME PER DESTINATION (bean `ob3m` finding 6). Labelled here, where
   // the directories are in hand, and read by every surface from the data.
-  labelVisualisations(visualisations, dirs);
+  labelVisualisations(visualisations, dirs, pageNames);
 
   if (stagingOnly.length > 0) {
     findings.push(

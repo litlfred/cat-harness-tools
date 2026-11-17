@@ -75,7 +75,9 @@ export const CENSUS_RULES: Readonly<Record<string, CensusRule>> = {
   "bean-defs": { rule: "files", suffixes: [".md"] },
   "bean-notes": { rule: "files", suffixes: [".md"] },
   methodology: { rule: "files", suffixes: [".md", ".bpmn", ".json"] },
-  themes: { rule: "files", suffixes: [".json", ".ts"], except: [".test.ts", ".d.ts"] },
+  // A `themes` directory holds one module whose `INSTANCE_THEMES` are the
+  // nodes (`lib/theme-nodes.ts`); the export names each, so it is read first.
+  themes: { rule: "files", suffixes: [".json", ".ts"], except: [".test.ts", ".d.ts"], exportFirst: true },
   skills: { rule: "files", suffixes: [".md"], exportFirst: true },
   schemas: { rule: "files", suffixes: [".ts", ".json"], except: [".test.ts", ".d.ts"], exportFirst: true },
   scenarios: { ...JSON_FILES, exportFirst: true },
@@ -658,8 +660,12 @@ export async function coverRow(r: RowInput): Promise<CoverageRow> {
       const canon = folderUrl ?? r.folderUrls[0];
       const canonUrl = canon ? nodePageUrl(canon, n.id) : undefined;
       const tail = n.id.split("/").pop()!;
+      // A node-kind page is named after the node's FILE (`<path without .json>/`),
+      // so its last segment is the id plus the file's own ending
+      // (`typescript.library`, `foo.attestations`): that names the node too.
+      const namesNode = (seg: string): boolean => seg === tail || seg.startsWith(`${tail}.`);
       const named = links.filter(
-        (l) => l === canonUrl || (n.iri !== undefined && (l === n.iri || l === `${n.iri}.jsonld`)) || (!isRawRepoLink(l) && lastSeg(l) === tail),
+        (l) => l === canonUrl || (n.iri !== undefined && (l === n.iri || l === `${n.iri}.jsonld`)) || (!isRawRepoLink(l) && namesNode(lastSeg(l))),
       );
       const listed = canonUrl !== undefined && (linkSet.has(canonUrl) || named.length > 0);
       if (!canonUrl) {

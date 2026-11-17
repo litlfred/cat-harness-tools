@@ -27,7 +27,8 @@ import {
   extractUses,
   type ContentGraph,
 } from "./content-graph";
-import { findContentRepoRoot } from "./repo-root";
+import { findContentRepoRoot, folioLabelIndex } from "./repo-root";
+import { UNRESOLVED_LOCAL, unresolvedReference } from "../schemas/constraints.ts";
 
 // ── Shared graph (built once per process) ───────────────────────
 //
@@ -39,6 +40,11 @@ import { findContentRepoRoot } from "./repo-root";
 let _graph: ContentGraph | null = null;
 let _graphLoaded = false;
 let _graphTried = false;
+// The labels of every document in the folio, keyed by slug, and their union.
+// The content graph holds blocks only; a `sec:`/`chap:` target lives in a
+// chapter manifest, so it is resolved here.
+let _folioLabels: Map<string, Set<string>> | undefined;
+let _folioAll: Set<string> = new Set();
 
 function graph(): ContentGraph | null {
   if (_graphTried) return _graphLoaded ? _graph : null;
@@ -49,6 +55,10 @@ function graph(): ContentGraph | null {
     if (!existsSync(folioRoot)) return null;
     _graph = buildContentGraph(folioRoot, repoRoot);
     _graphLoaded = _graph.nodes.size > 0;
+    if (_graphLoaded) {
+      _folioLabels = folioLabelIndex(folioRoot);
+      _folioAll = new Set([..._folioLabels.values()].flatMap((s) => [...s]));
+    }
     return _graphLoaded ? _graph : null;
   } catch {
     return null;
@@ -60,27 +70,32 @@ export function resetUsesGraphCache(): void {
   _graph = null;
   _graphLoaded = false;
   _graphTried = false;
+  _folioLabels = undefined;
+  _folioAll = new Set();
 }
 
 /**
- * A `uses[]` entry that is not a bare in-paper label.
+ * Why a `uses[]` entry is broken, or `undefined` when it resolves.
  *
- * Cross-folio refs are absolute URLs; cross-paper refs are
- * `paper-dir:label`. Neither can be resolved against the blocks walked
- * here without fetching or assuming a sibling checkout, so both are
- * accepted as-is. (`schemas/constraints.ts` → `uses-resolve` owns
- * deeper validation of those forms.)
+ * A bare label resolves against the whole folio: a block in the content
+ * graph, or a chapter/section label in any document. Every built-in label
+ * prefix is checked — `sec:`, `chap:`, `app:`, `bib:` and every discovered
+ * kind's, read from `KNOWN_LABEL_PREFIXES` rather than written out here. The
+ * hand-written list this replaces had no `sec:`/`chap:` (nor `tbl:`/`prf:`…),
+ * so a bare `sec:x` read as a cross-paper ref and was never looked at.
  *
- * A bare label always contains a kind prefix (`def:`, `thm:`, …), so
- * the discriminator is whether anything precedes that prefix.
+ * A cross-paper `<slug>:<label>` resolves only in THAT document of the same
+ * folio, and a miss is broken — it used to be
+ * "accepted as-is". A full URL is a cross-FOLIO ref and is still accepted.
  */
-const KIND_PREFIX =
-  /^(def|thm|lem|prop|cor|conj|rem|ex|eq|fig|alg|sim|prose|diagram):/;
-
-function isExternalRef(u: string): boolean {
-  if (/^https?:\/\//.test(u)) return true;
-  // `paper-dir:def:foo` — a kind prefix appears, but not at position 0.
-  return !KIND_PREFIX.test(u) && u.includes(":");
+export function usesEntryProblem(
+  u: string,
+  g: Pick<ContentGraph, "nodes">,
+  folioLabels: ReadonlyMap<string, ReadonlySet<string>>,
+  folioAll: ReadonlySet<string> = new Set([...folioLabels.values()].flatMap((s) => [...s])),
+): string | undefined {
+  const why = unresolvedReference(u, (l) => g.nodes.has(l) || folioAll.has(l), folioLabels);
+  return why === UNRESOLVED_LOCAL ? "no block or section in the folio has that label" : why;
 }
 
 function label(tsPath: string): string | undefined {
@@ -98,7 +113,9 @@ function label(tsPath: string): string | undefined {
  *
  * Checks, in order of severity:
  *  1. self-reference — a block cannot be its own prerequisite;
- *  2. unresolvable bare label — points at no block in the corpus;
+ *  2. unresolvable label — a bare one naming no block or section in the
+ *     folio, or a cross-paper `<slug>:<label>` naming no label of document
+ *     `<slug>` (or no such document) in the same folio;
  *  3. duplicate entry — inflates every degree/cone metric downstream;
  *  4. transitive redundancy — A uses B, B uses C, A also lists C.
  *
@@ -147,11 +164,11 @@ export function checkUsesEditorialHygiene(tsPath?: string): CheckerResult {
     broken++;
   }
 
-  // 2. unresolvable bare label
+  // 2. unresolvable label — bare, or cross-paper `<slug>:<label>`
   for (const u of raw) {
-    if (isExternalRef(u)) continue;
-    if (!g.nodes.has(u)) {
-      hit(`unresolvable dependency "${u}" — no block in the corpus has that label`);
+    const why = usesEntryProblem(u, g, _folioLabels ?? new Map(), _folioAll);
+    if (why) {
+      hit(`unresolvable dependency "${u}" — ${why}`);
       broken++;
     }
   }

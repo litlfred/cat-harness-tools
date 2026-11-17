@@ -85,15 +85,16 @@ function page(imgs: Img[], observer = true) {
   // input-site: inert — runs this layer's own committed chrome, lifted out of its IIFE, against stubs; it reads no environment
   const api = new Function(
     "window", "document", "location", "mountFigures", "scopeSvg", "safeHref", "fitBpmn", "console",
-    `${block()}\nreturn { inlineDiagrams: inlineDiagrams, inlineAll: inlineAll };`,
+    `${block()}\nreturn { inlineDiagrams: inlineDiagrams, inlineAll: inlineAll, queueLateDrawings: queueLateDrawings };`,
   )(win, doc, { href: "https://example.test/p/" }, () => { mounts++; }, (s: unknown) => s, (h: string) => h, () => {}, { warn() {} }) as {
     inlineDiagrams: (done: () => void) => void;
+    queueLateDrawings: () => void;
   };
   let done = 0;
   api.inlineDiagrams(() => { done++; });
   const flush = async () => { for (let k = 0; k < 10; k++) await Promise.resolve(); };
   return {
-    fetched, handlers, watched, win, flush,
+    fetched, handlers, watched, win, flush, api,
     get done() { return done; },
     get mounts() { return mounts; },
     see: (i: Img) => observe!([{ isIntersecting: true, target: i }]),
@@ -127,6 +128,25 @@ describe("diagrams are inlined as they near the viewport", () => {
     const p = page(imgs, false);
     await p.flush();
     expect(p.fetched.sort()).toEqual(["a.svg", "b.svg"]);
+  });
+
+  test("a drawing added after load is queued too, once, and a drawing already tried is left alone", async () => {
+    const imgs = [img("a.svg")];
+    const p = page(imgs);
+    p.see(imgs[0]!);
+    await p.flush();
+    // A whole-document page fills a block: its drawing arrives after load.
+    const late = img("late.svg");
+    imgs.push(late);
+    p.api.queueLateDrawings();
+    p.api.queueLateDrawings();
+    expect(late.hasAttribute("data-fa-inline-pending")).toBe(true);
+    expect(p.watched.filter((i) => i === late).length).toBe(1);
+    expect(p.watched.filter((i) => i === imgs[0]).length).toBe(1);
+    p.see(late);
+    await p.flush();
+    expect(p.fetched).toEqual(["a.svg", "late.svg"]);
+    expect(UI).toContain("  function mountFigures() {\n    queueLateDrawings();");
   });
 });
 

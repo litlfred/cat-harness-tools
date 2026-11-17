@@ -308,7 +308,7 @@ export function viewerHtml(
               padding: 8px 11px; border-radius: 6px; font-size: 12.5px;
               margin: 10px 0 0; max-width: 78ch; }
   main { display: grid; grid-template-columns: 210px minmax(0,1fr) minmax(0,1.15fr); gap: 0; align-items: start; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; } .facets { border-right: none !important; } }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0,1fr); } .facets { border-right: none !important; } }
   .facets, .list, .detail { padding: 14px 16px; }
   .facets, .list { border-right: 1px solid var(--line); }
   h2 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; font-weight: 600; }

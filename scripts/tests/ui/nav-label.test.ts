@@ -94,6 +94,17 @@ describe("two kinds on one page share one name", () => {
     expect(rows.map((r) => r.sameAs)).toEqual(["schemas", undefined, undefined, undefined]);
   });
 
+  test("a page a multi-kind tile names takes the tile's title; every other row is unchanged (owner, 2026-11-16)", () => {
+    const rows: { kind: string; path?: string; label?: string; sameAs?: string }[] = [
+      { kind: "library", path: "/en/core/shelf/top-library/" },
+      { kind: "uploads", path: "/en/core/shelf/top-library/" },
+      { kind: "docs", path: "/docs/" },
+    ];
+    labelVisualisations(rows, [{ graphTypologies: ["library", "uploads"] }, { graphTypologies: ["docs"] }], new Map([["/en/core/shelf/top-library/", "Shelf"]]));
+    expect(rows.map((r) => r.label)).toEqual(["Shelf", "Shelf", "Docs"]);
+    expect(rows.map((r) => r.sameAs)).toEqual([undefined, "library", undefined]);
+  });
+
   test("a row with no page is named for its own kind", () => {
     const rows: { kind: string; path?: string; label?: string }[] = [{ kind: "waiver" }, { kind: "memory" }];
     labelVisualisations(rows, [{ graphTypologies: ["memory", "waiver"] }]);

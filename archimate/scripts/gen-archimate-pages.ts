@@ -40,6 +40,7 @@
  * | `<m>/` | the model's page: views, and elements by layer |
  * | `<m>/model.json` | the model, normalised — what the loader draws from |
  * | `<m>/view/<v>.svg` | the view, drawn (`render-view.ts`) |
+ * | `<m>/view/<v>.as-drawn.svg` | the source publication's figure of the view, as drawn (`figures[].asDrawn`); its page then switches between the two |
  * | `<m>/view/<v>.jsonld`, `.json`, `<m>/view/<slug>/` | a view's node and page |
  * | `<m>/element/<e>.jsonld`, `.json`, `<m>/element/<slug>/` | an element's node and page |
  * | `<m>/relationship/<r>.jsonld`, `.json`, `<m>/relationship/<r>/` | a relationship's node and page |
@@ -101,6 +102,9 @@ import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "../../schemas/kg/visualiser-route.ts";
+import { readHarnessConfig, TranslationConfigSchema } from "../../schemas/kg/harness-config.ts";
+import { potWithoutTimestamp } from "../../pipeline/pot-extract.ts";
+import { archimateLocales, CATALOGUE_STEM, formatArchimatePot, localizedArchimateFiles, readArchimateCatalogue, type SiteFile } from "./archimate-locales.ts";
 
 /**
  * The namespace every page written here declares its node's class in
@@ -471,10 +475,20 @@ export function pagesFor(
       const vp = `${m}/view/${seg(v.id)}`;
       const viewNode: PageNode = { iri: viewIri(v.id), types: ["archimate:Diagram"] };
       stubAt(`${m}/view`, v.id, `${v.name} — ${title}`, viewNode, seg(v.id));
+      // The source publication's figure as drawn, beside the view's drawing, and the switch between the two.
+      const drawnAs = figuresOf(v.id).find((f) => f.asDrawn !== undefined);
+      let asDrawn = "";
+      if (drawnAs?.asDrawn !== undefined) {
+        const src = join(instanceRoot, drawnAs.asDrawn);
+        if (!existsSync(src)) throw new Error(`${drawnAs.label}: as-drawn figure ${drawnAs.asDrawn} is not in the instance`);
+        const svg = readFileSync(src, "utf8");
+        files.push({ path: `${vd}/${v.id}${AS_DRAWN_SUFFIX}`, content: svg });
+        asDrawn = asDrawnSwitch(drawnAs.label, svg, toData(vp, `../${v.id}${AS_DRAWN_SUFFIX}`));
+      }
       files.push(page(`${vp}/index.html`, 3, `${v.name} — ${title}`, toData(vp, `../${v.id}.jsonld`), viewNode,
         `${mount(viewNode, "am am-wide", { model: toData(vp, "../../model.json"), svg: toData(vp, `../${v.id}.svg`) })}<p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(v.name)}</h1>` +
           `<p class="am-kind">View${figuresOf(v.id).map((f) => ` · drawn in the document as ${escHtml(f.label)} (<code>${escHtml(f.block)}</code>)`).join("")}</p>` +
-          `<div class="am-body" aria-live="polite"><p>Loading the view…</p></div></main>`, nav("../../")));
+          `${asDrawn}<div class="am-body" aria-live="polite"><p>Loading the view…</p></div></main>`, nav("../../")));
     }
 
     for (const e of model.elements) {
@@ -740,6 +754,52 @@ function thinPage(
   };
 }
 
+/** The name, beside a view's drawing `<id>.svg`, of the copy of its figure as the source publication drew it (`figures[].asDrawn`). */
+export const AS_DRAWN_SUFFIX = ".as-drawn.svg";
+
+/**
+ * An as-drawn SVG made fit to inline in a page: no XML prolog, DOCTYPE or
+ * comments. Refused when it carries what a page must not run or embed — a
+ * script, an event handler, a `javascript:` link, or an
+ * `<object>`/`<embed>`/`<iframe>`/`<foreignObject>` (the IG content QA gate
+ * refuses embedded objects).
+ */
+export function inlineSvg(svg: string, label: string): string {
+  // Until nothing changes: one pass can join the halves of a nested `<!<!---->--` into a new comment.
+  let body = svg;
+  for (let prev = ""; prev !== body; ) {
+    prev = body;
+    body = body
+      .replace(/<\?xml[\s\S]*?\?>/g, "")
+      .replace(/<!DOCTYPE[^>[]*(\[[\s\S]*?\])?\s*>/gi, "")
+      .replace(/<!--[\s\S]*?-->/g, "");
+  }
+  body = body.trim();
+  if (!/^<svg[\s>]/.test(body)) throw new Error(`${label}: the as-drawn figure is not an SVG drawing`);
+  // An unclosed comment or a markup declaration left would swallow the rest of the page.
+  if (/<!/.test(body)) throw new Error(`${label}: the as-drawn figure carries an unclosed comment or a markup declaration, which a page must not inline`);
+  const bad = /<(script|object|embed|iframe|foreignObject)[\s>/]/i.exec(body) ?? /\son[a-z]+\s*=/i.exec(body) ?? /javascript:/i.exec(body);
+  if (bad) throw new Error(`${label}: the as-drawn figure carries ${JSON.stringify(bad[0].trim())}, which a page must not inline`);
+  return body;
+}
+
+/**
+ * The CSS-only switch on a view's page between the figure as the source
+ * publication drew it and the model's view (issue #2368): two radios in a
+ * fieldset, their labels styled as pill tabs, "As drawn" checked. `archimate.css` hides the drawing not
+ * chosen (`.am-switch`, by `:has`), so with no script both still show. The
+ * words are static, so `--pot` takes them like the rest of the page.
+ */
+export function asDrawnSwitch(label: string, svg: string, href: string): string {
+  return (
+    `<fieldset class="am-switch"><legend>Show the figure</legend>` +
+    `<input type="radio" name="am-figure" id="am-show-drawn" value="drawn" checked><label for="am-show-drawn">As drawn</label>` +
+    `<input type="radio" name="am-figure" id="am-show-model" value="model"><label for="am-show-model">ArchiMate</label></fieldset>` +
+    `<figure class="am-figure am-as-drawn" aria-label="${escHtml(label)}, as drawn">${inlineSvg(svg, label)}` +
+    `<figcaption>${escHtml(label)}, as drawn in the source publication · <a href="${escHtml(href)}">the drawing (SVG)</a></figcaption></figure>`
+  );
+}
+
 /** A document figure the config maps to a view, with where the site holds its drawing and its page. */
 export interface FigureTarget {
   /** The block holding the figure, relative to the layer root (`figures[].block`). */
@@ -942,11 +1002,15 @@ if (import.meta.main) {
   const out = arg("out");
   const check = process.argv.includes("--check");
   const root = resolve(instance);
+  // `--pot` writes the template of every word the pages show
+  // (`translations/<locale>/archimate.pot`, archimate-locales.ts); `--pot-check`
+  // exits 1 when one is missing or stale.
+  const potMode = process.argv.includes("--pot") || process.argv.includes("--pot-check");
   // A site build lays the metamodel's DOT out to SVG with Graphviz compiled to
   // WebAssembly (no JVM, no binary). If it cannot load, the page says so and
   // still offers the DOT and Mermaid.
   let drawDot: ((dot: string) => string) | undefined;
-  if (out) {
+  if (out || potMode) {
     try {
       const { Graphviz } = await import("@hpcc-js/wasm-graphviz");
       drawDot = await drawEveryDot(Graphviz, (draw) => pagesFor(root, { site: true, drawDot: draw }));
@@ -954,13 +1018,47 @@ if (import.meta.main) {
       console.warn(`! no metamodel drawing: @hpcc-js/wasm-graphviz would not load (${(e as Error).message})`);
     }
   }
-  const { graphPath, pageRoot, files } = pagesFor(root, { requireServed: out === undefined, site: out !== undefined, drawDot });
+  const { graphPath, pageRoot, files } = pagesFor(root, { requireServed: out === undefined && !potMode, site: out !== undefined || potMode, drawDot });
   const target = out ? join(resolve(out), graphPath) : archimateDir(root, readConfig(root));
+  const siteFiles: SiteFile[] = files.map((f) => ({ path: sitePathOf({ graphPath, pageRoot }, f), content: f.content, page: f.page === true }));
+  const tc = (() => {
+    const parsed = TranslationConfigSchema.safeParse((readHarnessConfig(root) as { translation?: unknown } | null)?.translation ?? {});
+    return parsed.success ? parsed.data : TranslationConfigSchema.parse({});
+  })();
+  if (potMode) {
+    const name = (JSON.parse(readFileSync(join(root, findDeclarationFile(root)!), "utf8")) as { name: string }).name;
+    const stale: string[] = [];
+    for (const l of tc.supportedLocales.filter((x) => x !== tc.defaultLocale)) {
+      const pot = formatArchimatePot(siteFiles, l, name);
+      const p = join(root, tc.translationDir, l, `${CATALOGUE_STEM}.pot`);
+      if (existsSync(p) && potWithoutTimestamp(readFileSync(p, "utf8")) === potWithoutTimestamp(pot)) continue;
+      stale.push(relative(root, p));
+      if (!process.argv.includes("--pot-check")) {
+        mkdirSync(dirname(p), { recursive: true });
+        writeFileSync(p, pot);
+      }
+    }
+    if (process.argv.includes("--pot-check")) {
+      if (stale.length) {
+        for (const s of stale) console.error(`✗ ${s} is missing or stale`);
+        console.error(`run: bun run cat-harness-tools/archimate/scripts/gen-archimate-pages.ts --instance ${instance} --pot`);
+        process.exit(1);
+      }
+      console.log("✓ archimate templates current");
+    } else console.log(stale.length ? stale.map((s) => `  wrote ${s}`).join("\n") : "✓ archimate templates current");
+    process.exit(0);
+  }
   if (out) {
-    for (const f of files) {
-      const p = join(resolve(out), sitePathOf({ graphPath, pageRoot }, f));
+    const locales = archimateLocales(root, tc.supportedLocales.filter((l) => l !== tc.defaultLocale), tc.translationDir);
+    const catalogues = new Map(locales.map((l) => [l, readArchimateCatalogue(root, l, tc.translationDir)] as const));
+    const localized = localizedArchimateFiles(siteFiles, catalogues, tc.defaultLocale);
+    for (const f of localized.files) {
+      const p = join(resolve(out), f.path);
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, f.content);
+    }
+    for (const r of localized.reports) {
+      console.log(`  ${r.locale}: ${r.pages} page(s), ${r.translated} segment(s) translated, ${r.untranslated} left in English${r.rejected.length ? `, ${r.rejected.length} rejected (placeholders differ)` : ""}`);
     }
     // Each model's Archi file, at the data path its page links and its node's
     // `schema:contentUrl` names (`<data root>/<file>`). A committed tree has it

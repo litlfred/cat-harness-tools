@@ -29,7 +29,7 @@
  * | `assets/present.css`, `assets/present.js` | the presentation pages' style and script |
  */
 import { readFileSync } from "node:fs";
-import { extname, join, posix } from "node:path";
+import { basename, extname, join, posix, relative, resolve } from "node:path";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import remarkHtml from "remark-html";
@@ -58,6 +58,7 @@ import {
 import { igProcessPage, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
 import { PRESENT_ASSETS } from "./present-assets.ts";
 import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
+import { imageSize, type ImageSize } from "./image-size.ts";
 
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
@@ -349,6 +350,13 @@ interface Crumb {
   href?: string;
 }
 
+/**
+ * A journey page asks the site's chrome to leave out its version banner ("This
+ * page is part of …"): the page is the viewer's, not a page of the guide
+ * (owner, 2026-11-17). A site that stamps no banner ignores it.
+ */
+export const IG_BANNER_OPT_OUT = '<meta name="ig-version-banner" content="none">';
+
 function page(o: { title: string; up: string; crumbs: Crumb[]; body: string; kind: string; print?: "sheets" }): string {
   const crumbs = o.crumbs
     .map((c) => (c.href !== undefined ? `<a href="${e(c.href)}">${e(c.label)}</a>` : `<span aria-current="page">${e(c.label)}</span>`))
@@ -361,6 +369,7 @@ function page(o: { title: string; up: string; crumbs: Crumb[]; body: string; kin
 <title>${e(o.title)}</title>
 <link rel="canonical" href="./">
 <link rel="icon" href="${e(DEFAULT_ICON)}">
+${IG_BANNER_OPT_OUT}
 ${NAVBAR_LINKED}
 <link rel="stylesheet" href="${o.up}assets/journeys.css">
 <script src="${o.up}assets/journeys.js" defer></script>
@@ -449,7 +458,7 @@ function indexPage(corpus: JourneyCorpus, links: SiteLinks, declaring: string): 
   const body = `<header class="jv-hero">
 <p class="jv-kicker">Journeys</p>
 <h1>Every journey in ${e(links.title)}</h1>
-<p class="jv-lede">${total} journey${total === 1 ? "" : "s"} and ${steps} step${steps === 1 ? "" : "s"} across ${names.length} instance${names.length === 1 ? "" : "s"} of this checkout, the mounted layers' included. Each journey is a user scenario told as a journey map; a journey's parts sit under it, in the order the story follows.</p>
+<p class="jv-lede">${total} journey${total === 1 ? "" : "s"} and ${steps} step${steps === 1 ? "" : "s"} across ${names.length} instance${names.length === 1 ? "" : "s"} of this checkout, the mounted layers included. Each journey is a user scenario told as a journey map; a journey's parts sit under it, in the order the story follows.</p>
 <label class="jv-filter"><span>Filter</span><input type="search" data-jv-filter placeholder="a title, a step code, a word" aria-label="Filter journeys"></label>
 </header>
 ${names.length ? names.map((n) => instanceSection(corpus, n, "", true)).join("\n") : `<p class="jv-empty">No instance in this checkout declares a <code>user-scenario</code> or <code>workshop</code> directory with anything in it.</p>`}`;
@@ -698,7 +707,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
     ? `<h4>User stories</h4><ul class="jv-stories">${stories
         .map(({ id, s: story }) =>
           story
-            ? `<li><span class="jv-code">${e(id)}</span> As a <b>${e(story.role.replace(/-/g, " "))}</b>, I want ${e(story.want.charAt(0).toLowerCase() + story.want.slice(1))}${story.soThat ? `, so that ${e(story.soThat)}` : ""}.</li>`
+            ? `<li><span class="jv-code">${e(id)}</span> As a <b>${e(story.role.replace(/-/g, " "))}</b>, I want to ${e(story.want.charAt(0).toLowerCase() + story.want.slice(1))}${story.soThat ? `, so that ${e(story.soThat)}` : ""}.</li>`
             : `<li class="jv-unresolved"><span class="jv-code">${e(id)}</span> not found</li>`,
         )
         .join("")}</ul>`
@@ -764,7 +773,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
 ${illustrationHtml(corpus, j, s, personas)}
 <div class="jv-step-body">
 <div class="jv-col">${story}</div>
-<div class="jv-col jv-hood"><h4 class="jv-hood-h">Under the hood</h4>${hood}</div>
+<details class="jv-col jv-hood"><summary class="jv-hood-h">Under the hood</summary>${hood}</details>
 </div>
 ${processes ? `<section class="jv-procs"><h4>Where it happens in the process</h4>${processes}</section>` : ""}
 ${ws}
@@ -908,7 +917,7 @@ function workshopPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
 ${ws.audience ? `<p><b>For:</b> ${e(ws.audience)}</p>` : ""}
 ${ws.promise ? `<p class="jv-promise">${e(ws.promise)}</p>` : ""}
 ${ws.useCaseStatement ? `<p class="jv-usecase">${e(ws.useCaseStatement)}</p>` : ""}
-<p><a class="jv-btn" href="overview/">Present it: overview and walkthrough</a>${ws.sheets?.length ? ` <a class="jv-btn" href="sheets/">Printable sheets (${ws.sheets.length})</a>` : ""}</p>
+<p><a class="jv-btn" href="overview/">Present it: overview and walkthrough</a>${ws.sheetsSource ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">${e(ws.sheetsSource.title ?? "Table canvas")}</a>` : ws.sheets?.length ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">Printable sheets (${ws.sheets.length})</a>` : ""}</p>
 </header>
 <section><h2>Taught from</h2><ol class="jv-tree">${scenarios.map((j, i) => (j ? journeyCard(corpus, j, up) : `<li class="jv-unresolved">${e(ws.scenarios[i]!)}: no such journey in this checkout</li>`)).join("\n")}</ol></section>
 <section><h2>Modules</h2>${modulesHtml}</section>
@@ -952,7 +961,7 @@ function modulePage(corpus: JourneyCorpus, w: WorkshopEntry, moduleId: string): 
 ${m.carries ? `<p class="jv-carries">${e(m.carries)}</p>` : ""}
 ${m.description ? `<div class="jv-lede">${mdHtml(m.description)}</div>` : ""}
 ${m.objectives?.length ? `<h2>By the end, a participant can</h2><ul class="jv-objectives">${m.objectives.map((o) => `<li>${e(o)}</li>`).join("")}</ul>` : ""}
-${sheet ? `<p><a class="jv-btn" href="../sheets/#sheet-${e(sheet.id)}">${e(sheet.label ?? sheet.title)}: ${e(sheet.title)} (${e(sheet.size)})</a></p>` : ""}
+${sheet ? `<p><a class="jv-btn" href="../${sheetsAt(corpus, w, `sheet-${sheet.id}`)}">${e(sheet.label ?? sheet.title)}: ${e(sheet.title)} (${e(sheet.size)})</a></p>` : ""}
 </header>
 <section><h2>The questions, along the journey</h2>${qs.length ? `<ol class="jv-modqs">${qs.map((q) => `<li>${stepLink(q, up)}<div><span class="jv-muted">${e(q.ref?.step.title ?? "")}</span><p>${e(q.text)}</p></div></li>`).join("")}</ol>` : `<p class="jv-muted">No step asks a question in this module.</p>`}</section>
 ${tables.length ? `<section><h2>Tables</h2>${tables.map((t) => tableHtml(t)).join("\n")}</section>` : ""}
@@ -973,6 +982,15 @@ function lines(n: number): string {
 }
 
 /** The printable sheets of a workshop, one `<article class="jv-sheet">` each: on the sheets page, framed or not. */
+/**
+ * Where a workshop's sheets are, from its own directory: the Table sheets panel
+ * of the discussion for a presented workshop (`present-views.ts`), the sheets
+ * page otherwise; `anchor` is a sheet on it.
+ */
+export function sheetsAt(corpus: JourneyCorpus, w: WorkshopEntry, anchor?: string): string {
+  return presentationOf(corpus, w).steps.length ? `discuss/#${e(anchor ?? "sheets")}` : `sheets/${anchor ? `#${e(anchor)}` : ""}`;
+}
+
 export function sheetsHtml(corpus: JourneyCorpus, w: WorkshopEntry): string {
   const ws = w.workshop;
   const scales = ws.assessment?.scales ?? [];
@@ -1023,11 +1041,113 @@ ${table ? `<section class="jv-ways" aria-label="${e(table.title)}">${table.rows.
 </article>`;
 }
 
+// ── the workshop's own canvas (JV-06) ─────────────────────────────────────
+
+/** One file of the canvas: where the sheets page links it, and, for a file of the layer, where it is copied from. */
+export interface CanvasFile {
+  /** Relative to the sheets page (`canvas/page-1.png`), or the URL as the workshop gave it. */
+  href: string;
+  /** The file in the layer, when it is copied beside the page. */
+  from?: string;
+  /** An image's pixel size, read from the file in the layer: the page never shows it wider. */
+  size?: ImageSize;
+}
+
+/** The workshop's `sheetsSource`, every file resolved; what the Table sheets view shows in place of the drawn sheets. */
+export interface Canvas {
+  title: string;
+  description?: string;
+  size: "A3" | "A4";
+  docx?: CanvasFile;
+  pdf?: CanvasFile;
+  previews: CanvasFile[];
+  /** Hrefs the workshop names that are no file of its layer (check:journey-refs reports them too). */
+  missing: string[];
+}
+
+const isUrl = (href: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("/");
+
+/**
+ * The workshop's own canvas, or undefined when it names none or none of its
+ * files resolves (the drawn sheets are shown then). A relative href is read
+ * from the workshop file's directory, inside its layer, and copied to
+ * `canvas/<file name>` beside the sheets page; a URL is linked as given.
+ */
+export function canvasOf(corpus: JourneyCorpus, w: WorkshopEntry): Canvas | undefined {
+  const src = w.workshop.sheetsSource;
+  if (!src) return undefined;
+  const root = corpus.instances.get(w.instance)?.root;
+  const missing: string[] = [];
+  const used = new Set<string>();
+  const file = (href: string | undefined): CanvasFile | undefined => {
+    if (href === undefined) return undefined;
+    if (isUrl(href)) return { href };
+    const from = root === undefined ? undefined : instanceFile(corpus, w.instance, relative(root, resolve(w.dir, href)));
+    if (from === undefined) {
+      missing.push(href);
+      return undefined;
+    }
+    // Two files of one name (a.png in two folders) get the second a number.
+    let name = basename(from);
+    for (let i = 2; used.has(name); i++) name = `${basename(from, extname(from))}-${i}${extname(from)}`;
+    used.add(name);
+    const size = imageSize(from);
+    return { href: `canvas/${name}`, from, ...(size ? { size } : {}) };
+  };
+  const docx = file(src.docx);
+  const pdf = file(src.pdf);
+  const previews = (src.previews ?? []).map(file).filter((f): f is CanvasFile => f !== undefined);
+  if (!docx && !pdf && previews.length === 0) return undefined;
+  return {
+    title: src.title ?? "Table canvas",
+    ...(src.description ? { description: src.description } : {}),
+    size: src.size ?? "A3",
+    ...(docx ? { docx } : {}),
+    ...(pdf ? { pdf } : {}),
+    previews,
+    missing,
+  };
+}
+
+/** The canvas files to copy beside a sheets page, paths relative to its directory (`sheets/`). */
+export function canvasFiles(c: Canvas | undefined): PageFile[] {
+  return c ? [c.docx, c.pdf, ...c.previews].filter((f): f is CanvasFile & { from: string } => f?.from !== undefined).map((f) => ({ path: f.href, content: new Uint8Array(readFileSync(f.from)) })) : [];
+}
+
+/** The canvas's download links, each with `cls`: the Word file, the PDF. */
+export function canvasDownloads(c: Canvas, cls: string, icons: { file?: string } = {}): string {
+  const link = (f: CanvasFile | undefined, label: string) => (f ? `<a class="${cls}" href="${e(f.href)}"${f.from ? " download" : ""}>${icons.file ?? ""}${e(label)}</a>` : "");
+  return link(c.docx, "Download Word (.docx)") + link(c.pdf, "Download PDF");
+}
+
+/**
+ * The canvas's pages: an image per page, one printed page each, never shown
+ * wider than its pixels (a 72 dpi preview stretched to a wide column is what
+ * made the canvas blurry, owner 2026-11-17; `check:journey-refs` warns on one); without
+ * previews, the PDF itself in the page; with only the Word file, a line
+ * saying so.
+ */
+export function canvasHtml(c: Canvas): string {
+  const n = c.previews.length;
+  const pages = n
+    ? c.previews
+        .map((f, i) => `<figure class="jv-canvas-page jv-canvas-${c.size.toLowerCase()}" id="canvas-page-${i + 1}"><img src="${e(f.href)}"${f.size ? ` width="${f.size.width}" height="${f.size.height}" style="max-width:${f.size.width}px"` : ""} alt="${e(`${c.title}, page ${i + 1} of ${n}`)}" loading="${i ? "lazy" : "eager"}"><figcaption class="jv-noprint">Page ${i + 1} of ${n}</figcaption></figure>`)
+        .join("")
+    : c.pdf
+      ? `<object class="jv-canvas-pdf" type="application/pdf" data="${e(c.pdf.href)}" aria-label="${e(c.title)}"><p><a href="${e(c.pdf.href)}">${e(c.title)} (PDF)</a></p></object>`
+      : `<p class="jv-muted">The canvas is a Word file: download it to print.</p>`;
+  return `<section class="jv-canvas" aria-label="${e(c.title)}">${pages}</section>`;
+}
+
 function sheetsPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
   const up = "../../../../";
   const ws = w.workshop;
+  const canvas = canvasOf(corpus, w);
   const sheets = sheetsHtml(corpus, w);
-  const body = `<header class="jv-hero jv-noprint"><p class="jv-kicker"><a href="../">${e(ws.title)}</a></p><h1>Printable sheets</h1><p>One sheet per page, ${[...new Set((ws.sheets ?? []).map((s) => s.size))].join(" and ")} landscape. Print from the browser at 100% with background graphics on.</p><p><button type="button" class="jv-btn" data-jv-print>Print the sheets</button></p></header>
+  const body = canvas
+    ? `<header class="jv-hero jv-noprint"><p class="jv-kicker"><a href="../">${e(ws.title)}</a></p><h1>${e(canvas.title)}</h1>${canvas.description ? `<p>${e(canvas.description)}</p>` : ""}<p>${canvas.previews.length ? `<button type="button" class="jv-btn" data-jv-print>Print the canvas (${e(canvas.size)} landscape)</button> ` : ""}${canvasDownloads(canvas, "jv-btn")}</p></header>
+${canvasHtml(canvas)}`
+    : `<header class="jv-hero jv-noprint"><p class="jv-kicker"><a href="../">${e(ws.title)}</a></p><h1>Printable sheets</h1><p>One sheet per page, ${[...new Set((ws.sheets ?? []).map((s) => s.size))].join(" and ")} landscape. Print from the browser at 100% with background graphics on.</p><p><button type="button" class="jv-btn" data-jv-print>Print the sheets</button></p></header>
 ${sheets || `<p class="jv-muted">This workshop has no sheets.</p>`}`;
   return page({
     title: `Sheets — ${ws.title}`,
@@ -1065,7 +1185,10 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
       out.push({ path: `${base}/${moduleSegment(m.id)}/index.html`, content: modulePage(corpus, w, m.id) });
     }
     // A workshop with steps to present has its sheets in the presentation frame (`present.ts`).
-    if (presentationOf(corpus, w).steps.length === 0) out.push({ path: `${base}/sheets/index.html`, content: sheetsPage(corpus, w) });
+    if (presentationOf(corpus, w).steps.length === 0) {
+      out.push({ path: `${base}/sheets/index.html`, content: sheetsPage(corpus, w) });
+      for (const f of canvasFiles(canvasOf(corpus, w))) out.push({ path: `${base}/sheets/${f.path}`, content: f.content });
+    }
   }
   out.push(...renderPresentationPages(corpus, links));
   // Every persona's picture, once, from the route root (`ROOT_MARK`).

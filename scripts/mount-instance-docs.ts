@@ -88,6 +88,7 @@ import { isPublished } from "../schemas/kg/url-space.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { instanceSitePath } from "./instance-exports.ts";
 import { inScope, siteScope } from "./lib/site-scope.ts";
+import { overviewHrefIn } from "./lib/harness-overview.ts";
 
 /**
  * A layer's route — `<instance>` or `<instance>/<path>`, no slash at
@@ -650,7 +651,16 @@ export function publishedGraphs(built: string, instanceName: string, toRoot: str
   return out;
 }
 
-export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] | undefined {
+export function instantiatedHarnesses(
+  built: string,
+  toRoot: string,
+  /**
+   * Where a harness's OVERVIEW page is on this site, when it holds one
+   * (`lib/harness-overview.ts`): every row links there, and keeps its
+   * `harness.json` href only where the site has no such page.
+   */
+  overview?: (name: string) => string | undefined,
+): NavItem[] | undefined {
   // The site root is READ, never composed. `join(REPO, built, "docs", ...)`
   // was the first version and `check:declared-paths` refused it -- rightly,
   // and pointedly, because `publishedDocsPrefix` exists a few lines up in this
@@ -674,7 +684,7 @@ export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] 
       const label = h.label ?? h.title ?? h.name ?? "?";
       // A site-absolute href has to be re-based for a page that is not at the
       // root. `/<instance>/` from `/docs/<instance>/index.html` is `../../<instance>/`.
-      const href = h.href ? `${toRoot}${h.href}` : undefined;
+      const href = (h.name ? overview?.(h.name) : undefined) ?? (h.href ? `${toRoot}${h.href}` : undefined);
       // The row's RESOLVED mark, never its `icon` (bean `2vpn`): reading
       // `icon` here dropped every theme avatar and every glyph, so only a
       // layer with a declared image ever drew one on a mounted page.
@@ -1096,9 +1106,10 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       const site = ownSite ? ownSiteGraphs(siteAbs, built, m.name, toRoot) : publishedGraphs(built, m.name, toRoot);
       const links: NavItem[] = declaredGraphs(m.name, linked, site, named.harness);
 
+      const overview = overviewHrefIn(siteAbs, toRoot);
       const harnesses = ownSite
-        ? instanceHarnesses(built, m.name, PLATFORM_BASE, `${toRoot}/`, toRoot)
-        : instantiatedHarnesses(built, toRoot);
+        ? instanceHarnesses(built, m.name, PLATFORM_BASE, `${toRoot}/`, toRoot, overview)
+        : instantiatedHarnesses(built, toRoot, overview);
       const read = readFileSync(file, "utf-8");
       // A Jekyll-laid-out page inside a mount (the IRIS replica's `catalogue/`) wears
       // the theme's side bar; the rail replaces it here as it does on every
@@ -1304,6 +1315,8 @@ export function instanceHarnesses(
   ownHref: string | undefined,
   /** Where the layer's OWN mark resolves; default `linkRoot`. See {@link ownsCheckout}. */
   ownMarkRoot: string = linkRoot,
+  /** Each harness's overview page on this site, which every row links when the site holds it (see {@link instantiatedHarnesses}). */
+  overview?: (name: string) => string | undefined,
 ): NavItem[] | undefined {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
@@ -1330,7 +1343,8 @@ export function instanceHarnesses(
     .sort((a, b) => (a.name === instance ? -1 : b.name === instance ? 1 : 0))
     .map((h) => {
       const label = h.label ?? h.title ?? h.name ?? "?";
-      const href = h.name === instance && ownHref !== undefined ? ownHref : h.href ? `${linkRoot}${h.href}` : undefined;
+      const page = h.name !== undefined ? overview?.(h.name) : undefined;
+      const href = page ?? (h.name === instance && ownHref !== undefined ? ownHref : h.href ? `${linkRoot}${h.href}` : undefined);
       const markRoot = h.name === instance ? ownMarkRoot : linkRoot;
       return { label, ...(href ? { href } : {}), ...navMarkFields(h.mark, h.tone, (src) => `${markRoot}${src}`) };
     });
@@ -1568,11 +1582,13 @@ export function railStandalonePages(
           // The folio's OWN mark is on its own site when it is the checkout's root (gap 4).
           const markRoot = foreign && ownsCheckout(foreign.instance) ? toRoot : linkRoot;
           const homeLabel = foreign ? foreign.homeLabel : named.site;
+          // Each harness row links its overview page on THIS site (owner, 2026-11-13), where the site holds one.
+          const overview = overviewHrefIn(siteAbs, toRoot);
           const listed = landed
-            ? [{ label: homeLabel ?? named.harness ?? owner, href: `${toRoot}/` }, ...(instanceHarnesses(built, foreign!.instance!, linkRoot, undefined) ?? [])]
+            ? [{ label: homeLabel ?? named.harness ?? owner, href: `${toRoot}/` }, ...(instanceHarnesses(built, foreign!.instance!, linkRoot, undefined, linkRoot, overview) ?? [])]
             : foreign?.instance
-              ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot)
-              : instantiatedHarnesses(built, linkRoot);
+              ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot, overview)
+              : instantiatedHarnesses(built, linkRoot, overview);
           // A FHIR IG rendered on this site gets a `[fhir]` row to its index
           // page, right after its harness's row (owner, 2026-10-31).
           const harnesses = withIgRenderRow(listed, {
@@ -1927,13 +1943,51 @@ export interface Served {
 }
 
 /**
+ * The directories each instance's index entry chose to mount: from
+ * `index.lock.json`'s `instances[].directories[].id`, and only for an entry
+ * that lists its directories. An instance absent from the map mounts its
+ * whole declaration, as does a whole-layer mount (`id: "*"`).
+ */
+export function servedScope(repo = REPO): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const file = join(repo, "index.lock.json");
+  if (!existsSync(file)) return out;
+  let lock: { instances?: { instance?: unknown; directories?: unknown }[] };
+  try {
+    lock = JSON.parse(readFileSync(file, "utf-8")) as typeof lock;
+  } catch (e) {
+    throw new Error(`${file} does not parse, so which directories are mounted cannot be determined: ${String(e)}`);
+  }
+  for (const i of lock.instances ?? []) {
+    if (typeof i.instance !== "string" || !Array.isArray(i.directories)) continue;
+    if ((i.directories as { id?: unknown }[]).some((d) => d?.id === "*")) continue;
+    const ids = out.get(i.instance) ?? new Set<string>();
+    for (const d of i.directories as { id?: unknown }[]) if (d && typeof d.id === "string") ids.add(d.id);
+    out.set(i.instance, ids);
+  }
+  return out;
+}
+
+/**
+ * Whether the index mounts `entry` of `instance`: yes when the instance's
+ * index entry lists no directories, or the entry has no id to match by.
+ * A directory the index chose not to mount is not served — its bytes are not
+ * in the checkout, so it is not owed.
+ */
+export function inMountScope(scope: Map<string, Set<string>>, instance: string, entry: { id?: string }): boolean {
+  const ids = scope.get(instance);
+  return ids === undefined || entry.id === undefined || ids.has(entry.id);
+}
+
+/**
  * Every directory declared `served`, with its route — `/<instance>/<path>`,
  * the same place the layer's composed pages sit under, so a page reaches
  * the data with a path that does not depend on where the site is hosted
  * (`visualizer-loading` §"How to fetch").
  */
 export function servedDirectories(entries: { name: string; entry: DeclaredEntry & { path: string }; abs: string }[] = declaredEntries(), repo = REPO): Served[] {
-  const served = entries.filter((x) => x.entry.served === true);
+  const scope = servedScope(repo);
+  const served = entries.filter((x) => x.entry.served === true && inMountScope(scope, x.name, x.entry));
   const mounted = served.length ? mountedInstances(repo) : new Map<string, string>();
   return served.map((x) => {
     const read = readPathAt(repo, x.abs, mounted);

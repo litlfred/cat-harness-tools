@@ -4,17 +4,21 @@
 # what the status means. It never merges: only the merge manager does.
 #
 # Keep this file's name: `scripts/merge-guard.ts` ignores runs of
-# `.github/workflows/merge-guard.yml` as evidence about the head.
+# `.github/workflows/merge-guard.yml` (and of its signal,
+# `merge-guard-trigger.yml`) as evidence about the head.
+#
+# It runs only from the default branch (owner, 2026-11-17): no
+# `pull_request_target`. A PR's labels, pushes and edits reach it as the
+# completion of `Merge guard trigger` (`merge-guard-trigger.yml`, written by
+# `workflow-pins --write`), a `pull_request` signal with no token.
 
 name: Merge guard
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, labeled, unlabeled, edited]
   issue_comment:
     types: [created, edited]
   workflow_run:
-    workflows: ["PR checks"]
+    workflows: ["PR checks", "Merge guard trigger"]
     types: [completed]
   workflow_dispatch:
     inputs:

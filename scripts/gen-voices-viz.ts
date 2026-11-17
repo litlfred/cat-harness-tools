@@ -42,6 +42,7 @@ import {
 } from "../schemas/kg/cat-harness.ts";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { makeEmit } from "./viewer-page.ts";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
@@ -49,6 +50,10 @@ import { SKILL_PAGES_DIR, skillPagesOf } from "./lib/skill-pages.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { subjectIri } from "./lib/subject-pages.ts";
+import { VOICE_SUBJECT_KIND, voiceNodes } from "./lib/voice-nodes.ts";
+import { carriesMarker } from "./orphan-pages.ts";
+import type { VoiceView } from "./voices-graph.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "voices-viewer";
@@ -69,13 +74,15 @@ export function projection(
   g: VoicesGraph,
   links?: LibraryResolver,
   kgLinks?: (kgPath: string, instance: string | undefined) => { viewer?: string; source?: string } | undefined,
+  nodeLinks?: (v: VoiceView) => VoiceNodeLinks,
 ): unknown {
+  const withNodes = nodeLinks === undefined ? g : { ...g, voices: g.voices.map((v) => ({ ...v, ...nodeLinks(v) })) };
   const linked =
     links === undefined
-      ? g
+      ? withNodes
       : {
-          ...g,
-          voices: g.voices.map((v) => ({
+          ...withNodes,
+          voices: withNodes.voices.map((v) => ({
             ...v,
             rules: v.rules.map((r) => {
               if (r.cites === undefined) return r;
@@ -98,6 +105,61 @@ export function projection(
     ...tileCounts({ voices: [g.totals.voices, "voices"] }),
     ...linked,
   };
+}
+
+/**
+ * Where one voice is a node (owner, 2026-11-13, node-kind audit: every listed
+ * node kind has an IRI, a JSON-LD document, a row and a page, no waivers).
+ * `page` is its own page, relative to the site root: `<route>/<layer>/<id>/`,
+ * under its layer's subject page, as the library's entry pages are under
+ * theirs. `iri` is the `@id` its layer's export mints (`kg-export`'s
+ * `collectVoices`), where that export is served; its JSON-LD is `iri` plus
+ * `.jsonld`.
+ */
+export interface VoiceNodeLinks {
+  page?: string;
+  iri?: string;
+}
+
+/** The page of voice `id` of layer `instance`, relative to the site root, under the viewer's `route`. */
+export function voicePagePath(route: string, instance: string, id: string): string {
+  return `${route.replace(/\/+$/, "")}/${instance}/${id}/`;
+}
+
+/** What a voice page opens with, and how a pruning run knows it wrote one. */
+export const VOICE_PAGE_MARKER = '<div class="vo-node">';
+
+const escHtml = (s: string): string =>
+  s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+
+/**
+ * One voice's own page: what it is, where it comes from, its IRI and JSON-LD,
+ * and every rule with the passage it was read from. Static, so it reads
+ * without the projection; the rule list is the same one the family page
+ * draws. `back` is the layer's subject page, relative to this one.
+ */
+export function voicePageHtml(v: VoiceView, iri: string | undefined, back = "../"): string {
+  const rule = (r: VoiceView["rules"][number]): string =>
+    `<tr><td><code>${escHtml(r.id)}</code></td><td><b>${escHtml(r.title)}</b><br>${escHtml(r.description)}</td>` +
+    `<td>${escHtml(r.category)} · ${escHtml(r.severity)}</td>` +
+    `<td>${r.citation === "none" ? "<b>cites nothing</b>" : `<blockquote>${escHtml(r.quote)}</blockquote>${escHtml(r.cites ?? "")}${r.pages ? `, p${escHtml(r.pages)}` : ""}`}</td></tr>`;
+  const sources = v.sources.length
+    ? v.sources.map((s) => `${escHtml(s.title)}${s.year ? ` (${s.year})` : ""}`).join("; ")
+    : "<b>declares no source publication</b>";
+  return themedPage({
+    title: v.title,
+    generator: "cat-harness-tools/scripts/gen-voices-viz.ts",
+    command: "bun run cat voices:viz",
+    frontMatter: { alternate_jsonld: iri === undefined ? undefined : `${iri}.jsonld` },
+    body: `${VOICE_PAGE_MARKER}
+<h1>${escHtml(v.title)}</h1>
+<p><code>${escHtml(v.id)}</code> · shipped by <b>${escHtml(v.instance)}</b> · <code>${escHtml(v.path)}</code> · <a href="${escHtml(back)}">every ${escHtml(v.instance)} voice</a></p>
+${iri === undefined ? "" : `<p>IRI: <a class="iri" href="${escHtml(iri)}">${escHtml(iri)}</a> · <a href="${escHtml(iri)}.jsonld" type="application/ld+json">JSON-LD</a></p>\n`}<p>${escHtml(v.description)}</p>
+<p>${v.rules.length} rule(s) · overlay <code>${escHtml(v.criterion)}</code> at <b>${escHtml(v.overlaySeverity)}</b> · provenance <b>${escHtml(v.provenance)}</b> · derived from ${sources}</p>
+<div style="overflow-x:auto"><table><thead><tr><th>rule</th><th>what it asks</th><th>category · severity</th><th>the passage it was read from</th></tr></thead>
+<tbody>${v.rules.map(rule).join("")}</tbody></table></div>
+</div>`,
+  });
 }
 
 /**
@@ -159,6 +221,8 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
 .vo-page .vhead .id { font-family:var(--fa-font-mono,Menlo,Consolas,monospace); font-size:.85rem; color:var(--muted); }
 .vo-page .vmeta { margin:6px 0 0 1em; color:var(--muted); font-size:.84rem; }
 .vo-page .vmeta code { font-size:.95em; }
+.vo-page .vlinks { margin:0 14px 6px calc(14px + 1em); }
+.vo-page .vlinks a { display:inline-block; min-height:24px; line-height:24px; padding:0 2px; }
 .vo-page .rules { padding:4px 14px 14px; }
 .vo-page .rule { border-top:1px solid var(--line); padding:12px 0 2px; }
 .vo-page .rule:first-child { border-top:0; }
@@ -311,6 +375,7 @@ function render() {
       v.hasInstructions ? "with a SKILL.md" : "<b>no SKILL.md</b>",
       "provenance <b>" + esc(v.provenance) + "</b>"
     ];
+    if (v.iri) meta.push('<a href="' + esc(v.iri) + '">IRI</a> \u00b7 <a href="' + esc(v.iri) + '.jsonld" type="application/ld+json">JSON-LD</a>');
     if (v.sources && v.sources.length) {
       meta.push("derived from " + v.sources.map(function (s) {
         return esc(s.title) + (s.year ? " (" + s.year + ")" : "");
@@ -321,10 +386,12 @@ function render() {
 
     html.push(
       '<details class="voice"' + (open || q || sev ? " open" : "") + ">" +
+      // No link inside <summary> (axe nested-interactive): the summary only
+      // toggles, and the voice's page, IRI and JSON-LD links sit just below it.
       "<summary><span class=\\"vhead\\"><h2>" + esc(v.title) + '</h2><span class="id">' +
       esc(v.id) + "</span></span>" +
-      '<div class="vmeta">' + esc(v.description) + "</div>" +
-      '<div class="vmeta">' + meta.join(" &middot; ") + "</div></summary>" +
+      '<div class="vmeta">' + esc(v.description) + "</div></summary>" +
+      '<div class="vmeta vlinks">' + (v.page ? '<a href="' + esc(SITE_ROOT + v.page) + '">' + esc(v.title) + " page</a> &middot; " : "") + meta.join(" &middot; ") + "</div>" +
       renderFlags(v) +
       '<div class="rules">' + rules.map(renderRule).join("") + "</div></details>"
     );
@@ -409,7 +476,30 @@ let stale = 0;
  * `nav` since 2026-10-07: the pages are themed, so the theme's sidebar is
  * their navigation and there is no rail to inject.
  */
-const emit = makeEmit({ check, onStale: () => { stale++; } });
+const emitPage = makeEmit({ check, onStale: () => { stale++; } });
+
+/**
+ * Whether the harness declares `path` built at publish (`builtAtPublish`).
+ * Every page here is: the voices of every layer in the checkout, so no
+ * commit of the harness holds them, and `derive:publish` runs this writer.
+ * Exported for the test.
+ */
+export function builtAtPublishHere(path: string, root: string = ROOT): boolean {
+  const rel = relative(root, path).split(sep).join("/");
+  return !rel.startsWith("..") && isBuiltAtPublish(readDeclaration(root)?.builtAtPublish ?? [], rel);
+}
+
+/**
+ * The established rule (`methodologies:viz`, `external-schemas:viz`,
+ * `folio:viz`): a page built at publish has no committed bytes for `--check`
+ * to compare, so `--check` does not judge it, and a checkout that has not run
+ * `derive:publish` is not told 55 pages are missing. Written as before
+ * otherwise, and judged where it is not built at publish (`--site`).
+ */
+const emit = (path: string, content: string): void => {
+  if (check && builtAtPublishHere(path)) return;
+  emitPage(path, content);
+};
 
 if (import.meta.main) {
   const repoRoot = repoRootFor(ROOT);
@@ -472,9 +562,24 @@ if (import.meta.main) {
     if (skill !== undefined && skillPages.has(skill)) out.viewer = `${SKILL_PAGES_DIR}/${skill}.html`;
     return out.source === undefined && out.viewer === undefined ? undefined : out;
   };
+  // Each voice is a node: its IRI, where its layer's export is served, and
+  // its own page under its layer's (owner, 2026-11-13, node-kind audit).
+  // Each voice's file is found in its OWN layer by the reader the export
+  // uses (`voiceNodes`), not rebuilt from `v.path`, which is relative to
+  // whichever root the graph reader settled on.
+  const voiceFiles = new Map<string, string>();
+  for (const [name, root] of roots) for (const n of voiceNodes(root)) voiceFiles.set(`${name}\u0000${n.id}`, n.file);
+  const iriOf = (v: VoiceView): string | undefined => {
+    const file = voiceFiles.get(`${v.instance}\u0000${v.id}`);
+    return file === undefined ? undefined : subjectIri(file, VOICE_SUBJECT_KIND, v.id);
+  };
+  const nodeLinks = (v: VoiceView): VoiceNodeLinks => {
+    const iri = iriOf(v);
+    return { page: voicePagePath(route, v.instance, v.id), ...(iri !== undefined ? { iri } : {}) };
+  };
   emit(
     join(dataDir, "index.json"),
-    JSON.stringify(projection(g, libraryResolver(repoRoot, ROOT), kgLinks), null, 2) + "\n",
+    JSON.stringify(projection(g, libraryResolver(repoRoot, ROOT), kgLinks, nodeLinks), null, 2) + "\n",
   );
   const subjects = [...new Set(g.voices.map((v) => v.instance))].sort();
   emit(join(pageDir, "index.html"), withRenderedByFrontMatter(viewerHtml(dataHref, "", subjects), VIEWER_TOOL));
@@ -487,6 +592,22 @@ if (import.meta.main) {
   for (const subject of subjects) {
     const sub = viewerPlacement(site, `${route}/${subject}`, seg);
     emit(join(sub.pageDir, "index.html"), withRenderedByFrontMatter(viewerHtml(sub.dataHref, subject, subjects), VIEWER_TOOL));
+    // One page per VOICE of this layer, under its subject page.
+    const mine = g.voices.filter((v) => v.instance === subject);
+    for (const v of mine) {
+      emit(join(sub.pageDir, v.id, "index.html"), withRenderedByFrontMatter(voicePageHtml(v, iriOf(v)), VIEWER_TOOL));
+    }
+    // A voice page whose voice is gone is an orphan, asked as the subject pages are below.
+    const gone = orphanSubjectPages(sub.pageDir, mine.map((v) => v.id), carriesMarker(VOICE_PAGE_MARKER));
+    for (const name of gone.owned) {
+      if (check) {
+        console.error(`  ✗ ${join(sub.pageDir, name)} is an orphan — it serves a voice the layer no longer holds`);
+        stale++;
+        continue;
+      }
+      rmSync(join(sub.pageDir, name), { recursive: true });
+      console.log(`  ✗ pruned ${join(sub.pageDir, name)}`);
+    }
   }
 
   // ── ORPHANS (bean `ankg`) ──────────────────────────────────────────────

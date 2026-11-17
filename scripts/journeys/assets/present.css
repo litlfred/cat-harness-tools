@@ -48,6 +48,10 @@ body.jp { margin: 0; background: var(--alabaster); color: var(--ink); font-famil
 .jp-top { background: var(--s900); color: var(--s300); font-size: 12px; line-height: 16px; padding: 6px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--s800); }
 .jp-top-l, .jp-top-r { display: flex; align-items: center; gap: 12px; }
 .jp-top-r { gap: 16px; font-size: 11px; }
+.jp-top .jv-langs { display: flex; gap: 8px; }
+.jp-top .jv-langs a { color: inherit; opacity: 0.75; text-decoration: none; }
+.jp-top .jv-langs a:hover { opacity: 1; text-decoration: underline; }
+.jp-top .jv-langs [aria-current] { font-weight: 700; }
 .jp-occasion { display: inline-flex; align-items: center; gap: 6px; color: var(--sky400); font-weight: 600; letter-spacing: 0.025em; }
 .jp-occasion .jp-i { width: 14px; height: 14px; }
 .jp-bar { color: var(--s600); }
@@ -285,10 +289,14 @@ html[data-presenter="on"] .jp-off-only, html[data-presenter="off"] .jp-on-only, 
 .jp-wf-a { display: none; font-size: 14px; color: var(--s700); line-height: 1.375; }
 .jp-whatif.is-open .jp-wf-a { display: block; }
 .jp-whatif.is-open .jp-reveal { display: none; }
+/* Without the presenter, no one holds the reveal back: the outcome is shown (owner, 2026-11-17). */
+html[data-presenter="off"] .jp-wf-a { display: block; }
 .jp-reveal { align-self: flex-start; font-size: 12px; font-weight: 600; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 12px; }
 .jp-reveal:hover { background: #fef3c7; }
 .jp-tone-indigo > p { font-size: 14px; color: var(--s800); line-height: 1.375; }
 .jp-policy { gap: 16px; }
+/* Below the moment, full width (owner, 2026-11-17): the questions side by side on a wide screen. */
+@media (min-width: 1024px) { .jp-walk ~ .jp-policy .jp-qs, .jp-walk ~ .jp-lens-pane > .jp-policy .jp-qs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; } }
 .jp-qs { display: flex; flex-direction: column; gap: 10px; }
 .jp-qs li { display: flex; align-items: flex-start; gap: 8px; }
 .jp-qs li > span { font-size: 14px; color: var(--s800); line-height: 1.375; }
@@ -440,9 +448,11 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-av-lg { width: 48px; height: 48px; font-size: 15px; }
 /* "See what … sees": full width at the right column's foot, as VaxLink (ref/02). */
 .jp-sees { display: flex; flex-direction: column; gap: 8px; }
-.jp-see { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--s200); background: #fff; color: var(--s800) !important; font-size: 13px; font-weight: 500; box-shadow: var(--shadow-sm); }
-.jp-see:hover { background: var(--s50); border-color: var(--s300); }
-.jp-see small { font-weight: 500; color: inherit; font-size: inherit; }
+/* The device demo, first in the right column and the one call to action on a moment (owner, 2026-11-17: "hard to see"). */
+.jp-see { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 18px; border-radius: 12px; border: 2px solid #0369a1; background: #0284c7; color: #fff !important; font-size: 15px; font-weight: 700; box-shadow: 0 4px 12px rgb(2 132 199 / 0.3); text-decoration: none; }
+.jp-see:hover, .jp-see:focus-visible { background: #0369a1; border-color: #075985; }
+.jp-see small { font-weight: 500; color: rgb(255 255 255 / 0.85); font-size: 13px; }
+.jp-see .jp-i { width: 20px; height: 20px; }
 
 /* ── a view's heading, buttons ──────────────────────────────────────── */
 .jp-vhead h2 { font-size: 16px; line-height: 24px; font-weight: 700; color: var(--ink); }
@@ -702,6 +712,7 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-sheets-h { padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .jp-sheets-h h2 { font-size: 16px; font-weight: 700; color: var(--ink); }
 .jp-sheetlist { display: flex; flex-direction: column; gap: 24px; }
+.jp-sheets-act { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* ── the device demo ────────────────────────────────────────────────── */
 .jp-stages { padding: 6px; display: flex; gap: 4px; overflow-x: auto; }
@@ -1053,6 +1064,37 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-pick input { width: 16px; height: 16px; accent-color: #4f46e5; vertical-align: -2px; }
 .jp-pick:has(input:checked) { border-color: #4f46e5; background: #f5f3ff; }
 .jp-lab-res { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; }
+/* The module × journey matrix (JV-05): modules down, steps across, ● asked, ○ draws; the cell's words pop up on hover or focus. */
+.jp-mx { display: flex; flex-direction: column; gap: 10px; }
+.jp-mx-scroll { overflow-x: auto; }
+.jp-mx-tbl { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+.jp-mx-tbl th, .jp-mx-tbl td { border: 1px solid var(--s200); padding: 6px 8px; text-align: center; }
+.jp-mx-tbl thead th { background: var(--s50); font: 700 12px/16px var(--mono); }
+.jp-mx-tbl thead th a { color: var(--s800) !important; }
+.jp-mx-tbl tbody th { text-align: left; font-weight: 600; white-space: nowrap; background: #fff; }
+.jp-mx-tbl tbody th span { font-weight: 500; color: var(--s600); margin-left: 4px; }
+.jp-mx-tbl td { position: relative; min-width: 44px; }
+.jp-mx-asked { background: #eef2ff; }
+.jp-mx-draws { background: #f8fafc; }
+.jp-mx-cell { display: block; font-size: 16px; line-height: 20px; color: #3730a3 !important; text-decoration: none; border-radius: 4px; }
+.jp-mx-draws .jp-mx-cell { color: var(--s500) !important; }
+.jp-mx-cell:focus-visible { outline: 2px solid #4f46e5; outline-offset: 1px; }
+.jp-mx-pop { display: none; position: absolute; z-index: 20; top: 100%; left: 50%; transform: translateX(-50%); width: 300px; text-align: left; background: #fff; border: 1px solid var(--s300); border-radius: 8px; box-shadow: 0 8px 24px rgba(15, 23, 42, .15); padding: 10px 12px; font-size: 12px; line-height: 1.45; color: var(--s800); }
+.jp-mx-pop small { color: var(--s500); }
+.jp-mx-pop p { margin-top: 6px; }
+.jp-mx-tbl td:hover .jp-mx-pop, .jp-mx-tbl td:focus-within .jp-mx-pop { display: block; }
+.jp-mx-q { color: var(--s600); font-style: italic; }
+.jp-mx-key { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.jp-mx-detail summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.jp-mx-mod h4 { margin: 12px 0 6px; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.jp-mx-mod ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.jp-mx-mod li { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: start; font-size: 13px; }
+.jp-mx-mod li p + p { margin-top: 2px; }
+.jp-mx-k { font: 600 11px/20px var(--mono); color: var(--s500); white-space: nowrap; }
+.jp-mx-ovs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.jp-mx-ov { display: flex; flex-direction: column; gap: 8px; }
+.jp-mx-ov h4 { font-size: 14px; }
+@media print { .jp-mx-pop { display: none !important; } .jp-mx-detail > :not(summary) { display: block; } }
 .jp-lab-nav { display: flex; justify-content: flex-end; }
 .jp-lab-aside { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
 .jp-lab-aside h4 { font: 700 11px/16px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--s600); }
@@ -1080,3 +1122,84 @@ a:hover > .jp-cv-dot { fill: var(--c); }
   .jp-print-report .jp-lab-step:not(.jp-lab-summary), .jp-print-report .jp-lab-summary > :not(.jp-gapreport) { display: none !important; }
   .jp-print-report .jp-lab-summary { border: 0; box-shadow: none; padding: 0; }
 }
+
+/* ── the canvas as an on-screen form (owner, 2026-11-17): a sheet per card, in the canvas's paper styling ── */
+.jp-cv { display: flex; flex-direction: column; gap: 24px; }
+.jp-cv-sheet { background: #fffdf7; border: 1px solid #e7e0cf; border-top: 6px solid #3730a3; border-radius: 10px; padding: 20px 24px; box-shadow: var(--shadow-sm); }
+.jp-cv-head { border-bottom: 1px solid #e7e0cf; padding-bottom: 10px; margin-bottom: 14px; }
+.jp-cv-kick { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6b7280; }
+.jp-cv-head h3 { font-size: 20px; font-weight: 800; color: var(--ink); margin: 2px 0; }
+.jp-cv-head p { font-size: 14px; color: var(--s700); }
+.jp-cv-secs { columns: 3 300px; column-gap: 28px; }
+.jp-cv-sec { break-inside: avoid-column; margin-bottom: 18px; }
+.jp-cv-sec h4, .jp-cv-annex h4 { font-size: 14px; font-weight: 700; color: #3730a3; margin: 0 0 8px; }
+.jp-cv-field { break-inside: avoid; margin-bottom: 14px; }
+.jp-cv-fh b { display: block; font-size: 13px; color: var(--ink); }
+.jp-cv-fh small { display: block; font-size: 12px; color: var(--s600); }
+.jp-cv-in { width: 100%; margin-top: 4px; background: #fff; border: 1px solid #cfc7b3; border-radius: 6px; }
+.jp-cv-opts { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.jp-cv-opt { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--s800); }
+.jp-cv-scroll { overflow-x: auto; margin-top: 6px; }
+.jp-cv-t { width: 100%; border-collapse: collapse; font-size: 12px; }
+.jp-cv-t th, .jp-cv-t td { border-top: 1px solid #e7e0cf; padding: 4px 6px; text-align: left; vertical-align: middle; }
+.jp-cv-t thead th { border-top: 0; font-size: 11px; color: var(--s600); font-weight: 600; text-align: center; }
+.jp-cv-t tbody th { font-weight: 500; color: var(--s800); }
+.jp-cv-t tbody th small { display: block; color: var(--s500); font-weight: 400; }
+.jp-cv-t td { text-align: center; }
+.jp-cv-t td .jp-cv-in { margin: 0; min-width: 90px; }
+.jp-cv-annex { border-top: 1px dashed #cfc7b3; margin-top: 8px; padding-top: 12px; }
+.jp-cv-annex ol { display: flex; flex-direction: column; gap: 10px; list-style: none; padding: 0; }
+.jp-cv-annex li { display: flex; gap: 8px; align-items: flex-start; }
+.jp-cv-annex li > div { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.jp-cv-pdf { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 16px; }
+@media print { .jp-cv-sheet { break-after: page; box-shadow: none; } .jp-cv-secs { columns: 3; } }
+
+/* ── "we have this" on an application component, and the room's own country names (owner, 2026-11-17) ── */
+.jp-have { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; font-size: 12px; color: var(--s700); }
+.jp-have label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.jp-have-name { flex: 1 1 140px; min-width: 120px; font-size: 12px; padding: 3px 8px; }
+.jp-amels li .jp-have { margin: 4px 0 8px; }
+.jp-countries-in { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; margin-top: 10px; }
+.jp-countries-in label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--s700); }
+
+/* ── below the journey: the policy view or the technical one (owner, 2026-11-17) ── */
+.jp-lens { display: flex; align-items: center; gap: 12px; }
+.jp-lens > i { flex: 1; border-top: 1px solid var(--s200); }
+.jp-lens-in { display: inline-flex; padding: 3px; border-radius: 9999px; border: 1px solid var(--s300); background: var(--s100); }
+.jp-lens button { display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 9999px; font-size: 13px; font-weight: 600; border: 0; background: transparent; color: var(--s700); }
+.jp-lens button .jp-i { width: 14px; height: 14px; }
+.jp-lens button.is-on { background: var(--s900); color: #fff; }
+.jp-lens button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.jp-lens-pane[hidden] { display: none; }
+
+/* ── the Table sheets, an expanding panel of the discussion (owner, 2026-11-17) ── */
+.jp-sheets-panel { padding: 0; margin-top: 16px; }
+.jp-sheets-sum { display: flex; align-items: center; gap: 12px; padding: 14px 20px; cursor: pointer; list-style: none; }
+.jp-sheets-sum::-webkit-details-marker { display: none; }
+.jp-sheets-sum > span:first-of-type { display: flex; flex-direction: column; flex: 1; }
+.jp-sheets-sum b { font-size: 15px; color: var(--ink); }
+.jp-sheets-sum small { font-size: 13px; color: var(--s600); }
+.jp-sheets-chev { transition: transform 0.15s; }
+.jp-sheets-panel[open] .jp-sheets-chev { transform: rotate(90deg); }
+.jp-sheets-sum:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 12px; }
+.jp-sheets-in { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+.jp-sheets-in > .jp-sheets-h { padding: 0; }
+@media print {
+  /* Its print button prints the sheets alone: the panel open, everything else gone. */
+  .jp-print-sheets .jp-wrap > :not(.jp-lab):not(.jp-sheets-panel), .jp-print-sheets .jp-lab-aside, .jp-print-sheets .jp-lab-step:not(:has(.jp-sheets-panel)), .jp-print-sheets .jp-lab-step > :not(.jp-sheets-panel), .jp-print-sheets .fa-page-bar { display: none !important; }
+  .jp-print-sheets .jp-lab { display: block; }
+  .jp-print-sheets .jp-lab-step, .jp-print-sheets .jp-sheets-panel { border: 0; box-shadow: none; padding: 0; margin: 0; }
+  .jp-print-sheets .jp-sheets-in { padding: 0; gap: 0; }
+  .jp-print-sheets .jp-sheetlist { gap: 0; }
+  /* Printed from anywhere else, the folded panel stays folded. */
+  html:not(.jp-print-sheets) .jp-sheets-panel:not([open]) { display: none !important; }
+}
+
+/* ── How it works: data on the move, from the journey map's technical layer (owner, 2026-11-17) ── */
+.jp-move-scroll { overflow-x: auto; margin-top: 12px; }
+.jp-move-t { width: 100%; border-collapse: collapse; font-size: 13px; }
+.jp-move-t th, .jp-move-t td { text-align: left; vertical-align: top; padding: 10px 12px; border-top: 1px solid var(--s200); }
+.jp-move-t thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--s600); }
+.jp-move-t td b { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.jp-move-t td small { display: block; color: var(--s600); margin-top: 4px; }
+.jp-move-t .jp-net { margin-top: 6px; }

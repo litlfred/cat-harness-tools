@@ -38,7 +38,9 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceDirectories, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { findDeclarationFile, instanceDirectories, layerRootsIn, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { TRANSLATION_SUBJECT_KIND, translationNodes, type TranslationNode } from "./lib/translation-nodes.ts";
+import { subjectIri } from "./lib/subject-pages.ts";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { siteRootFrom } from "../schemas/kg/visualiser-route.js";
 import { pageParts, tileDirectories, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
@@ -488,6 +490,8 @@ export function statusPage(doc: {
    * the skill is then named, not linked. True when absent.
    */
   skillPage?: boolean;
+  /** The layers with a page of their own catalogues (`<layer>/`), each linked from the onward links. */
+  layerPages?: readonly string[];
 }): string {
   const siteRoot = doc.siteRoot ?? siteRootFrom(pageParts({ harness: "harness", visualiser: "visualiser" }));
   const skill = doc.skillPage === false
@@ -632,13 +636,83 @@ and needs review; adding it to <em>translated</em> would flatter exactly the ent
 <div class="ts-onward">
 <h2 id="onward-links">Onward links</h2>
 <ul>
-  <li><strong>Review:</strong> <a href="review.html">review the machine translations</a> — every catalogue × locale, who reviewed it, and a form to accept a translation or suggest a better one as a GitHub issue.</li>
+${(doc.layerPages ?? []).length > 0 ? `  <li><strong>Each catalogue:</strong> ${(doc.layerPages ?? []).map((l) => `<a href="${esc(l)}/">${esc(l)}</a>`).join(" · ")} — one page per layer, and one per catalogue and template, with its IRI and JSON-LD.</li>\n` : ""}  <li><strong>Review:</strong> <a href="review.html">review the machine translations</a> — every catalogue × locale, who reviewed it, and a form to accept a translation or suggest a better one as a GitHub issue.</li>
   <li><strong>Skill:</strong> ${skill} — gettext extraction, PO injection, round-trip QA, and sign-off workflows.</li>
   <li><strong>Sources:</strong> <a href="https://github.com/litlfred/folio-assistant/tree/main/${esc(doc.scope)}"><code>${esc(doc.scope)}</code> on GitHub</a> — catalogues (<code>.po</code>) and extractable templates (<code>.pot</code>).</li>
 </ul>
 </div>
 </div>`,
   });
+}
+
+/**
+ * One layer's gettext sources, as nodes (owner, 2026-11-13, node-kind audit:
+ * every listed node kind has an IRI, a JSON-LD document, a row and a page, no
+ * waivers): a page listing every catalogue and template the layer holds, and
+ * one page per string set (`<locale>/<path>/`, the stem its `.po` and `.pot`
+ * share) with each file's counts, IRI and JSON-LD.
+ */
+export interface SourcePages {
+  /** Path under the layer's page → page HTML. `""` is the layer's own page. */
+  pages: Map<string, string>;
+}
+
+/** The nodes of one layer grouped by stem, in path order. */
+export function byStem(nodes: readonly TranslationNode[]): Map<string, TranslationNode[]> {
+  const out = new Map<string, TranslationNode[]>();
+  for (const n of nodes) out.set(n.stem, [...(out.get(n.stem) ?? []), n]);
+  return out;
+}
+
+export function sourcePages(
+  layer: string,
+  nodes: readonly TranslationNode[],
+  iriOf: (n: TranslationNode) => string | undefined,
+  read: (n: TranslationNode) => string | undefined,
+): SourcePages {
+  const pages = new Map<string, string>();
+  const cell = (n: TranslationNode, iri: string | undefined): string => {
+    let counts = "";
+    if (!n.template) {
+      const text = read(n);
+      counts = text === undefined ? "could not be read" : (() => { const c = countCatalogue(text); return `${c.translated} translated · ${c.fuzzy} fuzzy · ${c.untranslated} untranslated of ${c.entries}`; })();
+    }
+    return `<td>${n.template ? "template (<code>.pot</code>)" : "catalogue (<code>.po</code>)"}</td><td><code>${esc(n.sourcePath)}</code></td><td>${esc(counts)}</td>` +
+      `<td>${iri ? `<a href="${esc(iri)}">IRI</a> · <a href="${esc(iri)}.jsonld" type="application/ld+json">.jsonld</a>` : ""}</td>`;
+  };
+  const groups = byStem(nodes);
+  const rows: string[] = [];
+  for (const [stem, files] of groups) {
+    const first = files.find((f) => !f.template) ?? files[0]!;
+    const iri = iriOf(first);
+    rows.push(`<tr><td><a href="${esc(stem)}/"><code>${esc(stem)}</code></a></td><td>${esc(first.locale)}</td><td>${files.map((f) => (f.template ? ".pot" : ".po")).join(" + ")}</td>` +
+      `<td>${iri ? `<a href="${esc(iri)}">IRI</a> · <a href="${esc(iri)}.jsonld" type="application/ld+json">.jsonld</a>` : ""}</td></tr>`);
+    const back = "../".repeat(stem.split("/").length);
+    pages.set(stem, themedPage({
+      title: `${first.title} — ${layer}`,
+      generator: "cat-harness-tools/scripts/gen-translation-status.ts",
+      command: "bun run cat translation:status",
+      frontMatter: { alternate_jsonld: iri === undefined ? undefined : `${iri}.jsonld` },
+      body: `<div class="ts-node">
+<h1>${esc(stem)}</h1>
+<p>${esc(first.description)} · <a href="${back}">every ${esc(layer)} catalogue</a></p>
+<div style="overflow-x:auto"><table><thead><tr><th>file</th><th>path</th><th>strings</th><th>JSON-LD</th></tr></thead>
+<tbody>${files.map((f) => `<tr>${cell(f, iriOf(f))}</tr>`).join("")}</tbody></table></div>
+</div>`,
+    }));
+  }
+  pages.set("", themedPage({
+    title: `Translation sources: ${layer}`,
+    generator: "cat-harness-tools/scripts/gen-translation-status.ts",
+    command: "bun run cat translation:status",
+    body: `<div class="ts-node">
+<h1>Translation sources: ${esc(layer)}</h1>
+<p>${nodes.length} catalogue(s) and template(s) in ${groups.size} string set(s). <a href="../">Every layer's translation status</a>.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>string set</th><th>locale</th><th>files</th><th>JSON-LD</th></tr></thead>
+<tbody>${rows.join("")}</tbody></table></div>
+</div>`,
+  }));
+  return { pages };
 }
 
 /** One locale as a line of the `--instance` report. */
@@ -845,8 +919,28 @@ function main(): void {
   // NO RAIL since 2026-10-07: the page is themed, so the theme's sidebar is its
   // navigation. The page says which directory it draws (#1168 B7a-2), in its
   // front matter.
+  // Each layer's gettext sources as nodes: a page per layer and per string
+  // set, under this page (owner, 2026-11-13, node-kind audit).
+  const sourceLayers = new Map<string, TranslationNode[]>();
+  for (const r of [ROOT, ...layerRootsIn(REPO_ROOT)]) {
+    const name = readDeclaration(r)?.name;
+    if (name === undefined || sourceLayers.has(name)) continue;
+    const nodes = translationNodes(r);
+    if (nodes.length > 0) sourceLayers.set(name, nodes);
+  }
+  const sourceFiles: Array<readonly [string, () => string]> = [];
+  for (const [name, nodes] of [...sourceLayers].sort(([a], [b]) => a.localeCompare(b, "en"))) {
+    const { pages } = sourcePages(name, nodes, (n) => subjectIri(n.file, TRANSLATION_SUBJECT_KIND, n.id), (n) => {
+      try {
+        return readFileSync(n.file, "utf-8");
+      } catch {
+        return undefined;
+      }
+    });
+    for (const [at, html] of pages) sourceFiles.push([join(pageDir, name, ...at.split("/").filter(Boolean), "index.html"), () => withRenderedByFrontMatter(html, VIEWER_TOOL)]);
+  }
   const page = (changedAt: string) =>
-    withRenderedByFrontMatter(statusPage({ locales, changedAt, scope: doc.scope, instances, siteRoot: sitePath.up, skillPage: siteArg() === undefined || sitePageAt(site, `${SKILL_PAGES_DIR}/translation-manager.html`) }), VIEWER_TOOL);
+    withRenderedByFrontMatter(statusPage({ locales, changedAt, scope: doc.scope, instances, siteRoot: sitePath.up, skillPage: siteArg() === undefined || sitePageAt(site, `${SKILL_PAGES_DIR}/translation-manager.html`), layerPages: [...sourceLayers.keys()].sort((a, b) => a.localeCompare(b, "en")) }), VIEWER_TOOL);
   const json = (changedAt: string) => `${JSON.stringify({ ...doc, changedAt }, null, 2)}\n`;
 
   // The date the NUMBERS last changed is the projection's to say. When the
@@ -879,6 +973,7 @@ function main(): void {
     [pagePath, page],
     [reviewPath, () => withRenderedByFrontMatter(reviewPage(layers), VIEWER_TOOL)],
     [reviewJsonPath, () => reviewProjection(layers, sitePath.rel)],
+    ...sourceFiles,
   ] as const) {
     if (check && builtHere(p)) {
       built += 1;

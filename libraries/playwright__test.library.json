@@ -54,6 +54,7 @@
     "test/content/sticky-home.e2e.ts",
     "test/content/sticky-shape.e2e.ts",
     "test/content/table-filter.e2e.ts",
+    "test/draft-banner.e2e.ts",
     "test/folio-scheme.e2e.ts",
     "test/glass-card-metadata.e2e.ts",
     "test/glass-card-open.e2e.ts",
@@ -77,6 +78,8 @@
     "test/one-rail.e2e.ts",
     "test/process/subprocess-links.e2e.ts",
     "test/rail-icon-row.e2e.ts",
+    "test/rail-keeps-place.e2e.ts",
+    "test/rail-own-scroll.e2e.ts",
     "test/rail-tips.e2e.ts",
     "test/render-wait.e2e.ts",
     "test/review-budget.e2e.ts",
@@ -110,6 +113,7 @@
     "test/ui/kg-viewer.e2e.ts",
     "test/ui/review-visual.e2e.ts",
     "test/ui/state-dashboards.e2e.ts",
-    "test/who-iris-search.e2e.ts"
+    "test/who-iris-search.e2e.ts",
+    "test/workshop-answers.e2e.ts"
   ]
 }

@@ -186,11 +186,21 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
     gloss:
       "One subject's QA judgements — pair attestations, voice reviews, agent and human verdicts, bibliography verifications — kept as one `qa-attestations/v1` file in a layer's attestations store, each judgement pinned to the hash it attested so a stale one is detectable. The judgement half of a QA verdict: unlike a derived result, it cannot be regenerated.",
   },
+  Voice: {
+    layer: "harness",
+    gloss:
+      "A named editorial voice: a `folio-voice/v1` set of writing rules, each citing the passage of an ingested source or the knowledge-graph node it was read from. Opt-in per folio: shipping a voice does not apply it.",
+  },
   Requirement: {
     layer: "harness",
     gloss:
       "A stated need a change must satisfy, elicited and signed off in the CRDM process before implementation begins. Distinct from the issue that tracks it and the bean that plans the work.",
     seeAlso: "/process/crdm-methodology.html",
+  },
+  TranslationSource: {
+    layer: "harness",
+    gloss:
+      "One gettext source of a layer's translations: a `.po` catalogue of one locale's translated strings, or the `.pot` template it is made from. The input to injection; the rendered output declares its own `lang`.",
   },
   Lane: {
     gloss:
@@ -207,9 +217,19 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
       "regenerated wholesale and never retired, while a concept is a term " +
       "somebody may have cited.",
   },
+  Theme: {
+    layer: "harness",
+    gloss:
+      "A theme a layer derived from a source it holds — a served stylesheet or a style guide's stated rules: a palette and, for a sticky, its art, every value citing where it was measured. Kind `sticky`, `webpage` or `publication`.",
+  },
   SkillPackage: {
     gloss: "A directory of skills shipped and versioned together.",
     seeAlso: "/concepts/skills.html",
+  },
+  SoftwareLibrary: {
+    layer: "harness",
+    gloss:
+      "An outside software package a layer's code imports, as its lockfile pins it: the version, the registry tarball and its digest, the SPDX licence, and the files that import it.",
   },
   Tool: {
     // The harness's own term. Bootstrap defined it until v3 of its terms; the

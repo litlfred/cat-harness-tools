@@ -29,6 +29,26 @@
  * A job that calls `layer-pr-checks.yml` must not pass `tools-ref: <branch>`:
  * the judging scripts follow the lock too (`tools-ref: lock`, the default).
  *
+ * A workflow that calls `layer-pr-checks.yml` on `pull_request` must list
+ * `labeled` in its types, key its concurrency group so a no-op label never
+ * cancels the real run, and skip its calling job on any label but `release`
+ * or `preview` (the caller snippet in layer-pr-checks.yml's header). Without
+ * `labeled`, adding `release` starts nothing and every run reads the labels
+ * the PR had when it was opened or pushed: the dth-* callers ran the fast tier
+ * (`full=false`) on every PR, so no gate ever ran on them (2026-11-16).
+ * `--write` adds all three to the usual caller shape; any other shape is
+ * reported for a hand fix.
+ *
+ * A caller of `layer-merge-guard.yml` runs only from the default branch: no
+ * `pull_request_target` trigger (owner, 2026-11-17: GitHub is changing that
+ * trigger's default, and its 2026-11-16 brownout failed the guard). The
+ * pull-request events reach it through `.github/workflows/merge-guard-trigger.yml`,
+ * a permissionless `pull_request` signal ({@link MERGE_GUARD_TRIGGER_TEXT})
+ * whose completion the caller hears on `workflow_run`. `--write` drops the
+ * `pull_request_target` block, adds {@link MERGE_GUARD_TRIGGER_NAME} to the
+ * caller's `workflow_run.workflows`, and writes the signal file. These are
+ * trailing findings: they warn and pass until an agent session writes them.
+ *
  * `mount:remote` runs `--write` after it writes the lock, so a re-pin moves
  * the calls with the mounts. In CI (`CI=true`) it does not: the re-pin train's
  * App has no `workflows` permission, so a train cannot push workflow-file
@@ -267,7 +287,246 @@ export function judgeFile(
       lines[i] = "\u0000drop";
     }
   }
+  findings.push(...labeledTrigger(lines, rel));
+  findings.push(...mergeGuardCaller(lines, rel));
   return { findings, text: lines.filter((x) => x !== "\u0000drop").join("\n") };
+}
+
+/** The labels that start a layer-pr-checks run; any other label is a no-op there. */
+const NOOP_LABEL = "(github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview')";
+const JOB_IF = "github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview'";
+const CALLS_CHECKS = /^\s*(-\s+)?uses:\s*\S*\/layer-pr-checks\.yml(@|\s|$)/;
+const indentOf = (l: string) => l.length - l.trimStart().length;
+
+/**
+ * A caller of `layer-pr-checks.yml` that runs on `pull_request` must start on
+ * `labeled` (see the header). Judges `lines` in place, fixing what it can;
+ * insertions come last and bottom-up, so earlier findings' line numbers hold.
+ */
+export function labeledTrigger(lines: string[], rel: string): Finding[] {
+  const live = (i: number) => lines[i] !== "\u0000drop" && !/^\s*#/.test(lines[i]);
+  const call = lines.findIndex((l, i) => live(i) && CALLS_CHECKS.test(l));
+  if (call < 0) return [];
+  const pr = lines.findIndex((l, i) => live(i) && /^\s+pull_request:\s*(\{\s*\}|null|~)?\s*(#.*)?$/.test(l));
+  const prInline = lines.some((l, i) => live(i) && /^on:\s*(\[[^\]]*\bpull_request\b[^\]]*\]|pull_request)\s*(#.*)?$/.test(l));
+  if (pr < 0 && !prInline) return [];
+  const findings: Finding[] = [];
+  const inserts: { at: number; line: string }[] = [];
+  const why = "a layer-pr-checks caller must start on `labeled`, or adding `release` runs nothing and every PR runs the fast tier only (full=false)";
+  if (pr < 0) {
+    findings.push({ file: rel, line: lines.findIndex((l) => /^on:/.test(l)) + 1, have: "on: pull_request", want: null, why: `${why}: write \`pull_request: { types: [opened, synchronize, reopened, ready_for_review, labeled] }\`` });
+  } else {
+    const ind = indentOf(lines[pr]);
+    let types = -1;
+    for (let i = pr + 1; i < lines.length && (lines[i].trim() === "" || indentOf(lines[i]) > ind); i++)
+      if (live(i) && /^\s*types:/.test(lines[i])) types = i;
+    if (types < 0) {
+      const want = `${" ".repeat(ind + 2)}types: [opened, synchronize, reopened, ready_for_review, labeled]`;
+      findings.push({ file: rel, line: pr + 1, have: lines[pr].trim(), want: want.trim(), why });
+      lines[pr] = lines[pr].replace(/:\s*(\{\s*\}|null|~)?\s*(#.*)?$/, ":");
+      inserts.push({ at: pr + 1, line: want });
+    } else {
+      const m = lines[types].match(/^(\s*types:\s*\[)([^\]]*)\](.*)$/);
+      const names = m ? m[2].split(",").map((x) => x.trim().replace(/^["']|["']$/g, "")) : [];
+      if (!m) {
+        // A block list: `types:` with `- opened` lines under it.
+        let has = false;
+        let last = types;
+        for (let i = types + 1; i < lines.length && /^\s*-\s/.test(lines[i]); i++) {
+          last = i;
+          if (/^\s*-\s*["']?labeled["']?\s*(#.*)?$/.test(lines[i])) has = true;
+        }
+        if (!has) {
+          const want = lines[last].replace(/-\s*.*$/, "- labeled");
+          findings.push({ file: rel, line: types + 1, have: lines[types].trim(), want: want.trim(), why });
+          inserts.push({ at: last + 1, line: want });
+        }
+      } else if (!names.includes("labeled")) {
+        const want = `${m[1]}${[...names.filter(Boolean), "labeled"].join(", ")}]${m[3]}`;
+        findings.push({ file: rel, line: types + 1, have: lines[types].trim(), want: want.trim(), why });
+        lines[types] = want;
+      }
+    }
+  }
+  // The workflow's own concurrency group: keyed by the ref alone, a no-op label
+  // (`ready-to-merge`) cancels the PR's real run.
+  const conc = lines.findIndex((l, i) => live(i) && /^concurrency:\s*$/.test(l));
+  if (conc >= 0) {
+    for (let i = conc + 1; i < lines.length && (lines[i].trim() === "" || indentOf(lines[i]) > 0); i++) {
+      if (!live(i) || !/^\s*group:/.test(lines[i]) || lines[i].includes("noop-label")) continue;
+      const g = lines[i].match(/^(\s*group:\s*)(["']?)(.*)\$\{\{\s*github\.ref\s*\}\}(.*)$/);
+      const cancels = lines.slice(conc + 1, i + 4).some((l) => /^\s*cancel-in-progress:\s*(?!false\b)\S/.test(l));
+      if (!cancels) break;
+      const want = g ? `${g[1]}${g[2]}${g[3]}\${{ ${NOOP_LABEL} && format('noop-label-{0}', github.run_id) || github.ref }}${g[4]}` : null;
+      findings.push({ file: rel, line: i + 1, have: lines[i].trim(), want: want?.trim() ?? null, why: "a `labeled` run for any label but `release` or `preview` must get its own concurrency group, or it cancels the PR's real run" });
+      if (want) lines[i] = want;
+      break;
+    }
+  }
+  // The calling job skips a no-op label.
+  const callInd = indentOf(lines[call]);
+  let job = call - 1;
+  while (job >= 0 && (lines[job].trim() === "" || /^\s*#/.test(lines[job]) || indentOf(lines[job]) >= callInd)) job--;
+  if (job >= 0 && /^\s*[A-Za-z0-9_-]+:\s*$/.test(lines[job])) {
+    let jobIf = -1;
+    for (let i = job + 1; i < lines.length && (lines[i].trim() === "" || indentOf(lines[i]) >= callInd); i++)
+      if (live(i) && indentOf(lines[i]) === callInd && /^\s*if:/.test(lines[i])) jobIf = i;
+    if (jobIf < 0) {
+      const want = `${" ".repeat(callInd)}if: ${JOB_IF}`;
+      findings.push({ file: rel, line: job + 1, have: lines[job].trim(), want: want.trim(), why: "the job calling layer-pr-checks skips a `labeled` run for any label but `release` or `preview`" });
+      inserts.push({ at: job + 1, line: want });
+    } else if (!lines[jobIf].includes("labeled")) {
+      findings.push({ file: rel, line: jobIf + 1, have: lines[jobIf].trim(), want: null, why: `the job calling layer-pr-checks skips a \`labeled\` run for any label but \`release\` or \`preview\`: add \`${JOB_IF}\` to its if` });
+    }
+  }
+  for (const { at, line } of inserts.sort((a, b) => b.at - a.at)) lines.splice(at, 0, line);
+  return findings;
+}
+
+/** The `name:` of the merge guard's pull-request signal; a caller lists it under `workflow_run.workflows`. */
+export const MERGE_GUARD_TRIGGER_NAME = "Merge guard trigger";
+/** Where a layer keeps the merge guard's pull-request signal. */
+export const MERGE_GUARD_TRIGGER_FILE = ".github/workflows/merge-guard-trigger.yml";
+/** The pull-request types the guard re-judges on (those the `pull_request_target` caller listed). */
+export const MERGE_GUARD_PR_TYPES = ["opened", "synchronize", "reopened", "ready_for_review", "converted_to_draft", "labeled", "unlabeled", "edited"] as const;
+/**
+ * The merge guard's pull-request signal, as every layer holds it. It has no
+ * token and decides nothing: a PR may edit it in its own head, and the worst
+ * that does is that no signal comes, which leaves the status unposted.
+ * It names no layer, since the layers below this one hold it too
+ * (\`check:reference-direction\`).
+ */
+export const MERGE_GUARD_TRIGGER_TEXT = `# Written by \`bun run cat workflow-pins --write\`: do not edit.
+#
+# The merge guard's pull-request signal. It holds no token, checks nothing out
+# and decides nothing: it only finishes, and \`.github/workflows/merge-guard.yml\`,
+# which runs on \`workflow_run\` from the default branch, then judges the PR and
+# posts the \`merge-guard\` status. A PR may edit this file in its own head; the
+# worst that does is that no signal comes, and the status stays unposted.
+# Why not \`pull_request_target\`: the header of the shared
+# \`layer-merge-guard.yml\` that \`merge-guard.yml\` calls.
+#
+# TRIGGERS, ACTUAL: \`pull_request\` only, by the owner's decision of 2026-11-17
+# (no \`pull_request_target\`). The \`workflow_run\` named above is the
+# caller's trigger, not this file's.
+
+name: ${MERGE_GUARD_TRIGGER_NAME}
+run-name: "${MERGE_GUARD_TRIGGER_NAME} #\${{ github.event.pull_request.number }}"
+
+on:
+  pull_request:
+    types: [${MERGE_GUARD_PR_TYPES.join(", ")}]
+
+permissions: {}
+
+jobs:
+  signal:
+    name: Ask the merge guard to judge this PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Signal
+        run: echo "the merge guard judges this PR when this run completes (workflow_run, from the default branch)"
+`;
+
+const CALLS_GUARD = /^\s*(-\s+)?uses:\s*\S*\/layer-merge-guard\.yml(@|\s|$)/;
+
+/**
+ * A caller of `layer-merge-guard.yml` must not run on `pull_request_target`,
+ * and must hear {@link MERGE_GUARD_TRIGGER_NAME} on `workflow_run` (see the
+ * header). Judges `lines` in place, fixing the usual caller shape; every
+ * finding is trailing, since the re-pin train cannot push workflow files.
+ */
+export function mergeGuardCaller(lines: string[], rel: string): Finding[] {
+  const live = (i: number) => lines[i] !== "\u0000drop" && !/^\s*#/.test(lines[i]);
+  if (!lines.some((l, i) => live(i) && CALLS_GUARD.test(l))) return [];
+  const on = lines.findIndex((l, i) => live(i) && /^on:\s*(#.*)?$/.test(l));
+  if (on < 0) {
+    return [{ file: rel, line: 1, have: "on: …", want: null, why: "a merge-guard caller needs a block `on:` with `workflow_run` for the merge guard trigger: fix it by hand", trailing: true }];
+  }
+  /** [start, end) of each event under `on:`. */
+  const events = new Map<string, [number, number]>();
+  let end = on + 1;
+  for (let i = on + 1; i < lines.length; i++) {
+    if (lines[i].trim() === "" || /^\s*#/.test(lines[i])) continue;
+    if (indentOf(lines[i]) === 0) break;
+    end = i + 1;
+    const k = lines[i].match(/^  ([A-Za-z_]+):/);
+    if (k) events.set(k[1], [i, i + 1]);
+    else {
+      const last = [...events.values()].at(-1);
+      if (last) last[1] = i + 1;
+    }
+  }
+  const findings: Finding[] = [];
+  const prt = events.get("pull_request_target");
+  if (prt) {
+    findings.push({ file: rel, line: prt[0] + 1, have: lines[prt[0]].trim(), want: "(removed)", why: `the merge guard no longer runs on \`pull_request_target\`: pull-request events reach it through ${MERGE_GUARD_TRIGGER_FILE} on \`workflow_run\``, trailing: true });
+    for (let i = prt[0]; i < prt[1]; i++) lines[i] = "\u0000drop";
+  }
+  const why = `a merge-guard caller hears \`${MERGE_GUARD_TRIGGER_NAME}\` on \`workflow_run\`, or no label, push or edit of a PR re-judges it`;
+  const wr = events.get("workflow_run");
+  if (!wr) {
+    const add = [`  workflow_run:`, `    workflows: ["${MERGE_GUARD_TRIGGER_NAME}"]`, `    types: [completed]`];
+    findings.push({ file: rel, line: on + 1, have: "on:", want: add.map((x) => x.trim()).join(" "), why, trailing: true });
+    lines.splice(end, 0, ...add);
+    return findings;
+  }
+  let wfs = -1;
+  // A flow mapping on the key's own line (`workflow_run: { workflows: [...], types: [completed] }`),
+  // the shape every layer's caller was written in; else a `workflows:` line under the key.
+  if (/^\s*workflow_run:\s*\{.*\bworkflows:\s*\[/.test(lines[wr[0]])) wfs = wr[0];
+  else for (let i = wr[0] + 1; i < wr[1]; i++) if (live(i) && /^\s*workflows:/.test(lines[i])) wfs = i;
+  if (wfs < 0) {
+    findings.push({ file: rel, line: wr[0] + 1, have: lines[wr[0]].trim(), want: null, why: `${why}: add a \`workflows:\` list by hand`, trailing: true });
+    return findings;
+  }
+  const inline = lines[wfs].match(/^(\s*(?:workflow_run:\s*\{.*?\b)?workflows:\s*\[)([^\]]*)\](.*)$/);
+  if (inline) {
+    const names = inline[2].split(",").map((x) => x.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+    if (names.includes(MERGE_GUARD_TRIGGER_NAME)) return findings;
+    const want = `${inline[1]}${[...inline[2].split(",").map((x) => x.trim()).filter(Boolean), `"${MERGE_GUARD_TRIGGER_NAME}"`].join(", ")}]${inline[3]}`;
+    findings.push({ file: rel, line: wfs + 1, have: lines[wfs].trim(), want: want.trim(), why, trailing: true });
+    lines[wfs] = want;
+    return findings;
+  }
+  let last = wfs;
+  let has = false;
+  for (let i = wfs + 1; i < lines.length && /^\s*-\s/.test(lines[i]); i++) {
+    last = i;
+    if (lines[i].replace(/^\s*-\s*/, "").replace(/\s*#.*$/, "").replace(/^["']|["']$/g, "") === MERGE_GUARD_TRIGGER_NAME) has = true;
+  }
+  if (has) return findings;
+  if (last === wfs) {
+    findings.push({ file: rel, line: wfs + 1, have: lines[wfs].trim(), want: null, why: `${why}: list it under \`workflows:\` by hand`, trailing: true });
+    return findings;
+  }
+  const want = lines[last].replace(/-\s*.*$/, `- "${MERGE_GUARD_TRIGGER_NAME}"`);
+  findings.push({ file: rel, line: wfs + 1, have: lines[wfs].trim(), want: want.trim(), why, trailing: true });
+  lines.splice(last + 1, 0, want);
+  return findings;
+}
+
+/**
+ * The signal file a repository with a merge-guard caller must hold: a
+ * trailing finding (with `write`, the file is written) when it is missing or
+ * is not {@link MERGE_GUARD_TRIGGER_TEXT}.
+ */
+export function mergeGuardTrigger(root: string, callsGuard: boolean, write: boolean): Finding[] {
+  if (!callsGuard) return [];
+  const f = join(root, MERGE_GUARD_TRIGGER_FILE);
+  const have = existsSync(f) ? readFileSync(f, "utf8") : null;
+  if (have === MERGE_GUARD_TRIGGER_TEXT) return [];
+  if (write) writeFileSync(f, MERGE_GUARD_TRIGGER_TEXT);
+  return [{
+    file: MERGE_GUARD_TRIGGER_FILE,
+    line: 1,
+    have: have === null ? "(missing)" : "(differs from the canonical signal)",
+    want: "(the canonical merge guard trigger)",
+    why: "the merge guard hears pull-request events through this permissionless `pull_request` signal",
+    trailing: true,
+  }];
 }
 
 export function run(root: string, write: boolean): { findings: Finding[]; fixed: number } {
@@ -276,8 +535,10 @@ export function run(root: string, write: boolean): { findings: Finding[]; fixed:
   const { owner: ownOwner, repo: own } = ownSlug(root);
   const all: Finding[] = [];
   let fixed = 0;
+  let callsGuard = false;
   for (const f of workflowFiles(root)) {
     const before = readFileSync(f, "utf8");
+    if (before.split("\n").some((l) => !/^\s*#/.test(l) && CALLS_GUARD.test(l))) callsGuard = true;
     const { findings, text } = judgeFile(root, f, before, own, refs, repos, ownOwner);
     all.push(...findings);
     if (write && text !== before) {
@@ -285,6 +546,9 @@ export function run(root: string, write: boolean): { findings: Finding[]; fixed:
       fixed += findings.filter((x) => x.want !== null || x.why.startsWith("tools-ref")).length;
     }
   }
+  const trigger = mergeGuardTrigger(root, callsGuard, write);
+  all.push(...trigger);
+  if (write) fixed += trigger.length;
   return { findings: all, fixed };
 }
 
@@ -312,7 +576,7 @@ if (import.meta.main) {
   }
   if (write) {
     const left = result.findings.filter((f) => f.want === null && !f.why.startsWith("tools-ref"));
-    console.log(`  rewrote ${result.fixed} line(s)${left.length ? `; ${left.length} need a hand pin` : ""}`);
+    console.log(`  rewrote ${result.fixed} line(s)${left.length ? `; ${left.length} need a hand pin or fix` : ""}`);
     process.exit(left.length ? 1 : 0);
   }
   // input-site: env WORKFLOW_PINS_STRICT #4e1adbf3 — when 1, trailing pins fail the check too

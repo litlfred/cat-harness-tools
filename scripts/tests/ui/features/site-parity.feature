@@ -55,7 +55,8 @@ Feature: Site parity guard for the root publish
     Given a checkout whose r.config.json declares site.build
     When the recipe is read with pre "site:ast", keep "branches", profile "ig-repo-site" and links "refuse"
     Then those values come back with empty source and site steps
-    And links "report" and coverage "report", the defaults, are not carried
+    And links "report" and coverage "report", when declared, are carried, and are absent when not declared
+    And extends "document-folio" is carried, and an extends that is not a preset name is refused naming extends
     And a keep of "../x" or "." is refused naming keep
     And a profile of "ig" is refused naming profile
     And links "ignore" is refused naming links

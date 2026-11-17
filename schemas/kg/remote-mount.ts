@@ -391,6 +391,20 @@ export type LockedInstance = z.infer<typeof LockedInstanceSchema>;
 export const MountLockSchema = z
   .object({
     $schema: z.literal(MOUNT_LOCK_SCHEMA),
+    /**
+     * When `mount:remote` wrote this content, pins included (UTC, ISO 8601,
+     * whole seconds): T, the time `lock:coherence:check` judges freshness
+     * against. A commit's date is not T: a squash merge dates the commit
+     * that carries the lock at the MERGE, so every layer main that moved
+     * between the re-pin and the merge read as "moved before T" and the pin
+     * as stale (merge-manager, 2026-11-17: three WHO syncs lost that race).
+     * Kept when a mount rewrites the same content, so a re-run does not
+     * churn the lock; written anew whenever anything else in it changes.
+     * The check accepts it only when it is no later than the commit that
+     * carries the lock and no earlier than any pin's own commit; optional
+     * so a lock written before it was recorded still parses.
+     */
+    pinnedAt: z.string().datetime().optional(),
     /** The `remoteMounts` it was written for, so a changed pin reads as stale. */
     mounts: z.array(z.object({ harness: InstanceNameSchema, repository: z.string().min(1), ref: CommitShaSchema }).strict()),
     instances: z.array(LockedInstanceSchema),

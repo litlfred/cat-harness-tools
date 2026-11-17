@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { UsageError, parseArgs, resolveRun } from "../wireframe-check.mjs";
-import { checkWireframes } from "../check-wireframes.ts";
+import { checkWireframes, renderedByKeys } from "../check-wireframes.ts";
 
 /** An index-shaped checkout: one layer holding an as-is wireframe and a design proposal. */
 const ROOT = mkdtempSync(join(tmpdir(), "wireframe-check-"));
@@ -155,5 +155,71 @@ describe("check:wireframes reads each instance's own index (cat-harness-tools#28
     expect(r.incomplete.filter((i) => i.problem.includes("was written for topic"))).toEqual([]);
     expect(names).toContain("page");
     expect(names).toContain("content-layer/page");
+  });
+});
+
+describe("a wireframe covers every visualiser a writer draws (renderedBy:<tool>)", () => {
+  /** A wireframe directory whose report passes at both viewports. */
+  const passing = (dir: string, topic: string, covers: string[]) => {
+    put(join(dir, topic, "as-is.html"));
+    writeFileSync(join(dir, topic, "intent.md"), "intent");
+    mkdirSync(join(dir, topic, "checks"), { recursive: true });
+    const entries = ["web", "mobile"].map((viewport) => ({ viewport, criterion: "renders", result: "pass" }));
+    writeFileSync(join(dir, topic, "checks", "report.json"), JSON.stringify({ topic, candidates: [{ file: "as-is.html", entries }] }));
+    return [topic, { covers }] as const;
+  };
+  const RENDERERS = new Map([
+    ["dth-hrh/archimate", "archimate-pages"],
+    ["dpi-h-ra/archimate", "archimate-pages"],
+    ["dth-sfp/archimate", "archimate-pages"],
+    ["dth-sfp/glossary", "glossary-page"],
+  ]);
+
+  test("renderedByKeys names every declared visualiser drawn by that Tool, and nothing for another form", () => {
+    expect(renderedByKeys("renderedBy:archimate-pages", RENDERERS)).toEqual(["dpi-h-ra/archimate", "dth-hrh/archimate", "dth-sfp/archimate"]);
+    expect(renderedByKeys("renderedBy:no-such-tool", RENDERERS)).toEqual([]);
+    expect(renderedByKeys("dth-sfp/archimate", RENDERERS)).toBeUndefined();
+    expect(renderedByKeys("renderedBy:Not A Tool", RENDERERS)).toBeUndefined();
+  });
+
+  test("every visualiser rendered by the writer inherits its wireframe; one drawn by another Tool does not", () => {
+    const dir = join(ROOT, "by-writer");
+    const index = Object.fromEntries([passing(dir, "archimate-pages", ["renderedBy:archimate-pages"])]);
+    writeFileSync(join(dir, "index.json"), JSON.stringify({ wireframes: index }));
+    const r = checkWireframes(ROOT, [{ dir, prefix: "cat-harness-tools/" }], [], RENDERERS);
+    expect(r.covered).toEqual([
+      { ref: "dpi-h-ra/archimate", wireframe: "cat-harness-tools/archimate-pages" },
+      { ref: "dth-hrh/archimate", wireframe: "cat-harness-tools/archimate-pages" },
+      { ref: "dth-sfp/archimate", wireframe: "cat-harness-tools/archimate-pages" },
+    ]);
+    expect(r.uncovered).toEqual([{ ref: "dth-sfp/glossary" }]);
+    expect(r.unknownRef).toEqual([]);
+    expect(r.incomplete).toEqual([]);
+  });
+
+  test("a writer no mounted layer declares a visualiser for is not a stale ref", () => {
+    const dir = join(ROOT, "by-writer-alone");
+    const index = Object.fromEntries([passing(dir, "archimate-pages", ["renderedBy:archimate-pages"])]);
+    writeFileSync(join(dir, "index.json"), JSON.stringify({ wireframes: index }));
+    const r = checkWireframes(ROOT, [{ dir, prefix: "" }], [], new Map([["cat-harness/beans", "state-visualizer"]]));
+    expect(r.unknownRef).toEqual([]);
+    expect(r.uncovered).toEqual([{ ref: "cat-harness/beans" }]);
+  });
+
+  test("a wireframe naming the visualiser by its route key wins over the writer's", () => {
+    const shared = join(ROOT, "by-writer-shared");
+    const own = join(ROOT, "by-writer-own");
+    writeFileSync(
+      (mkdirSync(shared, { recursive: true }), join(shared, "index.json")),
+      JSON.stringify({ wireframes: Object.fromEntries([passing(shared, "archimate-pages", ["renderedBy:archimate-pages"])]) }),
+    );
+    writeFileSync(
+      (mkdirSync(own, { recursive: true }), join(own, "index.json")),
+      JSON.stringify({ wireframes: Object.fromEntries([passing(own, "archimate", ["dth-sfp/archimate"])]) }),
+    );
+    // The shared one is read first, as the tools layer's is; the layer's own still covers its page.
+    const r = checkWireframes(ROOT, [{ dir: shared, prefix: "cat-harness-tools/" }, { dir: own, prefix: "dth-sfp/" }], [], RENDERERS);
+    expect(r.covered).toContainEqual({ ref: "dth-sfp/archimate", wireframe: "dth-sfp/archimate" });
+    expect(r.covered).toContainEqual({ ref: "dth-hrh/archimate", wireframe: "cat-harness-tools/archimate-pages" });
   });
 });

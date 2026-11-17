@@ -45,11 +45,9 @@
  * The owner's ruling, option "Fresh at re-pin time": "Pass a pin that was
  * main when the lock was written (every commit main gained since is newer
  * than the re-pin commit). Kills the race, keeps 'all layers at main
- * together'." So the rule judges against T, the committer date of the last
- * commit that changed the lock (`git log -1 --format=%cI -- index.lock.json`
- * in the repository that holds `--lock`; merging main into the pull request
- * leaves T alone unless it touches the lock; an uncommitted lock is being
- * written now, so T is now). A pin P is fresh when it is main or descends
+ * together'." So the rule judges against T, when the pins were written
+ * (see "T is when the pins were written" below; an uncommitted lock is being
+ * written now, so T is its `pinnedAt`, else now). A pin P is fresh when it is main or descends
  * from it, or when P is behind main and every commit on main's first-parent
  * chain after P (`P..main --first-parent`) has a committer date after T: P
  * was main's tip when the lock was written. A pin behind main with a
@@ -60,6 +58,29 @@
  * of T by that skew; that is accepted, since the window it opens is minutes
  * and the next re-pin closes it. `--at-run-time` keeps the strict rule
  * above, every pin at main as the run finds it, for an audit.
+ *
+ * ## T is when the pins were written (merge-manager, 2026-11-17)
+ *
+ * T was the committer date of the last commit that changed the lock. For a
+ * pull request merged by SQUASH, the commit that carries the lock on main is
+ * dated at the MERGE (GitHub writes the merge time as both its author and
+ * its committer date), so a layer main that moved between the re-pin push
+ * and the merge counted as "moved before T", and a downstream sync of that
+ * lock failed as stale: three WHO syncs lost the race in one day, one by
+ * three seconds. T is now, best first:
+ *
+ * 1. `pinnedAt`, recorded in the lock by `mount:remote` when it wrote the
+ *    pins (kept when a mount rewrites the same content), accepted when it is
+ *    no later than the commit that carries the lock, plus
+ *    {@link PINNED_AT_SKEW}. A pin whose own commit is dated after it (a
+ *    hand-edited ref) is judged against the commit's date instead.
+ * 2. The author date of the last commit that changed the lock: the pull
+ *    request's on a rebase or merge commit, the merge's on a squash.
+ * 3. Its committer date, when the author date is later.
+ *
+ * The output names where T came from, and why a recorded `pinnedAt` was set
+ * aside when it was. A pin behind main whose main moved only after T is
+ * still reported as accepted for that reason.
  *
  * ## Three states, never two
  *
@@ -133,7 +154,7 @@ export interface Pin {
 
 /** A pinned harness's own lock at its pin: read, absent, or not determinable. */
 export type LowerLock =
-  | { state: "lock"; pins: Pin[] }
+  | { state: "lock"; pins: Pin[]; pinnedAt?: string }
   | { state: "absent" }
   | { state: "could-not-determine"; reason: string };
 
@@ -189,8 +210,29 @@ export interface MainCommit {
 /** The first-parent commits on main after a pin (`pin..main --first-parent`), or why they could not be read. */
 export type MainSince = { commits: MainCommit[] } | { reason: string };
 
-/** When the lock was written: T, the committer date of the last commit that changed it, or why it could not be found. */
-export type WrittenAt = { at: number; sha: string } | { reason: string };
+/**
+ * Where T came from, best first: `recorded`, the lock's own `pinnedAt`
+ * (written by `mount:remote` when it wrote the pins); `author`, the author
+ * date of the last commit that changed the lock; `committer`, that commit's
+ * committer date; `uncommitted`, now, for a lock being written.
+ */
+export type WrittenAtSource = "recorded" | "author" | "committer" | "uncommitted";
+
+/**
+ * When the lock was written: T, with where it came from, or why it could not
+ * be found. `commitAt` is T as the commit alone gives it (author, else
+ * committer, else now): what a pin judges against when the recorded time
+ * cannot be right for it (the pin's own commit is later).
+ */
+export type WrittenAt =
+  | { at: number; sha: string; source?: WrittenAtSource; commitAt?: number; note?: string }
+  | { reason: string };
+
+/**
+ * Clock skew, in seconds, allowed between the machine that wrote `pinnedAt`
+ * and the ones that dated the commits it is compared with.
+ */
+export const PINNED_AT_SKEW = 600;
 
 /** A pin behind main that was main's tip when the lock was written. */
 export interface FreshAtRepin {
@@ -199,16 +241,27 @@ export interface FreshAtRepin {
   main: string;
   /** The oldest first-parent commit main gained after the pin, dated after T. */
   firstAfter: MainCommit;
+  /** Set when this pin was judged against the commit's date, not the recorded `pinnedAt`. */
+  t?: number;
 }
 
 /** Judge at re-pin time: T, and the first-parent commits main gained after a pin. */
 export interface RepinTime {
   writtenAt: WrittenAt;
   mainSince: (pin: Pin, main: string) => MainSince;
+  /**
+   * The committer date of the pin's own commit, when it can be read. A
+   * recorded `pinnedAt` earlier than it (beyond the skew) was not written
+   * with this pin (a hand-edited ref), so that pin is judged against the
+   * commit's date instead.
+   */
+  pinAt?: (pin: Pin) => number | undefined;
 }
 
 export interface FreshnessReport {
   checked: number;
+  /** Pins judged against the commit's date because the recorded `pinnedAt` predates their own commit. */
+  pinnedAtIgnored?: string[];
   fresh: number;
   stale: Stale[];
   undetermined: Undetermined[];
@@ -258,16 +311,30 @@ export function judgeFreshness(
         out.undetermined.push({ harness: p.harness, via: p, lowerRef: m.sha, reason: `behind main, and when the lock was written is unknown: ${t.reason}` });
         continue;
       }
+      let tAt = t.at;
+      if (t.source === "recorded" && t.commitAt !== undefined && repin.pinAt) {
+        const pinAt = repin.pinAt(p);
+        if (pinAt !== undefined && pinAt > t.at + PINNED_AT_SKEW) {
+          tAt = t.commitAt;
+          (out.pinnedAtIgnored ??= []).push(`${p.harness}: its commit ${p.ref.slice(0, 12)} is dated ${iso(pinAt)}, after pinnedAt ${iso(t.at)}`);
+        }
+      }
       const since = repin.mainSince(p, m.sha);
       if ("reason" in since || !since.commits.length) {
         const why = "reason" in since ? since.reason : "no first-parent commit after the pin";
         out.undetermined.push({ harness: p.harness, via: p, lowerRef: m.sha, reason: `main's history after the pin: ${why}` });
         continue;
       }
-      const before = since.commits.filter((c) => c.at <= t.at);
+      const before = since.commits.filter((c) => c.at <= tAt);
       if (!before.length) {
         out.fresh++;
-        out.freshAtRepin.push({ harness: p.harness, ref: p.ref, main: m.sha, firstAfter: since.commits.reduce((a, c) => (c.at < a.at ? c : a)) });
+        out.freshAtRepin.push({
+          harness: p.harness,
+          ref: p.ref,
+          main: m.sha,
+          firstAfter: since.commits.reduce((a, c) => (c.at < a.at ? c : a)),
+          ...(tAt !== t.at ? { t: tAt } : {}),
+        });
         continue;
       }
       hadAtT = before.reduce((a, c) => (c.at > a.at ? c : a));
@@ -288,16 +355,30 @@ export function judgeFreshness(
 export function formatFreshness(r: FreshnessReport, label: string): string {
   const verdict = r.stale.length ? "FAILED" : r.undetermined.length ? "COULD NOT DETERMINE" : "OK";
   const t = r.writtenAt;
-  const when = !t ? "at run time" : "reason" in t ? "at re-pin time, T unknown" : `at re-pin time, T = ${iso(t.at)} (${t.sha.slice(0, 12)})`;
+  const sourceText: Record<WrittenAtSource, string> = {
+    recorded: "pinnedAt recorded in the lock",
+    author: "author date of",
+    committer: "committer date of",
+    uncommitted: "now: the lock is uncommitted",
+  };
+  const when = !t
+    ? "at run time"
+    : "reason" in t
+      ? "at re-pin time, T unknown"
+      : `at re-pin time, T = ${iso(t.at)} (` +
+        (t.source === "recorded" || t.source === "uncommitted" ? `${sourceText[t.source]}, ` : t.source ? `${sourceText[t.source]} ` : "") +
+        `${t.sha.slice(0, 12)})`;
   const lines = [
     `lock:freshness ${label} (${when}): ${verdict} — ${r.checked} pin(s), ${r.fresh} fresh` +
       (r.freshAtRepin.length ? ` (${r.freshAtRepin.length} behind main but main moved after the lock was written)` : "") +
       `, ${r.stale.length} stale, ${r.undetermined.length} undetermined`,
   ];
+  if (t && !("reason" in t) && t.note) lines.push(`  · ${t.note}`);
+  for (const n of r.pinnedAtIgnored ?? []) lines.push(`  · ${n}: judged against the commit's date instead`);
   for (const f of r.freshAtRepin) {
     lines.push(
       `  ✓ ${f.harness}: ${f.ref.slice(0, 12)} behind main ${f.main.slice(0, 12)}, but main moved after the lock was written ` +
-        `(${f.firstAfter.sha.slice(0, 12)} at ${iso(f.firstAfter.at)} > T): fresh at re-pin time`,
+        `(${f.firstAfter.sha.slice(0, 12)} at ${iso(f.firstAfter.at)} > T${f.t !== undefined ? ` = ${iso(f.t)}` : ""}): fresh at re-pin time`,
     );
   }
   for (const s of r.stale) {
@@ -501,7 +582,9 @@ export class LockReader {
     const show = git(dir, "show", `${commit}:index.lock.json`);
     if (show.status !== 0) return { state: "could-not-determine", reason: `git show failed: ${(show.stderr || "").trim()}` };
     try {
-      return { state: "lock", pins: pinsOf(resolveLockJson(JSON.parse(show.stdout), repositoryOwner(repository))) };
+      const raw = JSON.parse(show.stdout) as { pinnedAt?: unknown };
+      const pins = pinsOf(resolveLockJson(raw, repositoryOwner(repository)));
+      return { state: "lock", pins, ...(typeof raw.pinnedAt === "string" ? { pinnedAt: raw.pinnedAt } : {}) };
     } catch (e) {
       return { state: "could-not-determine", reason: `index.lock.json is not a readable lock: ${(e as Error).message}` };
     }
@@ -521,6 +604,14 @@ export class LockReader {
     const why = this.fetch(repository, [a, b]);
     if (why) return { rel: "unknown", reason: why };
     return gitRelate(this.dirOf(repository), a, b);
+  }
+
+  /** The committer date of a commit, in epoch seconds; undefined when it cannot be read. */
+  commitAt(repository: string, sha: string): number | undefined {
+    if (this.fetch(repository, [sha])) return undefined;
+    const r = git(this.dirOf(repository), "log", "-1", "--format=%ct", sha);
+    const at = Number(r.stdout.trim());
+    return r.status === 0 && Number.isFinite(at) && at > 0 ? at : undefined;
   }
 
   /** `pin..main --first-parent` with committer dates; commits only, which the `tree:0` fetch keeps. */
@@ -543,31 +634,83 @@ export function firstParentSince(dir: string, base: string, tip: string): MainSi
   return { commits };
 }
 
+/** `pinnedAt` as epoch seconds, or why it is not usable. */
+export function parsePinnedAt(pinnedAt: unknown): number | { reason: string } | undefined {
+  if (pinnedAt === undefined) return undefined;
+  if (typeof pinnedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(pinnedAt)) {
+    return { reason: `pinnedAt ${JSON.stringify(pinnedAt)} is not an ISO 8601 date-time` };
+  }
+  const ms = Date.parse(pinnedAt);
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : { reason: `pinnedAt ${pinnedAt} is not a date` };
+}
+
 /**
- * T: the committer date of the last commit that changed `file`, in the git
- * repository that holds it (bare or not), at `rev`. A shallow checkout (CI's) is deepened
- * once, commits and trees only, when the commit found is at its boundary,
- * since there git reads the boundary as adding the file. An uncommitted
- * change is being written now, so T is now.
+ * T: when the pins in `file` were written, in the git repository that holds
+ * it (bare or not), at `rev`. Best first:
+ *
+ * 1. `recorded`: the lock's own `pinnedAt`, written by `mount:remote` with the
+ *    pins, when it is no later than the commit that carries the lock (plus
+ *    {@link PINNED_AT_SKEW}). A later one cannot be when that commit's pins
+ *    were written, so it is set aside, and the output says so.
+ * 2. `author`: the author date of the last commit that changed the lock. A
+ *    rebase or a merge commit keeps the pull request's; a SQUASH merge on
+ *    GitHub does not (checked 2026-11-17: its author date is the merge's, the
+ *    same as its committer date), which is why `pinnedAt` is first.
+ * 3. `committer`: that commit's committer date, when the author date is later.
+ *
+ * A shallow checkout (CI's) is deepened once, commits and trees only, when
+ * the commit found is at its boundary, since there git reads the boundary as
+ * adding the file. An uncommitted change is being written now, so T is its
+ * `pinnedAt`, else now.
+ *
+ * `recorded` is the lock's `pinnedAt` as read at `rev`; omitted, it is read
+ * from `file` on disk (a working tree at `rev`).
  */
-export function lockWrittenAt(file: string, rev = "HEAD", now: () => number = () => Math.floor(Date.now() / 1000)): WrittenAt {
+export function lockWrittenAt(
+  file: string,
+  rev = "HEAD",
+  now: () => number = () => Math.floor(Date.now() / 1000),
+  recorded?: string | null,
+): WrittenAt {
   const dir = dirname(file);
   const name = basename(file);
   const bare = git(dir, "rev-parse", "--is-bare-repository");
   if (bare.status !== 0) return { reason: `${dir} is not in a git repository` };
+  if (recorded === undefined) {
+    try {
+      const p = (JSON.parse(readFileSync(file, "utf-8")) as { pinnedAt?: unknown }).pinnedAt;
+      recorded = typeof p === "string" ? p : p === undefined ? null : JSON.stringify(p);
+    } catch {
+      recorded = null;
+    }
+  }
+  const rec = recorded === null ? undefined : parsePinnedAt(recorded);
+  const withRecorded = (fromCommit: { at: number; sha: string; source: WrittenAtSource }): WrittenAt => {
+    if (rec === undefined) return fromCommit;
+    if (typeof rec !== "number") return { ...fromCommit, note: `${rec.reason}; T is ${fromCommit.source === "uncommitted" ? "now" : `the ${fromCommit.source} date`}` };
+    if (rec > fromCommit.at + PINNED_AT_SKEW) {
+      const why = fromCommit.source === "uncommitted" ? "is in the future; T is now" : `is later than the commit that carries the lock; T is the ${fromCommit.source} date`;
+      return { ...fromCommit, note: `pinnedAt ${recorded} ${why}` };
+    }
+    return { at: rec, sha: fromCommit.sha, source: "recorded", commitAt: fromCommit.at };
+  };
   if (bare.stdout.trim() !== "true") {
     const st = git(dir, "status", "--porcelain", "--", name);
-    if (st.status === 0 && st.stdout.trim()) return { at: now(), sha: "uncommitted" };
+    if (st.status === 0 && st.stdout.trim()) return withRecorded({ at: now(), sha: "uncommitted", source: "uncommitted" });
   }
   for (let deepened = false; ; deepened = true) {
-    const r = git(dir, "log", "-1", "--format=%H %ct", rev, "--", name);
+    const r = git(dir, "log", "-1", "--format=%H %at %ct", rev, "--", name);
     if (r.status !== 0) return { reason: `git log -- ${name} failed: ${(r.stderr || "").trim().split("\n").pop()}` };
-    const [sha, ct] = r.stdout.trim().split(" ");
-    if (!sha || !ct) return { reason: `no commit at ${rev.slice(0, 12)} changes ${name}` };
+    const [sha, at, ct] = r.stdout.trim().split(" ");
+    if (!sha || !at || !ct) return { reason: `no commit at ${rev.slice(0, 12)} changes ${name}` };
     const shallow = git(dir, "rev-parse", "--git-path", "shallow");
     const shallowFile = resolve(dir, shallow.stdout.trim());
     const boundary = existsSync(shallowFile) && readFileSync(shallowFile, "utf-8").split("\n").includes(sha);
-    if (!boundary) return { at: Number(ct), sha };
+    if (!boundary) {
+      const a = Number(at);
+      const c = Number(ct);
+      return withRecorded(a <= c ? { at: a, sha, source: "author" } : { at: c, sha, source: "committer" });
+    }
     if (deepened) return { reason: `the history is shallow at ${sha.slice(0, 12)} and could not be deepened` };
     git(dir, "fetch", "-q", "--unshallow", "--filter=blob:none", "origin");
   }
@@ -602,7 +745,8 @@ export function main(argv: readonly string[]): number {
     root = l.pins;
     label = `${repository}@${ref}${/^[0-9a-f]{40}$/.test(ref) ? "" : ` (${(reader.resolve(repository, ref) ?? "?").slice(0, 12)})`}`;
     const commit = reader.resolve(repository, ref) ?? ref;
-    writtenAt = () => lockWrittenAt(join(reader.dirOf(repository), "index.lock.json"), commit);
+    const recorded = l.pinnedAt ?? null;
+    writtenAt = () => lockWrittenAt(join(reader.dirOf(repository), "index.lock.json"), commit, undefined, recorded);
   } else {
     const file = resolve(argOf(argv, "--lock") ?? "index.lock.json");
     if (!existsSync(file)) {
@@ -642,7 +786,11 @@ export function main(argv: readonly string[]): number {
         (repo, a, b) => reader.relate(repo, a, b),
         argv.includes("--at-run-time")
           ? undefined
-          : { writtenAt: writtenAt(), mainSince: (p, m) => reader.mainSince(p.repository, p.ref, m) },
+          : {
+              writtenAt: writtenAt(),
+              mainSince: (p, m) => reader.mainSince(p.repository, p.ref, m),
+              pinAt: (p) => reader.commitAt(p.repository, p.ref),
+            },
       );
   if (argv.includes("--json")) console.log(JSON.stringify({ lock: label, ...report, freshness }, null, 2));
   else {

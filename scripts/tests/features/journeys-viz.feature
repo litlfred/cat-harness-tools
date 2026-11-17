@@ -82,7 +82,7 @@ Feature: The journeys viewer
   @test:scripts/tests/journeys-viz.test.ts::a_journey_page::stories,_requirements,_examples_and_blocks_resolve,_and_what_does_not_is_drawn_as_unresolved
   Scenario: Stories, requirements, examples and blocks resolve, and what does not is drawn as unresolved
     Given the rendered page of p2-treated
-    Then it shows the story want "show my summary abroad"
+    Then it shows the story as "I want to show my summary abroad, so that I am treated safely."
     And it links the requirement to its GitHub file in example/lower
     And "ghost-story" is drawn unresolved
     And LOW-REQ-404 is drawn as having no req: node
@@ -142,9 +142,9 @@ Feature: The journeys viewer
     When the module M2 page is read
     Then it shows the table row "Trust anchor"
 
-  @test:scripts/tests/journeys-viz.test.ts::the_workshop_layer::the_sheets_page_carries_the_cover_and_one_sheet_per_declared_sheet,_with_its_assessment_strip
-  Scenario: The sheets page carries the cover and one sheet per declared sheet, with its assessment strip
-    Given the sheets page of the policy workshop
+  @test:scripts/tests/journeys-viz.test.ts::the_workshop_layer::the_Table_sheets_panel_carries_the_cover_and_one_sheet_per_declared_sheet,_with_its_assessment_strip
+  Scenario: The Table sheets panel carries the cover and one sheet per declared sheet, with its assessment strip
+    Given the discussion page of the policy workshop
     Then it has 2 sheets, one of them the cover
     And it has an assessment strip
     And it names the capability "A viewer"
@@ -195,12 +195,27 @@ Feature: The journeys viewer
     And it shows "Trust anchor ★" with "— a signature crosses"
     And it has the gap strip input "policy:viewer:status"
 
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::below_the_journey,_a_toggle_between_the_policy_view_and_the_technical_one;_policy_first_(owner,_2026-11-17)
+  Scenario: Below the journey, a toggle between the policy view and the technical one, policy first
+    Given the P2 walkthrough page
+    Then it has a "Below the journey" tab list with "Policy view", selected, and "Technical view"
+    And the policy pane holds the policy questions, and the hood is hidden, with no separate hood toggle
+    And present.js switches the panes from the tabs, and the full-width questions keep two columns in the pane
+
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::a_journey_page_leaves_the_language_picker_to_the_site's_chrome;_only_the_presentation_frame,_outside_it,_draws_its_own_(owner,_2026-11-17)
+  Scenario: A journey page leaves the language picker to the site's chrome
+    Given the rendered journey pages
+    Then a journey page, in the site's chrome, has no language-links mark of its own
+    And no page outside the workshops has one
+    And the walkthrough's presentation frame, which opts out of the chrome, keeps its own
+    And a journey page asks the site's chrome to leave out the guide's version banner
+
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::a_step:_the_people,_each_with_the_avatar_in_the_card's_header_(never_inside_a_sentence),_and_under_the_hood
   Scenario: A step shows the people with the avatar in the card's header, and under the hood
     Given the P2 walkthrough page
     Then a who card carries Ana's colour
     And it names "Ben (nurse)" reading the summary, with no avatar inside the name
-    And under the hood it shows "Health wallet" with "shows the QR", the Task_Read highlight and the hood toggle
+    And under the hood it shows "Health wallet" with "shows the QR", the Task_Read highlight and the hood
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::the_workshop_page_links_to_the_presentation,_and_its_discussion_has_an_anchor
   Scenario: The workshop page links to the presentation, and its discussion has an anchor
@@ -213,19 +228,29 @@ Feature: The journeys viewer
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::every_view_has_a_page,_in_the_frame,_and_the_tabs_link_them
   Scenario: Every view has a page in the frame, and the tabs link them
-    Given the presentation views map, personas, each persona, how, how/wallet, discuss, sheets, demo and demo/S2
-    Then each opts out of the navbar and shows the name "PilgrimLink"
-    And the P2 page links the map, personas, how and discuss tabs, none disabled
-    And the map's BPMN drawing is emitted as map/bpmn/processes-care.svg
+    Given the presentation views map, personas, each persona, how, how/wallet, discuss, demo and demo/S2
 
-  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_map:_a_lane_per_person_to_focus_on,_the_two_toggles,_a_column_per_step,_the_technical_layer,_the_per-view_note
-  Scenario: The map has a lane per person to focus on, two toggles, a column per step, the technical layer and the note
-    Given the map page
-    Then it can focus ana and show pain and tech
-    And it has a lane row for cleo
-    And it links the wallet block's page
-    And a hand-off to a cast member wears their avatar, "Clinic EMR → Ana"
-    And it has a hidden panel, "Open screen S2" and the note "Read across, then down."
+    Given the presentation views personas, each persona, how, how/wallet, discuss, sheets, demo and demo/S2
+    Then each opts out of the navbar and shows the name "PilgrimLink"
+    And the P2 page links the personas, how and discuss tabs, none disabled, and no journey map
+
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_Table_sheets_are_a_folded_panel_of_the_discussion;_sheets/_redirects_there_and_the_tab_is_gone_(owner,_2026-11-17)
+  Scenario: The Table sheets are a folded panel of the discussion; sheets/ redirects there and the tab is gone
+    Given the discussion page of the policy workshop
+    Then it ends with a folded "sheets" panel holding the cover sheet, and loads journeys.css
+    And no page offers a Table sheets tab or links ../sheets/
+    And sheets/ redirects to ../discuss/#sheets, keeping an old anchor
+    And a module's sheet link opens ../discuss/#sheet-s1
+    And present.js opens the panel an address names and prints the sheets alone
+
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_journey_map_is_folded_into_How_it_works:_its_tab_is_gone,_map/_redirects,_and_its_hand-offs_are_How_it_works'_Data_on_the_move_(owner,_2026-11-17)
+  Scenario: The journey map is folded into How it works
+    Given the walkthrough, how, discussion and overview pages
+    Then none offers a Journey map tab or links map/
+    And the overview's second call to action is "See how it works", linking how/
+    And map/ is a redirect to ../how/, with no map grid and no BPMN thumbnails beside it
+    And How it works has "Data on the move" after the building-block grid, where a hand-off to a cast member wears their avatar, "Clinic EMR → Ana"
+    And no map grid is drawn in How it works, and the business processes are listed once
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_persona_lens:_needs,_frustrations,_the_curve's_points_linking_to_steps,_the_touchpoints;_a_glyph_for_an_icon
   Scenario: The persona lens shows needs, frustrations, curve points linking to steps, touchpoints, and a glyph for an icon
@@ -234,7 +259,7 @@ Feature: The journeys viewer
     And a curve point links to P2 titled "P2 Step P2: Worried"
     And it says "Ana’s touchpoints (2)"
     And the personas index links "ana/"
-    And Cleo, who has an icon, wears it as an icon avatar on her page and the map, while Ana keeps the initial "A"
+    And Cleo, who has an icon, wears it as an icon avatar on her page, while Ana keeps the initial "A" in How it works
     And the curve's axis shows happy, neutral and sad faces
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::how_it_works:_the_big_ideas,_the_grid,_a_block's_detail_with_the_moments_that_use_it
@@ -289,9 +314,9 @@ Feature: The journeys viewer
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-08:_the_drawer's_bar_names_the_active_stage,_and_the_workshop's_inspector_title,_key_and_hint
   Scenario: The drawer's bar names the active stage, and the workshop's inspector title, key and hint
     Given the presentation pages
-    Then the P2 page's chip says "Active Stage: P2", the map's "Active Stage: Journey map" and screen S2's "Active Stage: S2 · P2"
+    Then the P2 page's chip says "Active Stage: P2", How it works' "Active Stage: How it works" and screen S2's "Active Stage: S2 · P2"
     And the default inspector title is "FHIR payload inspector" with no key
-    And with a workshop inspector title, key and hint, the P2, map and S2 pages show the escaped title, the key with its icon, and the hint
+    And with a workshop inspector title, key and hint, the P2, how and S2 pages show the escaped title, the key with its icon, and the hint
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_lab:_the_Discussion_view_as_timed_steps,_the_journey's_questions_answered_under_the_walkthrough's_keys,_a_summary
   Scenario: The lab turns the Discussion view into timed steps, with the journey's questions and a summary
@@ -301,22 +326,35 @@ Feature: The journeys viewer
     And the discuss page has 5 lab tabs numbered from 0, a 5-minute timer, the Discuss prompt and the step note
     And the journey's use case comes ticked, the other not, and the statement starts from the use-case text and can be reset
     And the walkthrough's question keys reappear, readiness rows are grouped and rated, decision rights have holders, and the gap strip's radios are present
-    And the summary model lists the five steps and every answer's name, with the gap report, CSV, closing-question write-in and credit link
+    And the summary model lists the five steps, then the systems the room can mark, and every answer's name, with the gap report, CSV, closing-question write-in and credit link
     And a lab naming a table the workshop does not list is refused by the schema
+
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_canvas_as_data:_an_on-screen_form_keyed_per_field,_a_journey_question_naming_a_field_shares_its_key,_the_annex,_the_PDF's_model_(owner,_2026-11-17)
+  Scenario: The canvas as data: an on-screen form keyed per field, shared with the journey question that names a field
+    Given a workshop with a canvas of a cover (a write-in, a choice, ticks) and a sheet (a grid, a gap strip) of module M1
+    And P2's "trust" question naming the grid's write-in cell, and a lab step showing both sheets
+    Then the workshop passes the schema, and refuses a question naming a tick, a lab step naming no sheet, and a sheet twice
+    And the discussion draws each field under policy:cv:<sheet>:<field>[:<row>[:<col>]]
+    And the grid cell, on the discussion and on the walkthrough, is the question's box, moving its answer from the question's own key and its older one
+    And the sheet's annex lists P1's question of M1 under its own key
+    And the PDF's model has both sheets, a radio per option of the choice, and the annex; the writer is loaded and shipped
+    And the lab's summary lists every canvas key once
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-07:_every_page's_header_has_Reset_Simulation,_scoped_to_the_workshop,_returning_to_the_overview
   Scenario: Every page's header has Reset Simulation, scoped to the workshop, returning to the overview
-    Given the overview, P2, map, how and demo/S2 pages
+    Given the overview, P2, personas, how and demo/S2 pages
     Then each has a reset scoped to "policy" pointing back to the overview at its own depth
     And each shows "Reset Simulation"
     And present.js wires every data-jp-reset element
 
-  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-11:_the_map's_moment_columns_are_narrow_enough_on_a_desktop_for_eight,_and_a_chapter's_name_wraps,_never_cut
-  Scenario: The map's moment columns fit eight on a desktop, and a chapter's name wraps, never cut
-    Given present.css
-    Then at min-width 1280px the map grid has a 132px column and steps of at least 136px
-    And 132 + 8 × 136 fits within a 1400px window less gutters
-    And a chapter name is not cut with an ellipsis
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::a_room_marks_an_application_component_"we_have_this",_with_its_own_name_for_it,_and_renames_the_fictional_countries_(owner,_2026-11-17)
+  Scenario: A room marks an application component "we have this", and renames the fictional countries
+    Given a workshop whose architecture panel sets an application component in Taifafeki, beside Onesa, and a lab with a summary
+    Then the component carries a "We have this" tick and an "Our name for it" box, under one key, on the panel, in a view's element list and on its block's page
+    And no other kind of element is marked
+    And the lab's summary lists both marks under "Our systems"
+    And the overview has a box per fictional country, and every page names the countries present.js renames
+    And a workshop with no fictional countries has neither
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-13:_How_it_works_opens_with_the_architecture_panel_from_the_ArchiMate_graph,_then_the_views,_then_the_big_ideas
   Scenario: How it works opens with the architecture panel, then the views, then the big ideas
@@ -601,3 +639,12 @@ Feature: The journeys viewer
   Scenario: A step that includes a journey links to it
     When the home page is read
     Then it says the step is the journey "C2 — Away", linked
+
+  @test:scripts/tests/journeys-viz.test.ts::presentation_helpers::JV-06:_a_workshop's_own_canvas_(sheetsSource)_is_the_Table_sheets_panel,_its_files_copied_beside_the_discussion;_the_drawn_sheets_are_the_fallback
+  Scenario: A workshop's own canvas is the Table sheets panel, its files copied beside the discussion
+    Given a workshop whose sheetsSource names a Word file, a PDF URL and three previews, one missing
+    Then the discussion's panel shows the two previews, the Word download and the PDF link, and a print button
+    And the layer's files are copied under discuss/canvas/, none under sheets/, and the URL is not copied
+    And the workshop page links "discuss/#sheets"
+    And the check names the missing preview only
+    And with no file resolving, the drawn sheets come back; a path out of the layer is no file of it; a sheetsSource naming no file is refused

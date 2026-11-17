@@ -55,14 +55,18 @@ export const SUBJECT_KINDS: readonly string[] = [
   "decision",
   "directory",
   "externalSchema",
+  "softwareLibrary",
   "globalTask",
   "glossary-usage",
   "package",
   "process",
   "requirement",
+  "translationSource",
   "role",
+  "theme",
   "schema",
   "skill",
+  "voice",
 ];
 
 const KINDS = new Set(SUBJECT_KINDS);

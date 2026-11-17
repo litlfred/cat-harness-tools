@@ -519,7 +519,7 @@ export function highlightJson(json: string): string {
 
 // ── the frame ─────────────────────────────────────────────────────────────
 
-export type View = "overview" | "walkthrough" | "map" | "personas" | "how" | "discuss" | "sheets" | "demo";
+export type View = "overview" | "walkthrough" | "personas" | "how" | "discuss" | "demo";
 
 export interface FrameOpts {
   p: Presentation;
@@ -575,6 +575,43 @@ export function anchorHeadings(html: string): string {
   });
 }
 
+/**
+ * The fictional countries the workshop's journeys are set in, in order, once
+ * each: the names a room may rename to its own (owner, 2026-11-17). The
+ * architecture panel's country labels when the workshop declares them, since
+ * those are the countries; otherwise the chapters' `country`, which may also
+ * name a setting that is no country ("Cross-Border").
+ */
+export function countriesOf(p: Presentation): string[] {
+  const out: string[] = [];
+  const add = (c: string | undefined) => {
+    if (c && !out.includes(c)) out.push(c);
+  };
+  const declared = p.w.workshop.presentation?.architecture?.countries ?? [];
+  if (declared.length) for (const c of declared) add(c.label);
+  else for (const c of p.chapters) add(c.journey.scenario.country);
+  return out;
+}
+
+/** Where a room's own name for a country is kept (`jv:` + this). */
+export const countryKey = (workshop: string, name: string): string => `${workshop}:country:${name.normalize("NFKD").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "x"}`;
+
+/** The countries' block every frame page carries: present.js puts the room's names in place of these throughout the page's text. */
+function countriesBlock(p: Presentation): string {
+  const names = countriesOf(p);
+  if (!names.length) return "";
+  return `<script type="application/json" id="jp-countries">${JSON.stringify(names.map((n) => ({ name: n, key: countryKey(p.w.workshop.id, n) }))).replace(/</g, "\\u003c")}</script>`;
+}
+
+/** The overview's renaming panel: a box per fictional country, kept in the browser, applied on every page. */
+function countriesPanel(p: Presentation): string {
+  const names = countriesOf(p);
+  if (!names.length) return "";
+  return `<section class="jp-card jp-pad jp-countries" id="your-countries"><h3 class="jp-h">${icon("globe", "jp-sky")} Make it your countries</h3><p class="jp-small">The journeys are set in fictional countries. Give each one the name of a country at your table: the new names replace the old ones throughout the journeys’ text, in this browser only.</p><div class="jp-countries-in">${names
+    .map((n) => `<label><span>${e(n)}</span><input type="text" class="jp-answer" name="${e(countryKey(p.w.workshop.id, n))}" data-jv-text data-jp-country="${e(n)}" placeholder="${e(n)}" aria-label="${e(`Our name for ${n}`)}"></label>`)
+    .join("")}</div></section>`;
+}
+
 export function frame(o: FrameOpts): string {
   const ws = o.p.w.workshop;
   const pr = ws.presentation ?? {};
@@ -583,11 +620,9 @@ export function frame(o: FrameOpts): string {
   const tabs: { id: View; label: string; hint: string; ic: keyof typeof ICON; href?: string }[] = [
     { id: "overview", label: "Overview", hint: "The story & the cast", ic: "compass", href: `${o.toWorkshop}overview/` },
     { id: "walkthrough", label: "Walkthrough", hint: "Present one moment at a time", ic: "present", href: o.p.steps[0] ? `${o.toWorkshop}walkthrough/${o.p.steps[0].key}/` : undefined },
-    { id: "map", label: "Journey map", hint: "Everyone, every step", ic: "map", href: o.p.steps.length ? `${o.toWorkshop}map/` : undefined },
     { id: "personas", label: "Persona lens", hint: "One person end-to-end", ic: "user", href: o.p.cast.length ? `${o.toWorkshop}personas/` : undefined },
     { id: "how", label: "How it works", hint: "Standards & tools behind each moment", ic: "cpu", href: `${o.toWorkshop}how/` },
     { id: "discuss", label: "Discussion", hint: "Policy questions to close", ic: "message", href: `${o.toWorkshop}discuss/` },
-    { id: "sheets", label: "Table sheets", hint: "Print the A3 canvas", ic: "printer", href: ws.sheets?.length ? `${o.toWorkshop}sheets/` : undefined },
   ];
   void firstJourney;
   const nav = tabs
@@ -604,24 +639,25 @@ export function frame(o: FrameOpts): string {
     .join("");
   const range = rangeLabel(o.p.steps, pr.scope);
   const html = `<!doctype html>
-<html lang="en" data-presenter="on">
+<html lang="en" data-presenter="off">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${e(o.title)}</title>
 ${NAVBAR_OPT_OUT}
 <link rel="stylesheet" href="${o.root}assets/present.css">
-<script>try{if(localStorage.getItem("jp:presenter")==="off")document.documentElement.setAttribute("data-presenter","off")}catch(_){}</script>
+<script>try{if(localStorage.getItem("jp:presenter")==="on")document.documentElement.setAttribute("data-presenter","on")}catch(_){}</script>
 <script src="${o.root}assets/present.js" defer></script>
 ${panelHead(o.body, `${o.root}assets/`)}
 ${o.head ?? ""}
 ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="next" href="${e(o.next)}">` : ""}
+${countriesBlock(o.p)}
 </head>
 <body class="jp jp-${o.view}${o.bodyClass ? ` ${o.bodyClass}` : ""}">
 <header class="jp-head">
 <div class="jp-top">
 <div class="jp-top-l">${pr.occasion ? `<span class="jp-occasion">${icon("globe")}<span>${e(pr.occasion)}</span></span><span class="jp-bar">|</span>` : ""}<span>${e(pr.subject ?? ws.title)}</span>${range ? `<span class="jp-range">${e(range)}</span>` : ""}</div>
-<div class="jp-top-r">${pr.status ? `<span class="jp-status"><i></i>${e(pr.status)}</span>` : ""}<button type="button" class="jp-presenter-btn" data-jp-presenter title="Show or hide the presenter's notes">${icon("eye")}<span class="jp-on-only">Presenter Mode: ON</span><span class="jp-off-only">Presenter Notes</span></button></div>
+<div class="jp-top-r"><!--jv-langs-->${pr.status ? `<span class="jp-status"><i></i>${e(pr.status)}</span>` : ""}<button type="button" class="jp-presenter-btn" data-jp-presenter title="Show or hide the presenter's notes">${icon("eye")}<span class="jp-on-only">Presenter Mode: ON</span><span class="jp-off-only">Presenter Notes</span></button></div>
 </div>
 <div class="jp-app">
 <div class="jp-brand"><span class="jp-logo" aria-hidden="true">${e(name.trim().charAt(0).toUpperCase())}</span><div><div class="jp-brand-name"><span class="jp-name">${e(name)}</span>${pr.badge ? `<span class="jp-badge">${e(pr.badge)}</span>` : ""}</div>${pr.tagline ? `<p class="jp-tagline">${e(pr.tagline)}</p>` : ""}</div></div>
@@ -630,7 +666,7 @@ ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="n
       ? `<a${o.view === "demo" ? ' class="is-on" aria-current="page"' : ""} href="${e(`${o.toWorkshop}demo/`)}">${icon("phone", "jp-sky")}<span>${e(demoLabel(o.p))}</span></a>`
       : `<span class="jp-mode-off" aria-disabled="true" title="No device screen shows a step of this workshop">${icon("phone", "jp-sky")}<span>Device Demo</span></span>`
   }</div>
-<div class="jp-links">${links}<button type="button" class="jp-btn-link jp-reset" data-jp-reset="${e(ws.id)}" data-jp-reset-to="${e(`${o.toWorkshop}overview/`)}" title="Forget this workshop's answers and the presenter's choices in this browser, and go back to the overview">${icon("reset")}<span>Reset Simulation</span></button></div>
+<div class="jp-links">${links}<button type="button" class="jp-btn-link jp-reset jp-presenter-only" data-jp-reset="${e(ws.id)}" data-jp-reset-to="${e(`${o.toWorkshop}overview/`)}" title="Forget this workshop's answers and the presenter's choices in this browser, and go back to the overview">${icon("reset")}<span>Reset Simulation</span></button></div>
 </div>
 </header>
 ${o.band ?? ""}
@@ -640,7 +676,7 @@ ${o.view === "demo" ? "" : `<nav class="jp-tabs" aria-label="Views">${nav}</nav>
 ${anchorHeadings(o.body.trim())}
 </div></main>
 ${o.foot ?? ""}
-<footer class="jp-foot">Drawn by the journeys viewer from the <code>workshop</code>, <code>user-scenario</code>${o.view === "demo" && o.p.demo === "screens" ? " and <code>device-screen</code>" : ""} nodes of ${e(o.p.w.instance)}. Every person is fictional.</footer>
+<footer class="jp-foot">Drawn by the journeys viewer from the ${o.view === "demo" && o.p.demo === "screens" ? "<code>workshop</code>, <code>user-scenario</code> and <code>device-screen</code>" : "<code>workshop</code> and <code>user-scenario</code>"} nodes of ${e(o.p.w.instance)}. Every person is fictional.</footer>
 </body>
 </html>
 `;
@@ -735,7 +771,7 @@ ${pic}
 <span class="jp-kicker">${icon("route")} The story in one sentence</span>
 <h2>${e(pr.story ?? ws.description)}</h2>
 ${pr.lede ? `<p>${e(pr.lede)}</p>` : ""}
-<div class="jp-ctas">${first ? `<a class="jp-cta" href="${e(walk(first))}">${icon("play")} Start the walkthrough</a>` : ""}${p.steps.length ? `<a class="jp-cta jp-cta-2" href="../map/">See the whole journey map ${icon("arrow")}</a>` : ""}</div>
+<div class="jp-ctas">${first ? `<a class="jp-cta" href="${e(walk(first))}">${icon("play")} Start the walkthrough</a>` : ""}<a class="jp-cta jp-cta-2" href="../how/">See how it works ${icon("arrow")}</a></div>
 </div>
 </section>
 <section class="jp-moments-sec">
@@ -746,7 +782,8 @@ ${band}
 <div class="jp-split">
 <section class="jp-card jp-pad jp-col-3"><h3 class="jp-h">${icon("users", "jp-sky")} Meet the people</h3><div class="jp-people">${castHtml}</div></section>
 ${ladderHtml}
-</div>`;
+</div>
+${countriesPanel(p)}`;
   return frame({
     p,
     root,
@@ -776,19 +813,76 @@ function progress(p: Presentation, s: PresentedStep, prev: string | undefined, n
   return `<div class="jp-card jp-prog">
 ${prev ? `<a class="jp-pbtn" href="${e(prev)}" aria-label="Previous moment">${icon("left")}</a>` : `<span class="jp-pbtn is-off" aria-hidden="true">${icon("left")}</span>`}
 <div class="jp-prog-grid" style="grid-template-columns:${cols}">${chapters}</div>
-<span class="jp-keys">${icon("keyboard")} ← → · W · T</span>
+<span class="jp-keys jp-presenter-only">${icon("keyboard")} ← → · W · T</span>
 <a class="jp-pbtn jp-pbtn-next" href="${e(next)}" aria-label="${last ? "Go to discussion" : "Next moment"}" title="${last ? "Go to discussion" : "Next moment"}">${last ? "<span>Discuss</span>" : ""}${icon("right")}</a>
 </div>`;
 }
 
-/** Where a table's answer to a step's question is kept (`jv:` + this, in the browser): one key for the walkthrough and the Discussion view. */
-export function questionKey(workshop: string, s: PresentedStep, i: number): string {
+/**
+ * A question's identity within its workshop step: `id` when the workshop names
+ * one, else a hash of its text (case, spacing and punctuation aside). Never its
+ * position, so adding or reordering questions moves no answer.
+ */
+export function questionId(q: { id?: string; text: string }): string {
+  if (q.id) return q.id;
+  const norm = q.text.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  let h = 0x811c9dc5;
+  for (let k = 0; k < norm.length; k++) h = Math.imul(h ^ norm.charCodeAt(k), 0x01000193) >>> 0;
+  return `t${h.toString(36)}`;
+}
+
+/**
+ * Where a table's answer to a step's question is kept (`jv:` + this, in the
+ * browser): one key wherever the question is shown — its walkthrough step and
+ * every lab step of the Discussion view that lists its module. Keyed by the
+ * workshop, the journey and step the question belongs to, and the question's
+ * own identity (`questionId`), never by page or position.
+ */
+export function questionKey(workshop: string, ws: WorkshopStep, q: { id?: string; text: string; canvas?: string }): string {
+  // A question that is a canvas field keeps its answer under the field's key (`canvas-form.ts`).
+  return q.canvas ? `${workshop}:cv:${q.canvas}` : ownQuestionKey(workshop, ws, q);
+}
+
+/** A question's own key, whether or not it names a canvas field: where its answer was kept before it did. */
+export function ownQuestionKey(workshop: string, ws: WorkshopStep, q: { id?: string; text: string }): string {
+  return `${workshop}:q:${ws.scenario}:${ws.step}:${questionId(q)}`;
+}
+
+/** The keys an answer may have been kept under before, space-separated, for `data-jv-was`. */
+export function earlierKeys(workshop: string, ws: WorkshopStep, q: { id?: string; text: string; canvas?: string }, legacy?: string): string {
+  return [q.canvas ? ownQuestionKey(workshop, ws, q) : undefined, legacy].filter(Boolean).join(" ");
+}
+
+/**
+ * The key the same answer was kept under before (2026-11): the step's URL
+ * segment and the question's position. present.js moves an answer kept there
+ * to `questionKey` the first time the question is shown.
+ */
+export function legacyQuestionKey(workshop: string, s: PresentedStep, i: number): string {
   return `${workshop}:q:${s.key}:${i}`;
 }
 
 /** A write-in kept in the browser under `name` (present.js, `data-jv-text`); `value` is its text until the table writes its own. */
-export function answerBox(name: string, label: string, lines = 2, value = ""): string {
-  return `<textarea class="jp-answer" name="${e(name)}" rows="${lines}" data-jv-text aria-label="${e(`Our answer: ${label}`)}" placeholder="Our answer…">${e(value)}</textarea>`;
+export function answerBox(name: string, label: string, lines = 2, value = "", was?: string): string {
+  return `<textarea class="jp-answer" name="${e(name)}" rows="${lines}" data-jv-text${was ? ` data-jv-was="${e(was)}"` : ""} aria-label="${e(`Our answer: ${label}`)}" placeholder="Our answer…">${e(value)}</textarea>`;
+}
+
+/**
+ * What a walkthrough step shows below the journey, in one of two views (owner,
+ * 2026-11-17): **Policy** (the questions for the table, the tables the moment
+ * touches, the gap strip) or **Technical** (under the hood: the standards,
+ * data, logic and processes). A toggle switches them; Policy shows first, and
+ * a browser that last chose Technical (`jp:hood = "on"`, also the T key) gets
+ * that. A step with nothing for the table has only the technical toggle.
+ */
+function belowTheJourney(policy: string, technical: string): string {
+  if (!policy) {
+    return `<div class="jp-hood-toggle"><i></i><button type="button" data-jp-hood-toggle aria-controls="hood" aria-expanded="false">${icon("cpu")}<span class="jp-hood-hide">Hide the technical view</span><span class="jp-hood-show">Show the technical view</span></button><i></i></div>
+${technical}`;
+  }
+  return `<div class="jp-lens jp-noprint" role="tablist" aria-label="Below the journey"><i></i><span class="jp-lens-in"><button type="button" role="tab" id="lens-policy" class="is-on" data-jp-lens="policy" aria-controls="policy" aria-selected="true">${icon("landmark")}<span>Policy view</span></button><button type="button" role="tab" id="lens-technical" data-jp-lens="technical" aria-controls="hood" aria-selected="false">${icon("cpu")}<span>Technical view</span></button></span><i></i></div>
+<div class="jp-lens-pane" id="policy" role="tabpanel" aria-labelledby="lens-policy" data-jp-policy>${policy}</div>
+${technical.replace('<section class="jp-hood" id="hood" data-jp-hood hidden>', '<section class="jp-hood" id="hood" role="tabpanel" aria-labelledby="lens-technical" data-jp-hood hidden>')}`;
 }
 
 function policyPanel(p: Presentation, s: PresentedStep, toWorkshop: string): string {
@@ -796,9 +890,9 @@ function policyPanel(p: Presentation, s: PresentedStep, toWorkshop: string): str
   if (!ws) return "";
   const w = p.w.workshop;
   const mod = (id: string) => w.modules.find((m) => m.id === id);
-  // Each question has a write-in: the same answer the Discussion view's lab shows (`questionKey`).
+  // Each question has a write-in: the same answer the Discussion view's lab shows, under one key per question (`questionKey`).
   const qs = (ws.questions ?? [])
-    .map((q, i) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span>${answerBox(questionKey(w.id, s, i), q.text)}</li>`)
+    .map((q, i) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span>${answerBox(questionKey(w.id, ws, q), q.text, 2, "", earlierKeys(w.id, ws, q, legacyQuestionKey(w.id, s, i)))}</li>`)
     .join("");
   // The rows of the card's foot: the workshop's `tagRows` (VaxLink's Forces / Cost driver /
   // If it is missing), else one row per table the step touches, in the workshop's table order.
@@ -1014,7 +1108,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
       return `<div class="jp-box jp-proc">${head}${d ? `${zoom}${fig}` : `<p class="jp-small jp-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`}</div>`;
     })
     .join("");
-  return `<section class="jp-hood" id="hood" data-jp-hood>
+  return `<section class="jp-hood" id="hood" data-jp-hood hidden>
 <div class="jp-hood-h">${icon("cpu", "jp-sky3")}<h3>Under the hood</h3><span>What the standards and tools are doing at this moment</span></div>
 <div class="jp-hood-in">
 ${st.technicalSummary ? `<div class="jp-sowhat">${icon("bulb", "jp-amber jp-i-lg")}<div><span class="jp-label jp-amber8">Technical so-what</span><p>${e(st.technicalSummary)}</p></div></div>` : ""}
@@ -1063,10 +1157,10 @@ ${ladder && level >= 0 ? meter(ladder, level) : ""}
 <p class="jp-small">Held in: ${e(st.record.heldWhere)}</p>
 ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> ${personaText(st.handoff.summary, p.cast, pl)}</span></div>` : ""}</section>`
     : "";
-  const ask = s.ws?.askTheRoom ? `<section class="jp-ask"><h3 class="jp-h">${icon("message")} Ask the room</h3><p>${e(s.ws.askTheRoom)}</p></section>` : "";
+  const ask = s.ws?.askTheRoom ? `<section class="jp-ask jp-presenter-only"><h3 class="jp-h">${icon("message")} Ask the room</h3><p>${e(s.ws.askTheRoom)}</p></section>` : "";
   const whatIf = (st.whatIf ?? [])
     .map(
-      (wf) => `<section class="jp-card jp-pad jp-tone-amber jp-whatif" data-jp-whatif><h3 class="jp-h jp-amber8">${icon("branch")} What if…</h3><p class="jp-wf-q">${e(wf.scenario)}</p><button type="button" class="jp-reveal" data-jp-reveal>Let the room guess, then reveal</button><p class="jp-wf-a">${e(wf.outcome)}</p></section>`,
+      (wf) => `<section class="jp-card jp-pad jp-tone-amber jp-whatif" data-jp-whatif><h3 class="jp-h jp-amber8">${icon("branch")} What if…</h3><p class="jp-wf-q">${e(wf.scenario)}</p><button type="button" class="jp-reveal jp-presenter-only" data-jp-reveal>Let the room guess, then reveal</button><p class="jp-wf-a">${e(wf.outcome)}</p></section>`,
     )
     .join("");
   const policy = st.policy ? `<section class="jp-card jp-pad jp-tone-indigo"><h3 class="jp-h jp-indigo">${icon("landmark")} Policy takeaway</h3><p>${e(st.policy)}</p></section>` : "";
@@ -1097,12 +1191,11 @@ ${meta ? `<div class="jp-meta">${meta}</div>` : ""}
 ${st.painPoint || st.enabler ? `<section class="jp-pe">${st.painPoint ? `<div class="jp-pain"><div class="jp-h">${icon("alert")} Without this</div><p>${personaText(st.painPoint, p.cast, pl)}</p></div>` : ""}${st.enabler ? `<div class="jp-enable"><div class="jp-h">${icon("sparkles")} What makes it work</div><p>${personaText(st.enabler, p.cast, pl)}</p></div>` : ""}</section>` : ""}
 </div>
 <div class="jp-walk-r">
-${record}${ask}${whatIf}${policy}${policyPanel(p, s, toWorkshop)}${cue}
 ${screens ? `<div class="jp-sees">${screens}</div>` : ""}
+${record}${ask}${whatIf}${policy}${cue}
 </div>
 </div>
-<div class="jp-hood-toggle"><i></i><button type="button" class="is-on" data-jp-hood-toggle aria-controls="hood" aria-expanded="true">${icon("cpu")}<span class="jp-hood-hide">Hide what’s under the hood</span><span class="jp-hood-show">Show what’s under the hood</span></button><i></i></div>
-${hood(corpus, p, s, links, root)}`;
+${belowTheJourney(policyPanel(p, s, toWorkshop), hood(corpus, p, s, links, root))}`;
   return frame({
     p,
     root,

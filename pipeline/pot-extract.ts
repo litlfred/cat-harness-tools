@@ -341,13 +341,25 @@ export interface CleanedMarkdown {
  * etc. after translation lookup (G1 + G3).
  */
 export function cleanMarkdownWithTokens(text: string): CleanedMarkdown {
-  // Remove Liquid control tags first
-  let result = text.replace(MD_LIQUID_TAG_RE, "");
+  // A Liquid control tag inside a link target is part of the target, so it
+  // is set aside here and put back in the recorded target below; every other
+  // Liquid control tag is removed first, as before.
+  const lqtTokens: string[] = [];
+  let result = text.replace(MD_LINK_RE, (m, label: string, target: string) =>
+    target.includes("{%")
+      ? `[${label}](${target.replace(MD_LIQUID_TAG_RE, (tag) => {
+        lqtTokens.push(tag);
+        return `\x00LQT${lqtTokens.length - 1}\x00`;
+      })})`
+      : m);
+  result = result.replace(MD_LIQUID_TAG_RE, "");
 
   // Tokenise Liquid output expressions to protect underscores from italic regex
   const lqdTokens: string[] = [];
-  result = result.replace(MD_LIQUID_OUTPUT_RE, (_match, expr: string) => {
+  const lqdRaw: string[] = [];
+  result = result.replace(MD_LIQUID_OUTPUT_RE, (match, expr: string) => {
     lqdTokens.push(expr.trim());
+    lqdRaw.push(match);
     return `\x00LQD${lqdTokens.length - 1}\x00`;
   });
 
@@ -390,9 +402,18 @@ export function cleanMarkdownWithTokens(text: string): CleanedMarkdown {
   // restoration on injection (G3) and allowing emphasis inside link text to
   // be cleaned below.
   const linkTargets: string[] = [];
+  // A target is recorded as the author wrote it: the Liquid, code and math
+  // set aside above are put back, since `po-inject` writes the target out
+  // verbatim (a downstream page's `{{game_lang}}` link came out as `<NUL>LQD0<NUL>`).
+  const asWritten = (target: string): string =>
+    target.replace(/\x00(LQD|LQT|CODE|MATH)(\d+)\x00/g, (m, kind: string, i: string) => {
+      const n = Number(i);
+      const v = kind === "LQD" ? lqdRaw[n] : kind === "LQT" ? lqtTokens[n] : kind === "CODE" ? codeSpans[n] : mathTokens[n];
+      return v ?? m;
+    });
   result = result.replace(MD_LINK_RE, (_m, label: string, target: string) => {
     const idx = linkTargets.length;
-    linkTargets.push(target);
+    linkTargets.push(asWritten(target));
     return `\x00AOPEN${idx}\x00${label}\x00ACLOSE${idx}\x00`;
   });
 
@@ -420,6 +441,8 @@ export function cleanMarkdownWithTokens(text: string): CleanedMarkdown {
   for (let i = 0; i < lqdTokens.length; i++) {
     result = result.replace(`\x00LQD${i}\x00`, () => `{${LQD_PREFIX}${lqdTokens[i]}}`);
   }
+  // A tag set aside in an image's source, whose target is not kept, goes as any other tag does.
+  result = result.replace(/\x00LQT\d+\x00/g, "");
 
   return { text: result.trim(), codeSpans, linkTargets };
 }
@@ -467,7 +490,10 @@ export type PotEntryKind =
   // (the content core's glossary producer). Declared 2026-09-30: that
   // producer predates `kind` and never decided, which compiled only because its
   // directory is outside tsconfig's include list.
-  | "glossary-term";
+  | "glossary-term"
+  // A segment of a rendered page (`html-po.ts`): a visualiser's words, taken
+  // from the page a reader reads (`scripts/journeys/locales.ts`).
+  | "html-text";
 
 /** A single translatable entry extracted from a source file. */
 export interface PotEntry {

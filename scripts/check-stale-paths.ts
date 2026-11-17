@@ -35,7 +35,8 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { CLOSED_STATUSES, OPEN_STATUSES, readBeanFiles, type BeanFile } from "./bean-store-read.ts";
+import { CLOSED_STATUSES, emptyStoreNote, OPEN_STATUSES, readBeanStore, storeDeterminedEmpty, type BeanFile } from "./bean-store-read.ts";
+import { BeanStoreAbsentError } from "./lib/bean-store-absent.ts";
 import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "../..");
@@ -65,6 +66,8 @@ export interface StalePath {
 
 export interface StalePathReport {
   examined: number;
+  /** The store was read whole and holds no open bean: a pass with a note, not "examined nothing" (owner, 2026-11-17). */
+  determinedEmpty?: { dir: string };
   /** Not in the baseline. These FAIL. */
   findings: StalePath[];
   /** Already recorded, repaired by the milestone's owner. Listed, never failed. */
@@ -299,16 +302,25 @@ export function stalePaths(beans: Bean[]): StalePath[] {
 }
 
 export function checkStalePaths(root = REPO_ROOT): StalePathReport {
-  const beans = readBeanFiles(root);
-  // `null` means the declaration did not resolve. That is UNKNOWN, not clean,
+  // Read through `readBeanStore` (what `readBeanFiles` delegates to) so the
+  // determined-empty case can be told from an unread one.
+  const store = readBeanStore(root);
+  if (store.state === "unreachable") {
+    if (store.absent) throw new BeanStoreAbsentError(store.reason);
+    throw new Error(`cannot read the bean store: ${store.reason}`);
+  }
+  // Not read means the declaration did not resolve. That is UNKNOWN, not clean,
   // so it throws rather than reporting zero findings over a store it never read.
-  if (beans === null) throw new Error("could not resolve the bean store from the declaration");
+  if (store.state !== "read") throw new Error("could not resolve the bean store from the declaration");
+  const beans = store.beans;
+  const isOpen = (b: BeanFile) => OPEN_STATUSES.has(b.status);
   const all = stalePaths(beans);
   const baseline = readBaseline(root);
   const key = (f: StalePath) => `${f.id}:${f.rule}`;
   const matched = new Set(all.map(key).filter((k) => baseline.has(k)));
   return {
-    examined: beans.filter((b) => OPEN_STATUSES.has(b.status)).length,
+    examined: beans.filter(isOpen).length,
+    ...(storeDeterminedEmpty(store, isOpen) ? { determinedEmpty: { dir: store.dir } } : {}),
     findings: all.filter((f) => !baseline.has(key(f))),
     outstanding: all.filter((f) => baseline.has(key(f))),
     stale: [...baseline].filter((k) => !matched.has(k)).sort(),
@@ -316,6 +328,7 @@ export function checkStalePaths(root = REPO_ROOT): StalePathReport {
 }
 
 function formatReport(r: StalePathReport): string {
+  if (r.examined === 0 && r.determinedEmpty) return `Stale paths (0 open beans)\n${emptyStoreNote("check:stale-paths", r.determinedEmpty.dir)}`;
   if (r.examined === 0) {
     return "Stale paths\n  ? EXAMINED NOTHING — no open beans were read. Not a pass.";
   }
@@ -355,5 +368,5 @@ if (import.meta.main) {
     process.exit(2);
   }
   console.log(process.argv.includes("--json") ? JSON.stringify(report, null, 2) : formatReport(report));
-  process.exit(report.findings.length > 0 || report.examined === 0 ? 1 : 0);
+  process.exit(report.findings.length > 0 || (report.examined === 0 && !report.determinedEmpty) ? 1 : 0);
 }

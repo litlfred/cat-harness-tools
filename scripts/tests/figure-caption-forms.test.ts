@@ -81,4 +81,41 @@ describe("caption patterns accept `Fig N.`", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test("declaredFigureCaptions reads captions wrapped in Markdown emphasis, or after a colon", () => {
+    // dth-sfp's L1 (9789240120747-eng) writes `**Fig. N.** Caption`: the
+    // line-start anchor met `**` and saw 2 of its 6 figures.
+    const dir = mkdtempSync(join(tmpdir(), "fig-captions-"));
+    try {
+      writeFileSync(
+        join(dir, "page-003.md"),
+        [
+          "**Fig. 1.** Stakeholders in the digital health ecosystem",
+          "*Figure 2.* Maturity levels",
+          "**Fig. 3**. Data flows between facilities",
+          "__Fig. 4.__ Governance structure",
+          "**Fig. 5. Investment roadmap**",
+          "**Fig. 6** Monitoring framework",
+          "As **Fig. 7** shows, the mention is not a caption.",
+          "**Figure 8** shows the timeline.",
+          "Fig. 9: Product master data",
+        ].join("\n") + "\n",
+      );
+      const got = declaredFigureCaptions(dir);
+      expect(got.get("1")).toBe("Stakeholders in the digital health ecosystem");
+      expect(got.get("2")).toBe("Maturity levels");
+      expect(got.get("3")).toBe("Data flows between facilities");
+      expect(got.get("4")).toBe("Governance structure");
+      expect(got.get("5")).toBe("Investment roadmap");
+      // No period: a declaration without a caption, like the mention below.
+      expect(got.get("6")).toBeNull();
+      expect(got.get("8")).toBeNull();
+      expect(got.has("7")).toBe(false);
+      // dth-pc's L1 (9789240116191-eng) delimits with a colon.
+      expect(got.get("9")).toBe("Product master data");
+      expect([...got.keys()].sort()).toEqual(["1", "2", "3", "4", "5", "6", "8", "9"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

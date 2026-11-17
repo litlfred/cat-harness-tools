@@ -127,6 +127,7 @@ import { langTabs, UN_LOCALES } from "./lib/lang-tabs.ts";
 import { writeLocaleFallback404 } from "./lib/locale-fallback-404.ts";
 import { describeSplit, SCOPES_DIR, SOURCE_PATH as SEARCH_SOURCE, splitSite } from "./search-split.ts";
 import { PREVIEW_PREFIX, PREVIEW_PREFIXES, previewPath } from "./lib/preview-prefix.ts";
+import { applyPreset, PRESET_NAME, skipReason } from "./lib/site-presets.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
 
@@ -194,8 +195,18 @@ export interface BuildOptions {
   parityDropped?: DroppedByRuling[];
   /** The platform steps around the declared ones ({@link PROFILE_STEPS}); `folio` when absent. */
   profile?: SiteProfile;
-  /** `report` (the default): unresolved links are said, and do not stop the publish; `refuse` stops it. */
+  /**
+   * `report` (the default): unresolved links are said, and do not stop the publish. `refuse`
+   * stops it on ANY unresolved internal link: the platform's pages, the pages the content
+   * supplies, absolute links to the site's own address and links inside diagrams
+   * (cat-harness-tools#2345). Namespace IRIs ({@link isNamespaceIri}) are never pages.
+   */
   links?: "refuse" | "report";
+  /**
+   * The shared site preset the steps build on (`lib/site-presets.ts`): resolved after the
+   * mount, its steps run before the recipe's own ({@link mergeSteps}).
+   */
+  extends?: string;
   /** `report` (the default): a declared visualiser page the site lacks ({@link siteCoverageShortfall}) is said, and does not stop the publish; `refuse` stops it. */
   coverage?: "refuse" | "report";
   /**
@@ -310,9 +321,14 @@ export const STEP_ENV = { baseurl: "FOLIO_SITE_BASEURL", upstreamPages: "FOLIO_S
  * which finds the name among the mounted layers' checkout scripts. Either way
  * a step is a script NAME, never a command.
  */
-export function stepCommand(root: string, name: string): string {
+export function stepCommand(root: string, name: string, presetScripts: Readonly<Record<string, string>> = {}): string {
   if (!SCRIPT_NAME.test(name)) throw new Error(`${JSON.stringify(name)} is not a package script name`);
-  return ownsScript(root, name) ? `bun run ${name}` : `bun run ${shellQuote(join(import.meta.dir, "run-script.ts"))} ${name}`;
+  if (ownsScript(root, name)) return `bun run ${name}`;
+  // A shared preset's command (`lib/site-presets.ts`): run from the checkout root with the
+  // step's arguments appended, as a package script is. The checkout's own script wins.
+  const preset = presetScripts[name];
+  if (preset !== undefined) return preset;
+  return `bun run ${shellQuote(join(import.meta.dir, "run-script.ts"))} ${name}`;
 }
 
 /**
@@ -388,6 +404,9 @@ export function gateSteps(pre: readonly string[]): string[] {
  */
 export const NODE_KIND_PAGES = "gen-node-kind-pages.ts";
 
+/** The writer of each harness's overview page (`gen-harness-pages.ts`), run on every site after {@link NODE_KIND_PAGES}. */
+export const HARNESS_PAGES = "gen-harness-pages.ts";
+
 /**
  * Whether one of the recipe's own steps already runs {@link NODE_KIND_PAGES}
  * (a folio's `site:node-kinds`), so the build does not run it twice: the
@@ -426,6 +445,8 @@ export interface SiteRecipe {
   profile?: SiteProfile;
   /** An unresolved link is only said (`report`, the default; owner 2026-11-14) or refuses the publish (`refuse`). */
   links?: "refuse" | "report";
+  /** The shared site preset this recipe builds on (`templates/site-presets/<name>.json` of a mounted layer; cat-harness-tools#2345). */
+  extends?: string;
   /** A declared visualiser page missing from the built site is only said (`report`, the default; owner 2026-11-14) or refuses the publish (`refuse`). */
   coverage?: "refuse" | "report";
   /** Publish every layer's graph document and the root index, `index.jsonld` ({@link BuildOptions.rootIndex}). */
@@ -494,10 +515,13 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
   if (home !== undefined && typeof home !== "string") throw new Error(`${where}: site.build.home must be a path`);
   const profile = b.profile ?? "folio";
   if (profile !== "folio" && profile !== "ig-repo-site") throw new Error(`${where}: site.build.profile must be folio or ig-repo-site`);
-  const links = b.links ?? "report";
-  if (links !== "refuse" && links !== "report") throw new Error(`${where}: site.build.links must be refuse or report`);
-  const coverage = b.coverage ?? "report";
-  if (coverage !== "refuse" && coverage !== "report") throw new Error(`${where}: site.build.coverage must be refuse or report`);
+  // Kept only when declared: a preset's `refuse` must not be overridden by a default.
+  const links = b.links;
+  if (links !== undefined && links !== "refuse" && links !== "report") throw new Error(`${where}: site.build.links must be refuse or report`);
+  const coverage = b.coverage;
+  if (coverage !== undefined && coverage !== "refuse" && coverage !== "report") throw new Error(`${where}: site.build.coverage must be refuse or report`);
+  const ext = b.extends;
+  if (ext !== undefined && (typeof ext !== "string" || !PRESET_NAME.test(ext))) throw new Error(`${where}: site.build.extends must be a site preset name`);
   const rootIndex = b.rootIndex ?? false;
   if (typeof rootIndex !== "boolean") throw new Error(`${where}: site.build.rootIndex must be true or false`);
   const keep = b.keep ?? [];
@@ -511,8 +535,9 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
       ...(list("finalSteps").length ? { finalSteps: list("finalSteps") } : {}),
       ...(keep.length ? { keep: keep as string[] } : {}),
       ...(profile !== "folio" ? { profile } : {}),
-      ...(links !== "report" ? { links } : {}),
-      ...(coverage !== "report" ? { coverage } : {}),
+      ...(links !== undefined ? { links: links as "refuse" | "report" } : {}),
+      ...(coverage !== undefined ? { coverage: coverage as "refuse" | "report" } : {}),
+      ...(ext !== undefined ? { extends: ext as string } : {}),
       ...(rootIndex ? { rootIndex } : {}),
     },
     read,
@@ -633,6 +658,17 @@ export function targetOf(url: string, pageRel: string, base: string): string | "
   return stack.join("/") + (u.endsWith("/") ? "/" : "");
 }
 
+/**
+ * A namespace IRI (`…/<layer>/v0/ns`, `…/v0/ns/graphTypology/x`, `…/v0/ns#Term`): an
+ * identifier a page links as a name, not a page the site owes. The WHO smart-ra sweep
+ * (4,660 links, 2026-11-15) found `/smart-ra/v0/ns` as its only "dead" link, and it is one
+ * of these. Never counted as unresolved (cat-harness-tools#2345).
+ */
+export function isNamespaceIri(url: string): boolean {
+  const path = url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]*/i, "").split("?")[0]!;
+  return /(?:^|\/)v\d+\/ns(?:[/#]|$)/.test(path);
+}
+
 /** True when `rel` resolves to a file the way a static host serves it. */
 function served(site: string, rel: string): boolean {
   const p = join(site, rel);
@@ -714,6 +750,7 @@ export async function checkLinks(
       if (t === "outside-base" || !served(site, t)) misses.push(`${rel}: ${tab.href} (language tab ${tab.locale}, by ${tab.from})`);
     }
     for (const url of await pageUrls(html)) {
+      if (isNamespaceIri(url)) continue;
       const own = selfAddress === undefined ? undefined : selfTargetOf(url, selfAddress);
       if (own !== undefined) {
         if (!served(site, own)) selfMisses.push(`${rel}: ${url}`);
@@ -731,6 +768,7 @@ export async function checkLinks(
   for (const svg of diagrams) {
     const rel = relative(site, svg).split(sep).join("/");
     for (const url of await pageUrls(readFileSync(svg, "utf-8"))) {
+      if (isNamespaceIri(url)) continue;
       const own = selfAddress === undefined ? undefined : selfTargetOf(url, selfAddress);
       const t = own ?? targetOf(url, rel, base);
       if (t === undefined || (t !== "outside-base" && served(site, t))) continue;
@@ -747,6 +785,17 @@ export async function checkLinks(
   };
   count(site);
   return { pages: pages.length, diagrams: diagrams.length, files, misses, upstreamMisses, selfMisses, diagramMisses };
+}
+
+/**
+ * How many unresolved links stop the publish: under `refuse`, every kind (the platform's,
+ * the content's, absolute self-address links, links inside diagrams); under `report`, none.
+ */
+export function unresolvedCount(
+  r: { misses: readonly string[]; upstreamMisses: readonly string[]; selfMisses: readonly string[]; diagramMisses: readonly string[] },
+  mode: "refuse" | "report" = "report",
+): number {
+  return mode === "refuse" ? r.misses.length + r.upstreamMisses.length + r.selfMisses.length + r.diagramMisses.length : 0;
 }
 
 /** Where the built site carries its link check's result, from the site root. */
@@ -1105,16 +1154,43 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const ownPackage = existsSync(join(root, "package.json"));
   run("install", [...(ownPackage ? ["bun install --no-save >/dev/null"] : ["true"]), ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${shellQuote(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
 
+  // The shared preset the recipe extends (cat-harness-tools#2345), read now that the layers
+  // that declare it are mounted: its steps first, then the recipe's own.
+  let presetScripts: Record<string, string> = {};
+  let when: Record<string, string> = {};
+  if (o.extends !== undefined) {
+    const own = { pre: o.pre, sourceSteps: o.sourceSteps, siteSteps: o.siteSteps ?? [], finalSteps: o.finalSteps ?? [], scripts: {}, when: {}, ...(o.links ? { links: o.links } : {}), ...(o.coverage ? { coverage: o.coverage } : {}) };
+    const { steps, chain } = applyPreset(root, o.extends, own);
+    console.log(`▶ site preset ${chain.join(" → ")}`);
+    o = { ...o, pre: steps.pre, sourceSteps: steps.sourceSteps, siteSteps: steps.siteSteps, finalSteps: steps.finalSteps, ...(steps.links ? { links: steps.links } : {}), ...(steps.coverage ? { coverage: steps.coverage } : {}) };
+    presetScripts = steps.scripts;
+    when = steps.when;
+    for (const n of [...o.pre, ...o.sourceSteps, ...(o.siteSteps ?? []), ...(o.finalSteps ?? [])]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
+    console.log(`  steps: pre ${o.pre.join(", ") || "(none)"}; source ${o.sourceSteps.join(", ") || "(none)"}; site ${(o.siteSteps ?? []).join(", ") || "(none)"}${o.finalSteps?.length ? `; final ${o.finalSteps.join(", ")}` : ""}; links ${o.links ?? "report"}`);
+  } else if ((o.profile ?? "folio") === "folio") {
+    console.warn(`  ⚠ ${o.instance}'s site.build extends no shared site preset: its steps can drift from every other site's (cat-harness-tools#2345)`);
+  }
+  /** A step's command, or undefined (said) when its preset `when` path is absent here. */
+  const step = (phase: string, name: string): string | undefined => {
+    const why = skipReason(root, name, when);
+    if (why !== undefined) {
+      console.log(`▷ ${phase}: ${name} skipped: ${why}`);
+      return undefined;
+    }
+    return stepCommand(root, name, presetScripts);
+  };
+
   // The work directory exists before the first step: a pre step may leave its output there
   // (an IG's artefact index, read by a later step), as folio-site.yml's steps use $RUNNER_TEMP.
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   const upstreamFile = join(out, "upstream-pages.txt");
   writeFileSync(upstreamFile, "");
+  const siteCommit = capture("git rev-parse HEAD", root);
   const env = {
     ...siteStepEnv({
       instance: o.instance, title, baseurl, url: `https://${gh.owner}.github.io`, linkRoot: o.linkRoot, work: out, source: docs, site,
-      repository: `${gh.owner}/${gh.repo}`, commit: capture("git rev-parse HEAD", root), ref: capture("git rev-parse --abbrev-ref HEAD", root),
+      repository: `${gh.owner}/${gh.repo}`, commit: siteCommit, ref: capture("git rev-parse --abbrev-ref HEAD", root),
     }),
     [STEP_ENV.baseurl]: baseurl,
     [STEP_ENV.upstreamPages]: upstreamFile,
@@ -1122,7 +1198,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // input/business-processes/ it was an untracked file that made the cached AST stale.
     [BESIDE_SOURCE_OUT_ENV]: join(out, "beside-source-drawings"),
   };
-  for (const p of gateSteps(o.pre)) run(`pre: ${p}`, stepCommand(root, p), root, env);
+  for (const p of gateSteps(o.pre)) {
+    const c = step("pre", p);
+    if (c !== undefined) run(`pre: ${p}`, c, root, env);
+  }
   // The data the build's steps write (`sync-docs-harness`, `gen-landing-data`) lands in
   // whichever mount holds the harness or the landing — cat-harness, or the DAK base layer for an
   // IG that lands on it: put the pinned bytes back afterwards, failed build or not, so
@@ -1142,7 +1221,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${shellQuote(docs)} ${shellFlags(o.profile)} ${scope}`, root);
     run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${shellQuote(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
-    for (const s of o.sourceSteps) run(`source: ${s}`, `${stepCommand(root, s)} ${shellQuote(docs)}`, root, env);
+    for (const s of o.sourceSteps) {
+      const c = step("source", s);
+      if (c !== undefined) run(`source: ${s}`, `${c} ${shellQuote(docs)}`, root, env);
+    }
     // Every declared visualiser page the site owes (its own layer and every one it needs),
     // written by the writer its Tool declares, into the site source — the pages a recipe
     // step already wrote are not written twice ({@link writeMissingVisualisers}). A writer
@@ -1171,11 +1253,18 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
       gemDir,
     );
 
-    for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    for (const st of o.siteSteps ?? []) {
+      const c = step("site", st);
+      if (c !== undefined) run(`site: ${st}`, `${c} ${s}`, root, env);
+    }
     // Every site, whatever its profile: the schemas page links each node kind's pages.
     if (!recipeWritesNodeKindPages(root, [...(o.siteSteps ?? []), ...(o.finalSteps ?? [])])) {
       run("node-kind pages", `bun run ${TOOLS}/${NODE_KIND_PAGES} --root . --out ${s}`, root);
     }
+    // Every site: one overview page per harness, which the rail's Harnesses panel links
+    // (owner, 2026-11-13). After the node-kind pages, whose declaration pages it links;
+    // before the rail, which links a row to its page only where the site holds one.
+    run("harness pages", `bun run ${TOOLS}/${HARNESS_PAGES} --root . --out ${s} --title ${shellQuote(title)} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}/`)}${siteCommit ? ` --commit ${shellQuote(siteCommit)}` : ""}`, root);
     if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}${o.scope ? ` --scope ${shellQuote(scopeArg(o.scope))}` : ""}`, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");
@@ -1184,7 +1273,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("lang")) run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
     run("rail on every page", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --theme-source ${shellQuote(docs)} --foreign-site --home-label ${shellQuote(title)} --instance ${shellQuote(o.instance)}${o.identity ? " --landing" : ""}`, root);
-    for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    for (const st of o.finalSteps ?? []) {
+      const c = step("final", st);
+      if (c !== undefined) run(`final: ${st}`, `${c} ${s}`, root, env);
+    }
     // After every page writer, so the documents never shadow a page; before the
     // guards below, which see the documents as part of the site.
     if (o.rootIndex) run("graph documents and root index", `bun run ${TOOLS}/publish-root-index.ts --site ${s} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}`)}`, root);
@@ -1286,25 +1378,31 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const upstream = readUpstreamPages(upstreamFile);
   const links = await checkLinks(site, `${baseurl}/`, upstream, selfAddressOf(gh.owner, gh.repo));
   console.log(`links: ${links.pages} html pages, ${links.misses.length} unresolved; ${links.files} files`);
-  // Absolute links to the site's own address (fhir-harness#380). Reported, not gated yet: the
-  // layers that wrote them publish again once they re-pin the fix, and then this gates too.
+  // `refuse` gates EVERY kind of unresolved internal link (cat-harness-tools#2345): a content
+  // page's link to a glossary term the build never wrote is as much a 404 as the platform's.
+  const refuse = o.links === "refuse";
+  const gated = refuse ? " (gated: links refuse)" : " (reported, not gated)";
+  // Absolute links to the site's own address (fhir-harness#380).
   if (links.selfMisses.length > 0) {
-    console.log(`links: ${links.selfMisses.length} absolute link(s) to ${selfAddressOf(gh.owner, gh.repo)} reach no page of this build (reported, not gated):`);
+    console.log(`links: ${links.selfMisses.length} absolute link(s) to ${selfAddressOf(gh.owner, gh.repo)} reach no page of this build${gated}:`);
     for (const m of links.selfMisses.slice(0, 20)) console.log(`  · ${m}`);
   }
   if (links.diagramMisses.length > 0) {
-    console.log(`links: ${links.diagramMisses.length} link(s) inside ${links.diagrams} diagram(s) reach no page of this build (reported, not gated):`);
+    console.log(`links: ${links.diagramMisses.length} link(s) inside ${links.diagrams} diagram(s) reach no page of this build${gated}:`);
     for (const m of links.diagramMisses.slice(0, 20)) console.log(`  · ${m}`);
   }
   // The same result on the site, for its QA report to read (an IG layer's `qa.html`).
   writeLinkReport(site, links);
   if (links.upstreamMisses.length > 0) {
-    console.log(`links: ${links.upstreamMisses.length} unresolved on ${upstream.size} page(s) the content supplies (reported, not gated: the content's own to fix):`);
+    console.log(`links: ${links.upstreamMisses.length} unresolved on ${upstream.size} page(s) the content supplies${refuse ? gated : " (reported, not gated: the content's own to fix)"}:`);
     for (const m of links.upstreamMisses.slice(0, 20)) console.log(`  · ${m}`);
   }
   if (links.misses.length > 0) {
     for (const m of links.misses.slice(0, 50)) console.error(`  ✗ ${m}`);
-    if (o.links === "refuse") throw new Error(`${links.misses.length} unresolved link(s): the site is not published`);
+  }
+  const unresolved = unresolvedCount(links, o.links);
+  if (unresolved > 0 && refuse) throw new Error(`${unresolved} unresolved internal link(s): the site is not published (links: refuse; the first are listed above, all of them in ${LINK_REPORT})`);
+  if (links.misses.length > 0) {
     console.error(`  (links: reported, not gated — published with ${links.misses.length} unresolved link(s); the QA page reads ${LINK_REPORT})`);
   }
 
@@ -1389,7 +1487,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   // Explicit step flags win. With none, the layer's own `site.build`.
-  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links" | "rootIndex"> => {
+  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links" | "coverage" | "extends" | "rootIndex"> => {
     const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step"), finalSteps: many("--final-step") };
     if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length + flags.finalSteps.length > 0) return { ...flags, keep: many("--keep") };
     const { recipe: r, read } = recipeRead(root, instance);

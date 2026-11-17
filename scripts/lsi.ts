@@ -88,15 +88,17 @@ export const LSI_TOOL_ID = "lsi-index";
  * (`<site>/<locale>/cat-harness/lsi/`, owner 2026-10-09; folio-assistant#2527)
  * — read, never spelled here.
  */
-// declared-path-literal: the LSI viewer page under cat-harness's docs site, at the route the visualiser declares. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
-export const VIEWER_DIR = join(REPO, "cat-harness/docs", lsiViewerRoute()) + "/";
+// declared-path-literal: cat-harness's docs site, under which the LSI viewer's declared route sits. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
+export const LSI_DOCS_ROOT = join(REPO, "cat-harness/docs");
+/** The LSI viewer page's directory: {@link LSI_DOCS_ROOT} plus the route the visualiser declares. */
+export const VIEWER_DIR = join(LSI_DOCS_ROOT, lsiViewerRoute()) + "/";
 /**
  * The same viewer's OLD address, `<site>/cat-harness/lsi/` (folio-assistant#2527):
  * where a site not yet regenerated still holds the page. Excluded from every
  * index for the same reason {@link VIEWER_DIR} is.
  */
-// declared-path-literal: the viewer's pre-locale address, kept so a stale page there is found and reported. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
-const OLD_VIEWER_DIR = join(REPO, "cat-harness/docs", lsiViewerRoute().replace(new RegExp(`^${PAGE_LOCALE}/`), "")) + "/";
+// The viewer's pre-locale address, kept so a stale page there is found and reported.
+const OLD_VIEWER_DIR = join(LSI_DOCS_ROOT, lsiViewerRoute().replace(new RegExp(`^${PAGE_LOCALE}/`), "")) + "/";
 
 function lsiViewerRoute(): string {
   try {

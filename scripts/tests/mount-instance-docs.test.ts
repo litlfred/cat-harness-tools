@@ -492,6 +492,32 @@ describe("a served directory's bytes publish at /<instance>/<path> — bean 680p
     expect(servedDirectories([at], repo)).toEqual([{ name: "some-ig", dir: pinned, route: "some-ig/fhir-artifact-index", computed: twin }]);
     rmSync(repo, { recursive: true, force: true });
   });
+
+  // smart-pcmt mounts dth-sc with an override for `glossary` only; dth-sc's
+  // declaration still marks `archimate/` served, and it is not in the checkout.
+  const dthSc = (repo: string, dirs: string[] | undefined) => {
+    writeFileSync(join(repo, "index.lock.json"), JSON.stringify({ instances: [{ instance: "dth-sc", path: "dth-sc", ...(dirs === undefined ? {} : { directories: dirs.map((id) => ({ id })) }) }] }));
+    const at = (id: string) => ({ name: "dth-sc", abs: join(repo, "dth-sc", id), entry: { id, path: `${id}/`, graphTypologies: [id], served: true } });
+    return [at("glossary"), at("archimate")];
+  };
+
+  it("serves only the directories the index mounts", () => {
+    const repo = mkdtempSync(join(tmpdir(), "served-scope-"));
+    expect(servedDirectories(dthSc(repo, ["glossary"]), repo).map((x) => x.route)).toEqual(["dth-sc/glossary"]);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it("a whole-layer mount (`id: \"*\"`) serves the whole declaration", () => {
+    const repo = mkdtempSync(join(tmpdir(), "served-scope-"));
+    expect(servedDirectories(dthSc(repo, ["*"]), repo).map((x) => x.route)).toEqual(["dth-sc/glossary", "dth-sc/archimate"]);
+    rmSync(repo, { recursive: true, force: true });
+  });
+
+  it("an index entry with no directories list serves the whole declaration", () => {
+    const repo = mkdtempSync(join(tmpdir(), "served-scope-"));
+    expect(servedDirectories(dthSc(repo, undefined), repo).map((x) => x.route)).toEqual(["dth-sc/glossary", "dth-sc/archimate"]);
+    rmSync(repo, { recursive: true, force: true });
+  });
 });
 
 describe("the URL space: several instances, each under its own name — bean cat-tools-sthf", () => {

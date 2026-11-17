@@ -11,7 +11,7 @@
  * @module cat-harness/scripts/navbar-client
  */
 import { RAIL_PAGE_ID, renderRailRegions, type RailPage } from "./lib/harness-rail.ts";
-import { wireNavFolds, wireNavResize } from "./lib/navbar.ts";
+import { wireNavAnchor, wireNavFolds, wireNavResize } from "./lib/navbar.ts";
 import { localisePageBar, localiseRail, navbarStringsFile, railLocale, railRootPath } from "./lib/navbar-locale.ts";
 
 declare const self: { FaRailData?: Record<string, string>; FaNavStrings?: Record<string, Record<string, string>> };
@@ -98,3 +98,5 @@ draw();
 wireNavFolds(document);
 // The drag edge (owner, 2026-11-10): after `draw`, which replaces the rail's contents.
 wireNavResize(document);
+// The reader keeps their place when the rail opens, closes or is dragged (owner, 2026-11-16).
+wireNavAnchor(document);

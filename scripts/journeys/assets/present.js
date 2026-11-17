@@ -3,7 +3,7 @@
    without it; it adds what a facilitator does in a room:
    - ← / PageUp and → / PageDown: the previous and next moment (the page's
      <link rel="prev|next">);
-   - W: reveal the "What if…"; T: show or hide what is under the hood;
+   - W: reveal the "What if…"; T: switch between the policy and the technical view (under the hood);
    - presenter mode: the presenter's note and the facilitator cue, on or off,
      remembered in this browser;
    - the gap strip's answers, remembered in this browser only;
@@ -21,6 +21,19 @@
   "use strict";
   var doc = document;
   var root = doc.documentElement;
+
+  // The page's catalogue for the words this script writes (`journeys/locales.ts`); English without one.
+  var I18N = (function () {
+    try {
+      var n = typeof document !== "undefined" && document.getElementById("jv-i18n");
+      return n ? JSON.parse(n.textContent) : {};
+    } catch (_e) {
+      return {};
+    }
+  })();
+  function T(s) {
+    return I18N[s] || s;
+  }
 
   function store(key, value) {
     try {
@@ -50,13 +63,28 @@
     });
   }
 
+  // Below the journey: the policy view or the technical one (under the hood), or,
+  // on a step with nothing for the table, the hood alone behind its toggle.
+  function hoodShown() {
+    var hood = doc.querySelector("[data-jp-hood]");
+    return Boolean(hood && !hood.hidden);
+  }
   function setHood(show) {
     var hood = doc.querySelector("[data-jp-hood]");
+    if (!hood) return;
+    var policy = doc.querySelector("[data-jp-policy]");
     var btn = doc.querySelector("[data-jp-hood-toggle]");
-    if (!hood || !btn) return;
     hood.hidden = !show;
-    btn.classList.toggle("is-on", show);
-    btn.setAttribute("aria-expanded", String(show));
+    if (policy) policy.hidden = show;
+    if (btn) {
+      btn.classList.toggle("is-on", show);
+      btn.setAttribute("aria-expanded", String(show));
+    }
+    each("[data-jp-lens]", function (b) {
+      var on = (b.getAttribute("data-jp-lens") === "technical") === show;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-selected", String(on));
+    });
     store("jp:hood", show ? "on" : "off");
   }
 
@@ -194,7 +222,7 @@
       a.target = "_blank";
       a.rel = "noopener";
       a.className = "jp-json-open";
-      a.textContent = "Open " + src.replace(/^.*\//, "");
+      a.textContent = T("Open") + " " + src.replace(/^.*\//, "");
       code.appendChild(a);
     }
     function load() {
@@ -202,7 +230,7 @@
       var pre = d.querySelector("[data-jp-pane]:not([hidden]) pre[data-jp-src]");
       if (!pre || pre.hasAttribute("data-jp-loading")) return;
       if (location.protocol === "file:") {
-        offline(pre, "This page is open from disk, so the JSON is in its own file:");
+        offline(pre, T("This page is open from disk, so the JSON is in its own file:"));
         return;
       }
       pre.setAttribute("data-jp-loading", "");
@@ -216,7 +244,7 @@
           pre.removeAttribute("data-jp-src");
         })
         .catch(function () {
-          offline(pre, "Could not load this payload here.");
+          offline(pre, T("Could not load this payload here."));
         })
         .then(function () {
           pre.removeAttribute("data-jp-loading");
@@ -250,9 +278,9 @@
         var pane = d.querySelector("[data-jp-pane]:not([hidden]) pre");
         if (!pane || pane.hasAttribute("data-jp-src") || !navigator.clipboard) return;
         navigator.clipboard.writeText(pane.textContent).then(function () {
-          copy.textContent = "Copied";
+          copy.textContent = T("Copied");
           setTimeout(function () {
-            copy.textContent = "Copy";
+            copy.textContent = T("Copy");
           }, 1500);
         });
       });
@@ -308,7 +336,7 @@
       report.statusOptions.forEach(function (o) {
         tr.appendChild(el("th", null, o.label));
       });
-      tr.appendChild(el("th", null, "Not rated"));
+      tr.appendChild(el("th", null, T("Not rated")));
       var thead = el("thead");
       thead.appendChild(tr);
       t.appendChild(thead);
@@ -359,20 +387,20 @@
       var grid = el("div", "jp-gr-grid");
       grid.appendChild(
         countsTable(
-          "Per moment",
+          T("Per moment"),
           report.perMoment.map(function (x) {
             return { link: stepLink(x.step), counts: x.counts };
           }),
-          "Moment",
+          T("Moment"),
         ),
       );
       grid.appendChild(
         countsTable(
-          "Per module",
+          T("Per module"),
           report.perModule.map(function (x) {
             return { label: (x.module ? x.module + " · " : "") + x.title, counts: x.counts };
           }),
-          "Module",
+          T("Module"),
         ),
       );
       body.appendChild(grid);
@@ -423,17 +451,137 @@
     window.addEventListener("storage", function (ev) {
       if (ev.key && ev.key.indexOf("jv:") === 0) draw();
     });
+    window.addEventListener("jv:sync", draw);
     draw();
   }
 
   // Write-ins and ticks kept in this browser (jv:<name>), as the gap strip keeps its
-  // ratings: a journey question's answer is one key on the walkthrough and the lab.
+  // ratings: a journey question's answer is one key wherever the question shows (its
+  // walkthrough step, and each lab step listing its module). Every box under one name
+  // shows the one answer: typed in one, the others on the page follow at once, other
+  // tabs follow by the `storage` event, and a page brought back by Back (the
+  // back/forward cache, or the browser restoring the form) reads the store again.
+  function sameName(el, fn) {
+    Array.prototype.forEach.call(doc.getElementsByName(el.name), function (x) {
+      if (x !== el) fn(x);
+    });
+  }
+  // An answer kept under the question's old key (`data-jv-was`: its step and position)
+  // moves to its own key the first time the question is shown.
+  // Several earlier keys, space-separated, are tried in order (a question that has
+  // since become a canvas field: its own key, then its step-and-position key).
+  function migrate(el) {
+    var was = el.getAttribute("data-jv-was");
+    if (!was || store("jv:" + el.name) !== null) return;
+    var keys = was.split(/\s+/);
+    for (var i = 0; i < keys.length; i++) {
+      if (!keys[i]) continue;
+      var old = store("jv:" + keys[i]);
+      if (old === null) continue;
+      store("jv:" + el.name, old);
+      forget("jv:" + keys[i]);
+      return;
+    }
+  }
   function keepText(el) {
     var key = "jv:" + el.name;
+    migrate(el);
     var v = store(key);
     if (v !== null) el.value = v;
     el.addEventListener("input", function () {
       store(key, el.value);
+      sameName(el, function (x) {
+        if (x.hasAttribute("data-jv-text") && x.value !== el.value) x.value = el.value;
+      });
+    });
+  }
+  var COUNTRY_ORIG = typeof WeakMap === "function" ? new WeakMap() : null;
+  // An element's attributes as they were before any renaming: { attr: value }.
+  var COUNTRY_ATTR_ORIG = typeof WeakMap === "function" ? new WeakMap() : null;
+  var COUNTRY_ATTRS = ["title", "aria-label", "alt"];
+  function renameCountries() {
+    var src = doc.getElementById("jp-countries");
+    if (!src || !COUNTRY_ORIG) return;
+    var list;
+    try {
+      list = JSON.parse(src.textContent);
+    } catch (_e) {
+      return;
+    }
+    var pairs = [];
+    list.forEach(function (c) {
+      var to = (store("jv:" + c.key) || "").trim();
+      if (to && to !== c.name) pairs.push([c.name, to]);
+    });
+    // Longest first, so "North Onesa" is renamed before "Onesa".
+    pairs.sort(function (a, b) {
+      return b[0].length - a[0].length;
+    });
+    function reEsc(t) {
+      return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    var res = pairs.map(function (pr) {
+      return [new RegExp("(^|[^\\p{L}\\p{N}])" + reEsc(pr[0]) + "(?=$|[^\\p{L}\\p{N}])", "gu"), pr[1]];
+    });
+    function sub(orig) {
+      var out = orig;
+      res.forEach(function (r) {
+        out = out.replace(r[0], function (_m, pre) {
+          return pre + r[1];
+        });
+      });
+      return out;
+    }
+    function kept(el) {
+      return el.closest && el.closest("[data-jp-countries-keep], .jp-countries");
+    }
+    // The page's own text, and the text of every drawing embedded as its own
+    // document (an ArchiMate view is an <object> SVG): its labels and titles.
+    var roots = [[doc, doc.body]];
+    each('object[type="image/svg+xml"]', function (o) {
+      var d;
+      try {
+        d = o.contentDocument;
+      } catch (_e) {
+        d = null;
+      }
+      if (d && d.documentElement) roots.push([d, d.documentElement]);
+    });
+    roots.forEach(function (r) {
+      var walker = r[0].createTreeWalker(r[1], 4, {
+        acceptNode: function (n) {
+          var p = n.parentNode;
+          if (!p || /^(SCRIPT|STYLE|TEXTAREA|OPTION|script|style)$/.test(p.nodeName)) return 2;
+          if (p.closest && p.closest("[data-jp-countries-keep], .jp-countries label > span")) return 2;
+          return 1;
+        },
+      });
+      var n;
+      while ((n = walker.nextNode())) {
+        var orig = COUNTRY_ORIG.get(n);
+        if (orig === undefined) {
+          if (!pairs.length) continue;
+          orig = n.nodeValue;
+        }
+        var out = sub(orig);
+        if (out !== orig) COUNTRY_ORIG.set(n, orig);
+        if (n.nodeValue !== out) n.nodeValue = out;
+      }
+      // Tooltips and accessible names: what a reader hovers or a screen reader says.
+      Array.prototype.forEach.call(r[1].querySelectorAll("[title], [aria-label], [alt]"), function (el) {
+        if (kept(el)) return;
+        var was = COUNTRY_ATTR_ORIG.get(el);
+        if (was === undefined && !pairs.length) return;
+        was = was || {};
+        COUNTRY_ATTRS.forEach(function (at) {
+          if (!el.hasAttribute(at)) return;
+          var o = Object.prototype.hasOwnProperty.call(was, at) ? was[at] : el.getAttribute(at);
+          var out = sub(o);
+          if (out !== o) was[at] = o;
+          if (el.getAttribute(at) !== out) el.setAttribute(at, out);
+        });
+        COUNTRY_ATTR_ORIG.set(el, was);
+      });
     });
   }
   function keepCheck(el) {
@@ -442,7 +590,31 @@
     if (v !== null) el.checked = v === "1";
     el.addEventListener("change", function () {
       store(key, el.checked ? "1" : "0");
+      sameName(el, function (x) {
+        if (x.hasAttribute("data-jv-check")) x.checked = el.checked;
+      });
     });
+  }
+  // Read every kept answer on the page from the store again; then whatever draws from
+  // the store (the gap report, the lab's summary) redraws on `jv:sync`.
+  function resync() {
+    each("[data-jv-text]", function (el) {
+      var v = store("jv:" + el.name);
+      if (v !== null && el.value !== v) el.value = v;
+    });
+    each("input[data-jv-check]", function (el) {
+      var v = store("jv:" + el.name);
+      if (v !== null) el.checked = v === "1";
+    });
+    each("input[data-jv-store]", function (el) {
+      var v = store("jv:" + el.name);
+      if (v !== null) el.checked = v === el.value;
+    });
+    try {
+      window.dispatchEvent(new Event("jv:sync"));
+    } catch (_e) {
+      /* no Event constructor: nothing redraws */
+    }
   }
   function forget(key) {
     try {
@@ -461,7 +633,7 @@
     function show(left) {
       var m = Math.floor(left / 60);
       var sec = left % 60;
-      label.textContent = "Stop · " + m + ":" + (sec < 10 ? "0" : "") + sec;
+      label.textContent = T("Stop") + " · " + m + ":" + (sec < 10 ? "0" : "") + sec;
     }
     b.addEventListener("click", function () {
       if (t) {
@@ -483,7 +655,7 @@
           t = null;
           b.classList.remove("is-on");
           b.classList.add("is-up");
-          label.textContent = "Time’s up · restart";
+          label.textContent = T("Time’s up · restart");
         }
       }, 1000);
     });
@@ -495,14 +667,20 @@
     var ws = box.getAttribute("data-jp-lab");
     var steps = box.querySelectorAll("[data-jp-lab-step]");
     var tabs = doc.querySelectorAll("[data-jp-lab-tab]");
-    function show(id, scroll) {
+    // The step an element of the page sits in (`#sheets`, `#sheet-s1`: the Table sheets panel in the summary).
+    function stepOf(id) {
+      var t = id ? doc.getElementById(id) : null;
+      var s = t && t.closest ? t.closest("[data-jp-lab-step]") : null;
+      return s ? s.getAttribute("data-jp-lab-step") : null;
+    }
+    function show(id, scroll, keepHash) {
       var found = false;
       Array.prototype.forEach.call(steps, function (s) {
         var on = s.getAttribute("data-jp-lab-step") === id;
         s.hidden = !on;
         found = found || on;
       });
-      if (!found) return show(steps[0].getAttribute("data-jp-lab-step"), scroll);
+      if (!found) return show(steps[0].getAttribute("data-jp-lab-step"), scroll, keepHash);
       Array.prototype.forEach.call(tabs, function (t) {
         var on = t.getAttribute("data-jp-lab-tab") === id;
         t.classList.toggle("is-on", on);
@@ -510,7 +688,7 @@
         else t.removeAttribute("aria-current");
       });
       store("jp:lab:" + ws, id);
-      if (history.replaceState) history.replaceState(null, "", "#lab-" + id);
+      if (history.replaceState && !keepHash) history.replaceState(null, "", "#lab-" + id);
       if (scroll) {
         var nav = doc.querySelector(".jp-lab-tabs");
         if (nav) nav.scrollIntoView({ block: "start" });
@@ -524,14 +702,20 @@
       });
     });
     var m = /^#lab-(.+)$/.exec(location.hash);
-    show(m ? m[1] : store("jp:lab:" + ws) || steps[0].getAttribute("data-jp-lab-step"), false);
+    var inner = !m && location.hash.length > 1 ? stepOf(decodeURIComponent(location.hash.slice(1))) : null;
+    if (inner) show(inner, false, true);
+    else show(m ? m[1] : store("jp:lab:" + ws) || steps[0].getAttribute("data-jp-lab-step"), false);
+    window.addEventListener("hashchange", function () {
+      var s = stepOf(decodeURIComponent(location.hash.slice(1)));
+      if (s) show(s, false, true);
+    });
 
     // The aside: the statement's first line and the ticked use cases.
     var text = box.querySelector("[data-jp-usecase]");
     var shown = box.querySelector("[data-jp-usecase-show]");
     var ticks = box.querySelector("[data-jp-usecase-ticks]");
     function aside() {
-      if (text && shown) shown.textContent = (text.value.split("\n")[0] || "No use case agreed yet. Agree one together in step 1.").trim();
+      if (text && shown) shown.textContent = (text.value.split("\n")[0] || T("No use case agreed yet. Agree one together in step 1.")).trim();
       if (!ticks) return;
       ticks.textContent = "";
       Array.prototype.forEach.call(box.querySelectorAll(".jp-uc input:checked"), function (c) {
@@ -642,16 +826,16 @@
           var last = sec.items.filter(function (i) {
             return i.type === "choice";
           })[0];
-          dl.appendChild(el("dt", null, last ? last.options[last.options.length - 1].label : "Not yet"));
+          dl.appendChild(el("dt", null, last ? last.options[last.options.length - 1].label : T("Not yet")));
           dl.appendChild(el("dd", null, worst.join(" · ")));
         }
         if (dl.childNodes.length) {
           any = true;
           block.appendChild(dl);
-        } else block.appendChild(el("p", "jp-small", "Nothing written yet."));
+        } else block.appendChild(el("p", "jp-small", T("Nothing written yet.")));
         out.appendChild(block);
       });
-      if (!any) out.insertBefore(el("p", "jp-small", "Nothing written yet. Work through the steps; what the table writes appears here."), out.firstChild);
+      if (!any) out.insertBefore(el("p", "jp-small", T("Nothing written yet. Work through the steps; what the table writes appears here.")), out.firstChild);
     }
     var printBtn = box.querySelector("[data-jp-lab-print]");
     if (printBtn) {
@@ -670,7 +854,7 @@
         function q(x) {
           return '"' + String(x).replace(/"/g, '""') + '"';
         }
-        var lines = [["Step", "Item", "Answer"].map(q).join(",")];
+        var lines = [[T("Step"), T("Item"), T("Answer")].map(q).join(",")];
         rows().forEach(function (r) {
           lines.push([r.sec.n + ". " + r.sec.label, r.it.group ? r.it.group + ": " + r.it.label : r.it.label, r.v.text].map(q).join(","));
         });
@@ -689,6 +873,7 @@
     window.addEventListener("storage", function (ev) {
       if (ev.key && ev.key.indexOf("jv:") === 0) drawSummary();
     });
+    window.addEventListener("jv:sync", drawSummary);
     drawSummary();
   }
 
@@ -697,7 +882,7 @@
   // presenter's and the hood's choices, jp:…), then start again at the overview.
   function reset(b) {
     b.addEventListener("click", function () {
-      if (!window.confirm("Reset the simulation? This forgets the room's answers and choices kept in this browser.")) return;
+      if (!window.confirm(T("Reset the simulation? This forgets the room's answers and choices kept in this browser."))) return;
       var ws = "jv:" + b.getAttribute("data-jp-reset") + ":";
       try {
         var drop = [];
@@ -804,11 +989,30 @@
         setHood(!b.classList.contains("is-on"));
       });
     });
-    if (store("jp:hood") === "off") setHood(false);
+    each("[data-jp-lens]", function (b) {
+      b.addEventListener("click", function () {
+        setHood(b.getAttribute("data-jp-lens") === "technical");
+      });
+      // The arrow keys move between the two tabs, as a tab list's do.
+      b.addEventListener("keydown", function (ev) {
+        if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        setHood(!hoodShown());
+        var to = doc.querySelector('[data-jp-lens="' + (hoodShown() ? "technical" : "policy") + '"]');
+        if (to) to.focus();
+      });
+    });
+    // Under the hood starts hidden (owner, 2026-11-17); shown when this browser last showed it.
+    if (store("jp:hood") === "on") setHood(true);
     each(".jp-proc", zoom);
     each("input[data-jv-store]", remember);
     each("[data-jv-text]", keepText);
     each("input[data-jv-check]", keepCheck);
+    window.addEventListener("storage", function (ev) {
+      if (ev.key === null || ev.key.indexOf("jv:") === 0) resync();
+    });
+    window.addEventListener("pageshow", resync);
     each("[data-jp-text-reset]", function (b) {
       b.addEventListener("click", function () {
         var name = b.getAttribute("data-jp-text-reset");
@@ -843,6 +1047,56 @@
       fit();
     });
     each("[data-jp-gapreport]", gapReport);
+    // The Table sheets panel (discuss/#sheets, where sheets/ redirects): an address
+    // naming it, or a sheet in it, opens it; its print button prints the sheets alone.
+    function openTarget() {
+      var id = location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : "";
+      var t = id ? doc.getElementById(id) : null;
+      if (!t || !t.closest) return;
+      var d = t.closest("details");
+      if (d) d.open = true;
+      t.scrollIntoView({ block: "start" });
+    }
+    openTarget();
+    window.addEventListener("hashchange", openTarget);
+    each("[data-jp-sheets-print]", function (b) {
+      b.addEventListener("click", function () {
+        var d = b.closest("details");
+        if (d) d.open = true;
+        root.classList.add("jp-print-sheets");
+        doc.body.classList.add("jv-print-sheets");
+        window.print();
+      });
+    });
+    window.addEventListener("afterprint", function () {
+      root.classList.remove("jp-print-sheets");
+      doc.body.classList.remove("jv-print-sheets");
+    });
+    // The room's own names for the fictional countries (owner, 2026-11-17): kept per
+    // workshop, put in place of the old names throughout the page's text, live.
+    renameCountries();
+    // An embedded drawing's document exists only once it has loaded.
+    each('object[type="image/svg+xml"]', function (o) {
+      o.addEventListener("load", renameCountries);
+    });
+    // What the scripts draw later (the gap report, the lab's summary) is renamed
+    // too: once per frame after nodes are added. Renaming itself changes only
+    // text and attributes, never the node list, so it does not call itself again.
+    if (window.MutationObserver) {
+      var renamePending = false;
+      new MutationObserver(function () {
+        if (renamePending) return;
+        renamePending = true;
+        (window.requestAnimationFrame || setTimeout)(function () {
+          renamePending = false;
+          renameCountries();
+        });
+      }).observe(doc.body, { childList: true, subtree: true });
+    }
+    each("[data-jp-country]", function (el) {
+      el.addEventListener("input", renameCountries);
+    });
+    window.addEventListener("jv:sync", renameCountries);
     each("[data-jv-print]", function (b) {
       b.addEventListener("click", function () {
         window.print();
@@ -857,8 +1111,7 @@
       else if (ev.key === "ArrowLeft" || ev.key === "PageUp") go = linkHref("prev");
       else if (ev.key === "w" || ev.key === "W") toggleWhatIf();
       else if (ev.key === "t" || ev.key === "T") {
-        var b = doc.querySelector("[data-jp-hood-toggle]");
-        if (b) setHood(!b.classList.contains("is-on"));
+        if (doc.querySelector("[data-jp-hood]")) setHood(!hoodShown());
       }
       if (go) {
         ev.preventDefault();

@@ -61,9 +61,12 @@ import { fileURLToPath } from "node:url";
 
 import { propertyIri, termIri } from "../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import { SOFTWARE_LIBRARY_SUBJECT_KIND, softwareLibraryNodes } from "./lib/software-library-nodes.ts";
 import { STANDARD_PREFIXES, applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "../schemas/content/vocab-mapping.js";
 import { readPolicyGrants } from "../schemas/content/odrl.js";
+import { TRANSLATION_SUBJECT_KIND, translationNodes } from "./lib/translation-nodes.ts";
 import { attestationNodes } from "./lib/attestation-nodes.ts";
+import { VOICE_SUBJECT_KIND, voiceNodes } from "./lib/voice-nodes.ts";
 import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "../schemas/kg/depends-on.js";
 import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "../schemas/process/role-graph.js";
@@ -142,6 +145,7 @@ import {
 import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
 import { subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
+import { THEME_SUBJECT_KIND, themeNodes } from "./lib/theme-nodes.ts";
 import { placedOut } from "./lib/moved-document.ts";
 import { hostSchemaBase } from "./lib/host-schema.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
@@ -2276,6 +2280,26 @@ function collectSchemas(doc: string, base: string, scope: CorpusScope = "checkou
  * DMN 1.3, ODRL, PROV-O, ...). They were a published page and not graph
  * nodes, so nothing in the graph could point at "BPMN". Owner, 2026-09-27.
  */
+/**
+ * One node per `.po` catalogue and `.pot` template the layer's OWN
+ * `translation-sources` directory holds (owner, 2026-11-13, node-kind audit:
+ * every listed node kind has an IRI, a JSON-LD document and a page). The IRI
+ * is `<doc dir>/translationSource/<path under the directory>`, ending kept, so
+ * `writeSubjectDocuments` serves it with its `.jsonld`; the translation-status
+ * viewer draws its page and links it (`lib/translation-nodes.ts`, the one
+ * reader of both). The strings stay in the file (`sourcePath`).
+ */
+function collectTranslationSources(doc: string, root: string = ROOT): Node[] {
+  return translationNodes(root).map((t) => ({
+    "@id": makeIri(doc, TRANSLATION_SUBJECT_KIND, t.id),
+    "@type": termIri("TranslationSource"),
+    title: t.title,
+    description: t.description,
+    sourceKind: "translation-sources",
+    sourcePath: t.sourcePath,
+  }));
+}
+
 function collectExternalSchemas(doc: string): Node[] {
   let specs: ReturnType<typeof loadSpecs>;
   try {
@@ -2410,6 +2434,26 @@ function linkSchemas(graph: Node[], root: string = ROOT): void {
  * activity's `performedBy` reaches the role here through its lane's
  * `roleRef`. Lane-derived Roles, keyed by lane name, gave one role two nodes.
  */
+/**
+ * One node per outside library the layer's OWN `software-library` directory
+ * holds (owner, 2026-11-13, node-kind audit: every listed node kind has an
+ * IRI, a JSON-LD document and a page). The IRI is
+ * `<doc dir>/softwareLibrary/<id>`, so `writeSubjectDocuments` serves it with
+ * its `.jsonld`; the layer's software-libraries page links it
+ * (`lib/software-library-nodes.ts`, the one reader of both). The pin, the
+ * digest and the licence stay in the file (`sourcePath`).
+ */
+function collectSoftwareLibraries(doc: string, root: string = ROOT): Node[] {
+  return softwareLibraryNodes(root).map((l) => ({
+    "@id": makeIri(doc, SOFTWARE_LIBRARY_SUBJECT_KIND, l.id),
+    "@type": termIri("SoftwareLibrary"),
+    title: l.title,
+    description: l.description,
+    sourceKind: "software-library",
+    sourcePath: l.sourcePath,
+  }));
+}
+
 function collectDeclaredRoles(
   doc: string,
   root: string = ROOT,
@@ -2522,6 +2566,25 @@ function collectAttestations(doc: string, root: string = ROOT): Node[] {
   }));
 }
 
+/**
+ * One node per voice the layer's OWN `voices` directory holds, sub-graphs
+ * included (owner, 2026-11-13, node-kind audit: every listed node kind has an
+ * IRI, a JSON-LD document and a page). The IRI is `<doc dir>/voice/<id>`, so
+ * `writeSubjectDocuments` serves it with its `.jsonld`; the voices viewer
+ * draws its page and links it (`lib/voice-nodes.ts`, the one reader of both).
+ * The rules stay in the file (`sourcePath`).
+ */
+function collectVoices(doc: string, root: string = ROOT): Node[] {
+  return voiceNodes(root).map((v) => ({
+    "@id": makeIri(doc, VOICE_SUBJECT_KIND, v.id),
+    "@type": termIri("Voice"),
+    title: v.title,
+    description: v.description,
+    sourceKind: "voices",
+    sourcePath: v.sourcePath,
+  }));
+}
+
 function collectGraphTypologies(root: string = ROOT): Node[] {
   // `fsh-guts` and anything else in UNPUBLISHED_GRAPH_TYPOLOGIES never reaches a
   // published graph. Filtered HERE, where the document is built, rather than
@@ -2602,6 +2665,26 @@ function collectGraphTypologies(root: string = ROOT): Node[] {
  * file is absent is a FINDING that `check-declared-assets` already raises, and
  * silently omitting it here would hide the node whose absence is the point.
  */
+/**
+ * One node per theme the layer's OWN `themes` directory declares (its
+ * `themes.ts` module's `INSTANCE_THEMES`; owner, 2026-11-13, node-kind audit:
+ * every listed node kind has an IRI, a JSON-LD document and a page). The IRI
+ * is `<doc dir>/theme/<id>`, so `writeSubjectDocuments` serves it with its
+ * `.jsonld`; the themes viewer draws its page and links it
+ * (`lib/theme-nodes.ts`, the one reader of both). The palette stays in the
+ * module (`sourcePath`).
+ */
+function collectThemes(doc: string, root: string = ROOT): Node[] {
+  return themeNodes(root).map((t) => ({
+    "@id": makeIri(doc, THEME_SUBJECT_KIND, t.id),
+    "@type": termIri("Theme"),
+    title: t.title,
+    description: t.description,
+    sourceKind: "themes",
+    sourcePath: t.sourcePath,
+  }));
+}
+
 function collectDeclaredAssets(doc: string, problems: string[], root: string = ROOT): Node[] {
   let assets: ReturnType<typeof declaredAssets>;
   try {
@@ -2785,10 +2868,13 @@ export async function collectInstanceNodes(
   const nodes = [
     ...collectSkills(doc, base, problems, root, corpusScopeFor(root), baseUrl),
     ...(await collectProcesses(doc, problems, root, notes, siteBase, corpusScopeFor(root), base)),
+    ...collectTranslationSources(doc, root),
     ...collectGraphTypologies(root),
     ...collectAttestations(doc, root),
+    ...collectVoices(doc, root),
     ...collectDeclaredRoles(doc, root),
     ...collectDeclaration(doc, problems, root),
+    ...collectThemes(doc, root),
     ...collectDeclaredAssets(doc, problems, root),
     // Every declared `tools` graph is read by discovery, so Tools are generic
     // (bean `tdir`). The type vocabulary is the harness's: `baseUrl`, the
@@ -2798,6 +2884,7 @@ export async function collectInstanceNodes(
     // (`auditSchemaNodes` takes the root), so a layer's schema modules are
     // published as nodes. `buildExport` links each to its `zod/` renderings.
     ...collectSchemas(doc, base, "instance", root),
+    ...collectSoftwareLibraries(doc, root),
   ];
   // A LINK TO AN OMITTED COLLECTOR'S NODES MUST NOT BE EMITTED.
   //
@@ -3400,11 +3487,15 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...(await collectProcesses(docIri, problems, ROOT, undefined, base, scope, base)),
           ...collectTools(docIri, base, problems, scope, ROOT, base || undefined),
           ...collectSchemas(docIri, base, scope),
+          ...collectTranslationSources(docIri, ROOT),
           ...collectExternalSchemas(docIri),
+          ...collectSoftwareLibraries(docIri, ROOT),
           ...collectGraphTypologies(),
           ...collectAttestations(docIri, ROOT),
+          ...collectVoices(docIri, ROOT),
           ...collectDeclaredRoles(docIri, ROOT, scope, base),
           ...collectDeclaration(docIri, problems),
+          ...collectThemes(docIri, ROOT),
           ...collectDeclaredAssets(docIri, problems),
         ]
   ).map(compact);
@@ -4063,12 +4154,15 @@ const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
 
 const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
   skill: "skills",
+  translationSource: "translation-sources",
   process: "processes",
   globalTask: "processes",
   decision: "processes",
+  softwareLibrary: "software-library",
   actor: "scenarios",
   role: "scenarios",
   capability: "scenarios",
+  theme: "themes",
   schema: "schemas",
   convention: "schemas",
   externalSchema: "external-schema",
@@ -4077,6 +4171,7 @@ const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
   directory: "cat-harness",
   asset: "cat-harness",
   package: "skills",
+  voice: "voices",
 };
 
 /**

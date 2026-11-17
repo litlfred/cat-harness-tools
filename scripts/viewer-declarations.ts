@@ -56,6 +56,7 @@ import { DEFAULT_LOCALE } from "../schemas/content/translation.js";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
 import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "../schemas/kg/visualiser-route.js";
 import { overlayPath } from "./lib/layer-output.ts";
+import { discoverTools } from "../tools/discover.ts";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────
 
@@ -182,6 +183,34 @@ export function writerFilesFor(repoRoot: string, names: readonly string[]): stri
     if (file === undefined || !existsSync(join(repoRoot, file))) return undefined;
     files.push(file);
   }
+  return files;
+}
+
+/**
+ * The writer of a visualiser BUILT ON THE HOST SITE (`builtOnHostSite`; bean
+ * folio-assistant-uldr): `derive:publish` builds its pages, sub-graph views
+ * included, on whichever site hosts its subjects, with the `renderedBy`
+ * Tool's `bun run cat <script>` (`hostSiteArtefacts`). So in a downstream
+ * checkout its page is built at publish there, not missing, and that script is
+ * its writer. `undefined` for any other visualiser, or a Tool whose shell is
+ * not that form, which `derive:publish` itself refuses.
+ */
+const hostSiteWriterCache = new Map<string, string[] | undefined>();
+export function hostSiteWriter(repoRoot: string, v: DeclaredVisualiser): string[] | undefined {
+  if ((v as { builtOnHostSite?: unknown }).builtOnHostSite === undefined) return undefined;
+  const key = `${resolve(repoRoot)}\0${resolve(v.harnessRoot)}\0${v.renderedBy}`;
+  if (hostSiteWriterCache.has(key)) return hostSiteWriterCache.get(key);
+  const shellOf = (t: unknown) => (t as { invoke?: { shell?: string } } | undefined)?.invoke?.shell;
+  let shell: string | undefined;
+  try {
+    const own = discoverTools(repoRoot, undefined, v.harnessRoot).tools.find((t) => t.id === v.renderedBy);
+    shell = shellOf(own ?? discoverTools(repoRoot).tools.find((t) => t.id === v.renderedBy));
+  } catch {
+    shell = undefined;
+  }
+  const name = /^bun run (?:cat )?(\S+)$/.exec(shell?.trim() ?? "")?.[1];
+  const files = name === undefined ? undefined : writerFilesFor(repoRoot, [name]);
+  hostSiteWriterCache.set(key, files);
   return files;
 }
 
@@ -317,6 +346,7 @@ function recordedRenderer(text: string): string | undefined {
 export function clearDeclaredVisualisers(): void {
   declaredCache.clear();
   heldCache.clear();
+  hostSiteWriterCache.clear();
 }
 
 /** The visualisers one Tool is declared to draw. */
@@ -621,6 +651,18 @@ export interface ViewedDirectory {
 }
 
 /**
+ * One viewer of a directory, as {@link viewersOf} returns it. `namesPage` is
+ * set when the viewer is a tile covering several kinds: its title is then the
+ * name of the page, on the harness rows as on the tile.
+ */
+export type ViewerOf = Visualisation & { title: string; namesPage?: true };
+
+/** Whether a resolved visualisation names its page (see {@link ViewerOf}). */
+export function namesPage(v: Visualisation): boolean {
+  return (v as ViewerOf).namesPage === true;
+}
+
+/**
  * Does visualiser `v` cover directory `d` of the layer named `owner`?
  *
  * - `covers`: only the declaring harness's own directories, by id;
@@ -662,7 +704,7 @@ export function viewersOf(
   repoRoot: string = repoRootFor(instanceRoot),
   /** The site directory the routes are under; default the site owner's (`siteOwnerDir`). */
   siteDir?: string,
-): Array<Visualisation & { title: string }> {
+): Array<ViewerOf> {
   // The OWNER is the layer whose declaration carries the entry: this one,
   // or — for an entry `siteDirectories` presented from the checkout root —
   // the root. A `repository`-scoped path resolves from the checkout either way.
@@ -681,7 +723,7 @@ export function viewersOf(
   if (owner === undefined) return [];
   const absDir = join(d.scope === "repository" ? repoRoot : instanceRoot, d.path);
   let site: string | undefined = siteDir;
-  const out: Array<Visualisation & { title: string }> = [];
+  const out: ViewerOf[] = [];
   for (const v of declaredVisualisers(repoRoot)) {
     if (!covers(v, d, owner, absDir, repoRoot)) continue;
     site ??= siteOwnerDir(repoRoot);
@@ -714,7 +756,7 @@ export function viewersOf(
     // tile instead.
     const subRef = subs
       .map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!))
-      .find((r) => existsSync(overlayPath(join(repoRoot, r))) || v.writer !== undefined || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
+      .find((r) => existsSync(overlayPath(join(repoRoot, r))) || v.writer !== undefined || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined || hostSiteWriter(repoRoot, v) !== undefined);
     // Covered BY KIND, a visualiser that draws per-sub-graph views covers a
     // directory only where it drew that directory's view: the full KG page of
     // a viewer that never reached this layer is not its viewer.
@@ -753,12 +795,27 @@ export function viewersOf(
     };
     const writer =
       v.writer?.map((w) => renderedPath(repoRoot, writerAt(w))) ??
-      (existsSync(overlayPath(join(repoRoot, ref))) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v)));
+      (existsSync(overlayPath(join(repoRoot, ref))) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v) ?? hostSiteWriter(repoRoot, v)));
     // The directory's tile is the DEFAULT dress; what a visualiser that NAMES
     // the directory declares about itself wins, since a directory drawn twice
     // needs two names, whereas a kind-covering visualiser's generic title
     // must not override the directory's own title or row label.
-    out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: (named ? v.title : undefined) ?? d.tile?.title ?? d.id });
+    //
+    // A TILE COVERING SEVERAL KINDS NAMES ITS OWN PAGE (owner, 2026-11-16).
+    // core's `bibliography` covers `references` and `catalogue`, and its page
+    // code calls every page it draws "Bibliography": a page shared by several
+    // kinds is named after none of them, so the tile's title is the page's
+    // name, and `namesPage` tells the harness rows (`labelVisualisations`) to
+    // print it too. A single-kind tile is left as above.
+    const shared = !named && (v.coversKinds ?? []).length > 1 && v.title !== undefined && v.title.trim() !== "";
+    out.push({
+      ...d.tile,
+      ...tile,
+      ...(writer ? { writer } : {}),
+      ref,
+      title: (named || shared ? v.title : undefined) ?? d.tile?.title ?? d.id,
+      ...(shared ? { namesPage: true as const } : {}),
+    });
   }
   return out;
 }

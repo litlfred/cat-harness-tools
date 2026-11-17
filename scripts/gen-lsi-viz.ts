@@ -43,7 +43,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { dirname, join, posix, relative, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { VIEWER_DIR } from "./lsi.ts";
+import { LSI_DOCS_ROOT, VIEWER_DIR } from "./lsi.ts";
 import { withRenderedByFrontMatter } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteArg, siteTarget } from "./lib/site-target.ts";
@@ -85,9 +85,10 @@ const REPO = resolve(dirname(HARNESS_ROOT));
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 /** `--site <dir>`: the same route under a site being built (`visualiser-writers.ts`). */
 const SITE = siteArg();
-const OUT = SITE === undefined ? join(VIEWER_DIR, "index.md") : join(SITE, relative(join(REPO, "cat-harness/docs"), VIEWER_DIR), "index.md");
+// The docs root comes from `lsi.ts`, which spells it once (cat-harness-tools#2385).
+const OUT = SITE === undefined ? join(VIEWER_DIR, "index.md") : join(SITE, relative(LSI_DOCS_ROOT, VIEWER_DIR), "index.md");
 /** The page's own path under the base docs layer, for relative links. */
-const PAGE_REL = relative(join(REPO, "cat-harness/docs"), join(VIEWER_DIR, "index.md")).split("\\").join("/");
+const PAGE_REL = relative(LSI_DOCS_ROOT, join(VIEWER_DIR, "index.md")).split("\\").join("/");
 /** The keyword viewer, a page under this one (cat-harness#1144, owner card "B"). */
 const KEYWORDS_OUT = join(dirname(OUT), "keywords", "index.md");
 const KEYWORDS_PAGE_REL = posix.join(posix.dirname(PAGE_REL), "keywords", "index.md");

@@ -58,6 +58,12 @@ describe("a step's title link", () => {
   test("leaves the SVG alone when the shape is not there", () => {
     expect(linkTitle(SVG, "Nope", "x", "y")).toBe(SVG);
   });
+
+  test("decodes a name's character references once, so they are not escaped twice", () => {
+    const b = linkOf(linkTitle(SVG, "A_Request", "x", "Sign with Country B&#x27;s key &amp; go"), TITLE_LINK_CLASS);
+    expect(b).toContain(`aria-label="Open step: Sign with Country B's key &amp; go"`);
+    expect(b).not.toContain("&amp;#x27;");
+  });
 });
 
 describe("a call activity's [+] link", () => {

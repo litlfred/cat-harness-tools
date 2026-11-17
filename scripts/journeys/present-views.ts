@@ -1,6 +1,6 @@
 /**
- * The presentation frame's other views: the journey map, the persona lens,
- * how it works, the discussion, the table sheets and the device demo — the
+ * The presentation frame's other views: the persona lens,
+ * how it works, the discussion (with the table sheets) and the device demo — the
  * tabs of the VaxLink walkthrough after its overview and walkthrough
  * (`present.ts`), each a page of its own in the same frame.
  *
@@ -11,11 +11,11 @@
  *
  * | path | view |
  * |---|---|
- * | `map/` | everyone, every step: a column per step, a lane per person, the record, pain points and enablers, and the technical layer; **Focus on** a person dims the rest, two toggles hide the pain points and the technical layer, a click on a column inspects that moment |
+ * | `map/` | a redirect to `how/`, which carries what the journey map's technical layer showed: the building blocks per moment, the business processes, and what moves between the moments ("Data on the move") |
  * | `personas/`, `personas/<actor>/` | one person end to end: goal, needs, frustrations, how they feel along the way, their touchpoints (`personas/` is the first of the cast) |
- * | `how/`, `how/<block>/` | the catalogue's big ideas, the building blocks × moments grid by layer, a block's detail with the moments it makes possible, the ArchiMate views of the taught journeys, the business processes |
+ * | `how/`, `how/<block>/` | the catalogue's big ideas, the building blocks × moments grid by layer, a block's detail with the moments it makes possible, the ArchiMate views of the taught journeys, what moves between the moments, the business processes |
  * | `discuss/` | the closing questions with the moments to revisit, the questions module by module, the tables with the moments that force each row, the gap list the walkthrough's gap strips assembled, every moment's policy takeaway |
- * | `sheets/` | the printable sheets, in the frame |
+ * | `sheets/` | a redirect to the Table sheets, now an expanding panel of `discuss/` (`#sheets`): in the lab’s summary step, or at the discussion’s foot |
  * | `demo/`, `demo/<screen>/` | the Device Demo: a screen per page with the moments it shows, both ways. The `device-screen` nodes that show a step the workshop presents, each drawn in its device frame with its owner beside it (`screens.ts`); only when there are none, the layer's own app framed, as the workshop's `presentation.deviceDemo` names it |
  *
  * VaxLink's own addresses (`#/map`, `#/personas/khamla`, `#/how/gdhcn`,
@@ -26,45 +26,40 @@
  * carry (no catalogue, no ArchiMate view, no device demo, no sheets) draws
  * what it has and says what it lacks, never a hard-coded stand-in.
  */
-import type { BuildingBlock } from "../../schemas/process/user-scenario.ts";
 import { escHtml } from "../thin-page.ts";
-import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
+import { journeyById, lookup, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
-import { moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
+import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, TOOL_ID, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
+import { canvasFormHtml, canvasModel, canvasSummaryItems, type AnnexQuestion } from "./canvas-form.ts";
+import { withRenderedBy } from "../viewer-declarations.ts";
 import {
   avatar,
-  chapterScene,
   stepsExampleKeys,
   viewDrawer,
-  countryTones,
   demoLabel,
   deviceGlyph,
   emotionBadge,
   examplePage,
   EMOTION,
-  mentionedChips,
   ext,
   frame,
   glyph,
   icon,
   iconPaths,
   LAYER_TONES,
-  ladderOf,
   fromSite,
   personaHref,
   personaNameHtml,
   personaText,
   processLinks,
-  rungOf,
-  sceneStrip,
   screenHref,
-  screensFor,
   siteRootFrom,
-  trustColor,
   answerBox,
   questionKey,
+  legacyQuestionKey,
+  earlierKeys,
   type Presentation,
   type PresentedStep,
   type View,
@@ -121,167 +116,49 @@ export function blockUsage(p: Presentation, block: string): { s: PresentedStep; 
   return p.steps.flatMap((s) => (s.step.uses ?? []).filter((u) => u.block === block).map((u) => ({ s, role: u.role })));
 }
 
-// ── the journey map ──────────────────────────────────────────────────────
+// ── the journey map, folded into How it works ────────────────────────
 
-/** The BPMN drawings the map shows as thumbnails, copied beside it: one file per process. */
-function drawingFile(process: string): string {
-  return `bpmn/${process.replace(/\.bpmn$/, "").replace(/[^A-Za-z0-9._-]+/g, "-")}.svg`;
+/**
+ * Where `map/` was (owner, 2026-11-17: merge its "Under the hood" into How it
+ * works and drop it): a redirect to `how/`. The map's technical rows were the
+ * building blocks per moment (How it works' grid), the business processes (its
+ * BPMN list) and the hand-offs, now How it works' "Data on the move".
+ */
+export function mapRedirect(): string {
+  const to = "../how/";
+  return withRenderedBy(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Journey map: now in How it works</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="${to}">
+<script>location.replace("${to}" + location.search);</script>
+<meta http-equiv="refresh" content="0; url=${to}">
+</head><body><p>The journey map’s technical layer is in <a href="${to}">How it works</a>.</p></body></html>
+`, TOOL_ID);
 }
 
-function mapPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): string {
-  const a = at(1, links);
-  const pr = p.w.workshop.presentation ?? {};
-  const steps = p.steps;
-  const tones = countryTones(p.chapters.map((c) => c.journey.scenario.country));
-  const cell = (s: PresentedStep, inner: string, cls = "") => `<div class="jp-mc${cls ? ` ${cls}` : ""}" data-col="${s.index}">${inner}</div>`;
-  const label = (inner: string, cls = "") => `<div class="jp-ml${cls ? ` ${cls}` : ""}">${inner}</div>`;
-  const row = (attrs: string, l: string, cells: string) => `<div class="jp-mr"${attrs}>${l}${cells}</div>`;
-  const chapters = row(
-    ' data-row="chapter"',
-    label("Chapter", "jp-ml-dark"),
-    p.chapters
-      .map((c, i) => {
-        const j = c.journey.scenario;
-        return `<div class="jp-mchap" style="grid-column:span ${c.steps.length}"><span class="jp-mchap-n">${i + 1}</span>${sceneStrip(chapterScene(c), tones.get(j.country ?? "") ?? "sky", "sm")}<b>${e(c.title)}</b>${j.when ? `<small>${e(j.when)}</small>` : ""}</div>`;
-      })
-      .join(""),
-  );
-  const moments = row(
-    ' data-row="moment"',
-    label("Moment", "jp-ml-mono"),
-    steps
-      .map((s) =>
-        cell(
-          s,
-          `<a class="jp-mmoment" href="${e(walkHref(a, s))}" data-jp-col="${s.index}"><span class="jp-mrow"><span class="jp-mono jp-mcode">${e(s.step.id)}</span>${s.step.when ? `<small>${e(s.step.when)}</small>` : ""}</span><b>${e(s.step.title)}</b>${s.step.where ? `<small>${e(s.step.where)}</small>` : ""}${s.step.touchpoint ? `<small class="jp-mtouch">${icon("phone")}${e(s.step.touchpoint)}</small>` : ""}</a>`,
-          "jp-mc-moment",
-        ),
-      )
-      .join(""),
-  );
-  const lanes = p.cast
-    .map((x) =>
-      row(
-        ` data-row="lane" data-actor="${e(x.id)}" style="--c:${e(x.color)}"`,
-        label(`${avatar(x)}<span><b>${e(x.name)}</b>${x.role ? `<small>${e(x.role)}</small>` : ""}</span>`, "jp-ml-person"),
-        steps
-          .map((s) => {
-            const ex = s.step.experiences.find((y) => y.actor === x.id);
-            if (!ex) return cell(s, "", "jp-mc-empty");
-            const lead = s.step.lead === x.id;
-            return cell(s, `<div class="jp-mcard${lead ? " is-lead" : ""}"><div class="jp-mcard-h">${emotionBadge(ex.emotion)}${mentionedChips(ex.doing, p.cast, x.id)}${lead ? '<span class="jp-lead">Lead</span>' : ""}</div><p>${personaText(ex.doing, p.cast)}</p>${ex.feeling ? `<p class="jp-feel">${e(ex.feeling)}</p>` : ""}</div>`);
-          })
-          .join(""),
-      ),
-    )
-    .join("");
-  const subject = pr.recordOf ? (p.cast.find((x) => x.id === pr.recordOf)?.name ?? undefined) : undefined;
-  const hasRecord = steps.some((s) => s.step.record);
-  const record = hasRecord
-    ? row(
-        ' data-row="record"',
-        label(`${icon("package", "jp-emerald")}<span><b>${e(subject ? `${subject}’s record` : "The record")}</b><small>How far it can be trusted</small></span>`, "jp-ml-icon"),
-        steps
-          .map((s) => {
-            const r = s.step.record;
-            if (!r) return cell(s, "");
-            const ladder = ladderOf(corpus, s.journey);
-            const lv = rungOf(ladder, s.step);
-            const bars = ladder && lv >= 0 ? `<span class="jp-mbars">${ladder.map((_, i) => `<i style="${i <= lv ? `background:${trustColor(i, ladder.length)}` : ""}"></i>`).join("")}</span>` : "";
-            return cell(s, `${bars}<b class="jp-mstate">${e(ladder && lv >= 0 ? ladder[lv]!.label : r.state)}</b><p>${personaText(r.description, p.cast)}</p><small>Held in: ${e(r.heldWhere)}</small>`, "jp-mc-record");
-          })
-          .join(""),
-      )
-    : "";
-  const textRow = (group: string, cls: string, ic: string, title: string, sub: string, pick: (s: PresentedStep) => string | undefined) =>
-    steps.some((s) => pick(s))
-      ? row(` data-row="${cls}" data-jp-group="${group}"`, label(`${ic}<span><b>${e(title)}</b><small>${e(sub)}</small></span>`, `jp-ml-icon jp-ml-${cls}`), steps.map((s) => cell(s, pick(s) ? `<p>${personaText(pick(s)!, p.cast)}</p>` : "", `jp-mc-${cls}`)).join(""))
-      : "";
-  const pain = textRow("pain", "pain", icon("alert", "jp-rose"), "Pain point", "Without this system", (s) => s.step.painPoint);
-  const enabler = textRow("pain", "enabler", icon("sparkles", "jp-sky"), "What makes it work", "The enabler, in plain words", (s) => s.step.enabler);
-  // The technical layer.
-  const cat = catalogueOf(corpus, p);
-  const layers = cat?.layers ?? [];
-  const blockChip = (b: BuildingBlock, role: string, tone: string) => `<a class="jp-mblock jp-layer-${tone}" href="${e(`${a.toWorkshop}how/${b.id}/`)}" title="${e(`${b.name}: ${role}`)}">${e(b.short ?? b.name)}</a>`;
-  const techHead = row(' data-row="tech" data-jp-group="tech"', label(`${icon("cpu", "jp-sky3")}<b>Under the hood</b>`, "jp-ml-dark"), `<div class="jp-mtech" style="grid-column:span ${steps.length}">The standards and tools that make each moment possible. A chip opens the block in How it works.</div>`);
-  const layerRows = layers
-    .map((l, li) => {
-      const tone = LAYER_TONES[li % LAYER_TONES.length]!;
-      return row(
-        ` data-row="layer" data-jp-group="tech"`,
-        label(`<i class="jp-dot jp-layer-${tone}"></i><span><b>${e(l.label)}</b>${l.question ? `<small>${e(l.question)}</small>` : ""}</span>`, `jp-ml-icon jp-ml-layer jp-layer-${tone}`),
-        steps
-          .map((s) =>
-            cell(
-              s,
-              (s.step.uses ?? [])
-                .map((u) => ({ u, b: cat?.blocks.get(u.block) }))
-                .filter((x) => x.b?.layer === l.id)
-                .map((x) => blockChip(x.b!, x.u.role, tone))
-                .join(""),
-              "jp-mc-chips",
-            ),
-          )
-          .join(""),
-      );
+/**
+ * What moves between the moments, one row per step that hands something on:
+ * from whom to whom, how it travels, online or offline, and what the next step
+ * receives. The rest of the map's technical layer is already in How it works.
+ */
+function dataOnTheMove(p: Presentation, a: At): string {
+  const steps = p.steps.filter((s) => s.step.handoff);
+  if (steps.length === 0) return "";
+  const end = (v: string | undefined) => {
+    if (!v) return undefined;
+    const pv = p.cast.find((x) => x.id === v);
+    return `${pv ? avatar(pv, "sm") : ""}${e(pv?.name ?? v)}`;
+  };
+  const rows = steps
+    .map((s) => {
+      const h = s.step.handoff!;
+      const ends = [end(h.from), end(h.to)].filter(Boolean).join(" → ");
+      const net = h.offline !== undefined ? `<span class="jp-net ${h.offline ? "is-off" : "is-on"}">${icon(h.offline ? "wifioff" : "wifi")}${h.offline ? "Offline" : "Online"}</span>` : "";
+      return `<tr><th scope="row">${stepChip(a, s, s.step.id, true)}</th><td>${ends ? `<b>${ends}</b>` : ""}${h.carrier ? `<small>${e(h.carrier)}</small>` : ""}${net}</td><td><p class="jp-mhand">${icon("arrow")}<span>${personaText(h.summary, p.cast)}</span></p></td></tr>`;
     })
     .join("");
-  const who = (v: string | undefined) => (v ? (p.cast.find((x) => x.id === v)?.name ?? v) : undefined);
-  const moveRow = steps.some((s) => s.step.handoff?.carrier || s.step.handoff?.from)
-    ? row(
-        ' data-row="move" data-jp-group="tech"',
-        label(`${glyph("transfer")}<span><b>Data on the move</b><small>From → to, and how</small></span>`, "jp-ml-icon"),
-        steps
-          .map((s) => {
-            const h = s.step.handoff;
-            if (!h) return cell(s, "");
-            const end = (v: string | undefined) => {
-              const pv = v ? p.cast.find((x) => x.id === v) : undefined;
-              return who(v) ? `${pv ? avatar(pv, "sm") : ""}${e(who(v)!)}` : undefined;
-            };
-            const ends = who(h.from) || who(h.to) ? `<p class="jp-mends"><b>${[end(h.from), end(h.to)].filter(Boolean).join(" → ")}</b></p>` : "";
-            return cell(s, `${ends}${h.carrier ? `<small>${e(h.carrier)}</small>` : ""}${h.offline !== undefined ? `<span class="jp-net ${h.offline ? "is-off" : "is-on"}">${icon(h.offline ? "wifioff" : "wifi")}${h.offline ? "Offline" : "Online"}</span>` : ""}`);
-          })
-          .join(""),
-      )
-    : "";
-  const handoffRow = steps.some((s) => s.step.handoff)
-    ? row(' data-row="handoff" data-jp-group="tech"', label(`${icon("arrow")}<span><b>Hand-off</b><small>What moves to the next step</small></span>`, "jp-ml-icon"), steps.map((s) => cell(s, s.step.handoff ? `<p class="jp-mhand">${icon("arrow")}<span>${personaText(s.step.handoff.summary, p.cast)}</span></p>` : "")).join(""))
-    : "";
-  const procRow = steps.some((s) => s.step.realisedBy?.length)
-    ? row(
-        ' data-row="process" data-jp-group="tech"',
-        label(`${icon("workflow")}<span><b>Business process</b><small>The BPMN in the IG</small></span>`, "jp-ml-icon"),
-        steps
-          .map((s) =>
-            cell(
-              s,
-              (s.step.realisedBy ?? [])
-                .map((r) => {
-                  const d = processDrawing(corpus, s.journey.instance, r.process);
-                  const name = processName(corpus, s.journey.instance, r.process) ?? r.process;
-                  return `<div class="jp-mproc">${d ? `<img src="${e(drawingFile(r.process))}" alt="" loading="lazy">` : ""}<small>${e(name)}</small><span class="jp-mproc-links">${processLinks(corpus, pr, s.journey, r.process, a.siteRoot)}${sourceHref(corpus, s.journey.instance, r.process) ? ext(sourceHref(corpus, s.journey.instance, r.process)!, "BPMN") : ""}</span></div>`;
-                })
-                .join(""),
-            ),
-          )
-          .join(""),
-      )
-    : "";
-  const panels = steps
-    .map((s, i) => {
-      const sc = screensFor(p, s);
-      return `<section class="jp-card jp-msel" data-jp-panel="${s.index}"${i === 0 ? "" : " hidden"}><div><div class="jp-small"><b class="jp-mono jp-sky">${e(s.step.id)}</b>${s.step.when ? ` ${e(s.step.when)}` : ""}${s.step.where ? ` · ${e(s.step.where)}` : ""}</div><h3>${e(s.step.title)}</h3>${s.step.headline ? `<p>${personaText(s.step.headline, p.cast)}</p>` : ""}</div><div class="jp-msel-act"><a class="jp-btn-dark" href="${e(walkHref(a, s))}">${icon("play")} Present this moment</a>${sc.map((x) => `<a class="jp-btn-line" href="${e(`${a.toWorkshop}demo/${x.id}/`)}">${deviceGlyph(x)} Open screen ${e(x.id)}</a>`).join("")}</div></section>`;
-    })
-    .join("");
-  const focus = `<div class="jp-mfilter" role="group" aria-label="Focus on"><span>Focus on:</span><button type="button" class="is-on" data-jp-focus="">Everyone</button>${p.cast.map((x) => `<button type="button" data-jp-focus="${e(x.id)}"><i style="background:${e(x.color)}"></i>${e(x.name)}</button>`).join("")}<label><input type="checkbox" checked data-jp-show="pain"> Pain points &amp; enablers</label>${cat ? `<label><input type="checkbox" checked data-jp-show="tech"> Technical layer</label>` : ""}</div>`;
-  const body = `<section class="jp-vhead"><h2>Journey map</h2><p>Read across to follow one person. Read down to see everyone at one moment. Click a column to inspect it.</p></section>
-${focus}
-<div class="jp-card jp-map-scroll" tabindex="0"><div class="jp-mapgrid" data-jp-map style="--n:${steps.length}">
-${[chapters, moments, lanes, record, pain, enabler, cat ? techHead + layerRows : "", moveRow, handoffRow, procRow].join("\n")}
-</div></div>
-${panels}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "map", title: `Journey map — ${presentationName(p)}`, ...note(p, "map"), body, foot: drawerOf(corpus, p, a, p.steps, "Journey map") });
+  return `<section class="jp-card jp-pad jp-move" id="data-on-the-move"><h3 class="jp-h2">${glyph("transfer")} Data on the move</h3><p class="jp-small">What each moment hands to the next: from whom to whom, how it travels, and what the next moment receives.</p>
+<div class="jp-move-scroll"><table class="jp-move-t"><thead><tr><th scope="col">Moment</th><th scope="col">From → to, and how</th><th scope="col">Hand-off</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 }
 
 // ── the persona lens ─────────────────────────────────────────────────────
@@ -439,7 +316,7 @@ ${layers
     : `<section class="jp-card jp-pad"><p class="jp-small">No building-block catalogue is declared for ${e(p.w.instance)}: declare one (a directory of the <code>building-blocks</code> kind) and the grid draws.</p></section>`;
   const b = selected ? cat?.blocks.get(selected) : undefined;
   const elementList = (els: readonly ArchimateElementLink[]) =>
-    `<ul class="jp-amels">${els.map((x) => `<li>${ext(a.siteRoot + x.page, x.name, "", DAK_ATTR)} <small>${e(x.type)}</small></li>`).join("")}</ul>`;
+    `<ul class="jp-amels">${els.map((x) => `<li>${ext(a.siteRoot + x.page, x.name, "", DAK_ATTR)} <small>${e(x.type)}</small>${haveMark(p, x)}</li>`).join("")}</ul>`;
   const blockEls = b ? (links.archimateBlock?.(p.w.instance, b.id) ?? []) : [];
   const detail = b
     ? `<aside class="jp-card jp-bdetail"><span class="jp-lchip jp-layer-${toneOf(b.layer)}">${e(layers.find((l) => l.id === b.layer)?.label ?? b.layer)}</span><h3>${e(b.name)}</h3><small>${glyph("clinic")} ${e([b.owner, b.jurisdiction].filter(Boolean).join(" · "))}</small>
@@ -489,8 +366,43 @@ ${archHtml}
 ${viewsHtml}
 ${ideasHtml}
 <div class="jp-howgrid" id="jp-blocks">${matrix}${detail}</div>
+${dataOnTheMove(p, a)}
 ${procHtml}`;
   return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "how", title: `${b ? `${b.name} — ` : ""}How it works — ${presentationName(p)}`, ...note(p, "how"), body, foot: b ? drawerOf(corpus, p, a, blockUsage(p, b.id).map((x) => x.s), b.short ?? b.name, `where ${b.short ?? b.name} is used`) : drawerOf(corpus, p, a, steps, "How it works") });
+}
+
+// ── "we have this" (owner, 2026-11-17) ───────────────────────────────────
+
+/** The ArchiMate type a room marks as its own. */
+const MARKABLE = "Application Component";
+
+/** An element's id for its keys: the last segment of its page (`…/element/<id>/`), kebab. */
+export function elementSlug(x: ArchimateElementLink): string {
+  const seg = x.page.replace(/\/(index\.html)?$/, "").split("/").pop() ?? x.name;
+  return seg.replace(/\.html$/, "").replace(/[^A-Za-z0-9-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "element";
+}
+
+/** Where a room's mark on an element is kept (`jv:` + this): `<workshop>:am:<element>:have` ("1") and `…:name` (its local name). */
+export const elementKey = (workshop: string, x: ArchimateElementLink, part: "have" | "name"): string => `${workshop}:am:${elementSlug(x)}:${part}`;
+
+/** An application component's "We have this" tick and the room's own name for it; nothing for any other element. */
+function haveMark(p: Presentation, x: ArchimateElementLink): string {
+  if (x.type !== MARKABLE) return "";
+  const ws = p.w.workshop.id;
+  return `<span class="jp-have"><label><input type="checkbox" name="${e(elementKey(ws, x, "have"))}" data-jv-check> We have this</label><input type="text" class="jp-answer jp-have-name" name="${e(elementKey(ws, x, "name"))}" data-jv-text placeholder="Our name for it" aria-label="${e(`Our name for ${x.name}`)}"></span>`;
+}
+
+/** The application components a workshop's How it works shows, once each: the architecture panel's, then its views'. */
+function markableElements(p: Presentation, links: SiteLinks): ArchimateElementLink[] {
+  const pr = p.w.workshop.presentation ?? {};
+  const out = new Map<string, ArchimateElementLink>();
+  const add = (x: ArchimateElementLink) => {
+    if (x.type === MARKABLE && !out.has(elementSlug(x))) out.set(elementSlug(x), x);
+  };
+  const panel = pr.architecture ? links.archimateArchitecture?.(p.w.instance, pr.architecture) : undefined;
+  for (const r of panel?.rows ?? []) for (const c of r.cells) for (const b of c) add(b);
+  for (const v of viewsOf(p)) for (const x of links.archimateView?.(v.instance, v.model, v.view)?.elements ?? []) add(x);
+  return [...out.values()];
 }
 
 // ── the architecture panel (JV-13) ───────────────────────────────────────
@@ -530,7 +442,7 @@ function architectureHtml(p: Presentation, a: At, spec: ArchitectureSpec, panel:
                 ? cell
                     .map((b) => {
                       const ms = moments(b.bpmn);
-                      return `<div class="jp-arch-box"><small>${el(b.block)}</small><b>${el(b)}</b>${b.ig ? ext(b.ig, "IG page", "jp-arch-ig") : ""}${ms.length ? `<span class="jp-arch-ms">${ms.map((s) => stepChip(a, s, s.step.id)).join("")}</span>` : ""}</div>`;
+                      return `<div class="jp-arch-box"><small>${el(b.block)}</small><b>${el(b)}</b>${b.ig ? ext(b.ig, "IG page", "jp-arch-ig") : ""}${ms.length ? `<span class="jp-arch-ms">${ms.map((s) => stepChip(a, s, s.step.id)).join("")}</span>` : ""}${haveMark(p, b)}</div>`;
                     })
                     .join("")
                 : `<i>Not needed in this journey</i>`
@@ -548,6 +460,52 @@ function architectureHtml(p: Presentation, a: At, spec: ArchitectureSpec, panel:
 
 // ── the discussion ───────────────────────────────────────────────────────
 
+// ── the canvas as a form (owner, 2026-11-17) ─────────────────────────────
+
+/** Every journey question of the workshop, with the key its answer is kept under and the canvas field it is, if any. */
+function journeyQuestions(p: Presentation): AnnexQuestion[] {
+  const ws = p.w.workshop;
+  return p.steps.flatMap((s) => (s.ws?.questions ?? []).map((q) => ({ step: s.step.id, stepKey: s.key, module: q.module, text: q.text, key: questionKey(ws.id, s.ws!, q), ...(q.canvas ? { canvas: q.canvas } : {}) })));
+}
+
+/** Per canvas field ref, the keys its answer may have been kept under before: the journey questions that are it. */
+function canvasWas(p: Presentation): Map<string, string> {
+  const ws = p.w.workshop;
+  const out = new Map<string, string>();
+  for (const s of p.steps) (s.ws?.questions ?? []).forEach((q, i) => {
+    if (q.canvas && !out.has(q.canvas)) out.set(q.canvas, earlierKeys(ws.id, s.ws!, q, legacyQuestionKey(ws.id, s, i)));
+  });
+  return out;
+}
+
+/** The canvas sheets `ids` (all when absent) as the on-screen form. */
+function canvasForm(p: Presentation, a: At, ids?: readonly string[]): string {
+  const ws = p.w.workshop;
+  if (!ws.canvas) return "";
+  const qs = journeyQuestions(p);
+  return `<div class="jp-cv">${canvasFormHtml(ws.id, ws.canvas, qs, {
+    ...(ids ? { ids } : {}),
+    scale: ws.assessment?.scales[0]?.options,
+    was: canvasWas(p),
+    stepLink: (q) => stepChip(a, p.steps.find((s) => s.key === q.stepKey), q.step),
+    answerBox: (name, label) => answerBox(name, label, 2),
+  })}</div>`;
+}
+
+/** The button that writes the canvas out as an editable, pre-filled PDF, and (once a page) the model it writes from. */
+function canvasPdf(p: Presentation, withModel = true): string {
+  const ws = p.w.workshop;
+  if (!ws.canvas) return "";
+  const model = canvasModel(ws.id, ws.canvas, journeyQuestions(p), ws.assessment?.scales[0]?.options);
+  return `<div class="jp-cv-pdf jp-noprint"><button type="button" class="jp-btn-dark" data-jp-canvas-pdf>${icon("file")} Download the ${e(ws.canvas.title)} (editable PDF, ${e(ws.canvas.size ?? "A3")})</button><span class="jp-small">Filled in with this browser’s answers; every field stays editable in a PDF reader.</span>${withModel ? `<script type="application/json" data-jp-canvas-model>${jsonInHtml(model)}</script>` : ""}</div>`;
+}
+
+/** The discussion's head: the gap report's script, the sheets' styles when it carries the Table sheets, and the canvas PDF writer when the workshop has a canvas. */
+function discussHead(p: Presentation, a: At, gap: boolean): { head?: string } {
+  const head = [gap ? `<script src="${a.root}assets/gap-report.js" defer></script>` : "", hasSheets(p) ? `<link rel="stylesheet" href="${a.root}assets/journeys.css">` : "", p.w.workshop.canvas ? `<script src="${a.root}assets/canvas-pdf.js" defer></script>` : ""].filter(Boolean).join("\n");
+  return head ? { head } : {};
+}
+
 function discussPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): string {
   if (p.w.workshop.lab) return labPage(corpus, p, links, p.w.workshop.lab);
   const a = at(1, links);
@@ -562,7 +520,7 @@ function discussPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): 
       const qs = p.steps.flatMap((s) => (s.ws?.questions ?? []).filter((q) => q.module === m.id).map((q) => ({ s, q })));
       if (qs.length === 0) return "";
       const sheet = ws.sheets?.find((x) => x.id === m.sheet);
-      return `<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m.id)}<b>${e(m.title)}</b><small>${e([m.day ? `Day ${m.day}` : "", sheet?.label ?? ""].filter(Boolean).join(" · "))}</small></div>${m.carries ? `<p class="jp-dm-c">${e(m.carries)}</p>` : ""}<ul>${qs.map(({ s, q }) => `<li>${stepChip(a, s, s.step.id)}<span>${e(q.text)}</span></li>`).join("")}</ul></div>`;
+      return `<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m.id)}<b>${e(m.title)}</b><small>${m.day ? `<span class="jp-presenter-only">Day ${m.day}${sheet?.label ? " · " : ""}</span>` : ""}${e(sheet?.label ?? "")}</small></div>${m.carries ? `<p class="jp-dm-c">${e(m.carries)}</p>` : ""}<ul>${qs.map(({ s, q }) => `<li>${stepChip(a, s, s.step.id)}<span>${e(q.text)}</span></li>`).join("")}</ul></div>`;
     })
     .join("");
   const tables = (ws.tables ?? [])
@@ -589,9 +547,11 @@ ${cards ? `<div class="jp-dqs">${cards}</div>` : ""}
 ${ws.promise ? `<section class="jp-promise"><b>The scope promise.</b> ${e(ws.promise)}</section>` : ""}
 ${byModule ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("message", "jp-indigo")} The journey’s questions, module by module</h3><div class="jp-dms">${byModule}</div></section>` : ""}
 ${tables}
+${ws.canvas ? `<section class="jp-card jp-pad jp-cv-wrap" id="canvas"><h3 class="jp-h">${icon("clipboard", "jp-indigo")} ${e(ws.canvas.title)}</h3>${ws.canvas.description ? `<p class="jp-small">${e(ws.canvas.description)}</p>` : ""}${canvasPdf(p)}${canvasForm(p, a)}</section>` : ""}
 ${gap}
-${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(gap ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}
+${sheetsPanel(corpus, p)}`;
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussHead(p, a, Boolean(gap)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
 }
 
 // ── the discussion as a lab ──────────────────────────────────────────────
@@ -727,12 +687,19 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
         .join("");
       out.push(`<div class="jp-gap jp-lab-caps">${rows}${ws.assessment?.standingLine ? `<p class="jp-standing">${e(ws.assessment.standingLine)}</p>` : ""}<p class="jp-small">The same ratings as each moment’s gap strip in the walkthrough. The gap report is in the summary.</p></div>`);
     }
+    if (st.canvas?.length && ws.canvas) {
+      for (const g of canvasSummaryItems(ws.id, ws.canvas, scales[0]?.options)) if (st.canvas.includes(g.sheet.id)) items.push(...g.items);
+      const qs = journeyQuestions(p);
+      for (const sh of ws.canvas.sheets.filter((x) => st.canvas!.includes(x.id))) for (const q of qs.filter((x) => x.canvas === undefined && (sh.modules ?? []).includes(x.module))) items.push({ label: `${q.step} · ${q.text}`, name: q.key, type: "text" });
+      out.push(canvasPdf(p, st.id === lab.steps.find((x) => x.canvas?.length)?.id), canvasForm(p, a, st.canvas));
+    }
+    if (st.matrix) out.push(matrixHtml(corpus, p, a, mod));
     for (const m of st.modules ?? []) {
       const module = ws.modules.find((x) => x.id === m);
       const qs = p.steps.flatMap((s) => (s.ws?.questions ?? []).map((q, i) => ({ s, q, i })).filter((x) => x.q.module === m));
       if (!module || qs.length === 0) continue;
-      for (const { s, q, i } of qs) items.push({ label: `${s.step.id} · ${q.text}`, name: questionKey(ws.id, s, i), type: "text" });
-      out.push(`<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m)}<b>${e(module.title)}</b></div>${module.carries ? `<p class="jp-dm-c">${e(module.carries)}</p>` : ""}<ul class="jp-lab-qs">${qs.map(({ s, q, i }) => `<li>${stepChip(a, s, s.step.id)}<div><span>${e(q.text)}</span>${answerBox(questionKey(ws.id, s, i), q.text)}</div></li>`).join("")}</ul></div>`);
+      for (const { s, q } of qs) items.push({ label: `${s.step.id} · ${q.text}`, name: questionKey(ws.id, s.ws!, q), type: "text" });
+      out.push(`<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m)}<b>${e(module.title)}</b></div>${module.carries ? `<p class="jp-dm-c">${e(module.carries)}</p>` : ""}<ul class="jp-lab-qs">${qs.map(({ s, q, i }) => `<li>${stepChip(a, s, s.step.id)}<div><span>${e(q.text)}</span>${answerBox(questionKey(ws.id, s.ws!, q), q.text, 2, "", earlierKeys(ws.id, s.ws!, q, legacyQuestionKey(ws.id, s, i)))}</div></li>`).join("")}</ul></div>`);
     }
     if (st.discussion && ws.discussion?.length) {
       const cards = ws.discussion
@@ -745,20 +712,40 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
       out.push(`<div class="jp-dqs">${cards}</div>`);
     }
     if (st.resources?.length) {
-      const rs = st.resources.map((id) => ws.resources!.find((r) => r.id === id)!).map((r) => (r.href ? ext(fromSite(r.href, a.siteRoot), r.title) : `<span>${e(r.title)}</span>`));
+      // A facilitator's job aid is the presenter's (owner, 2026-11-17).
+      const rs = st.resources.map((id) => ws.resources!.find((r) => r.id === id)!).map((r) => {
+        const link = r.href ? ext(fromSite(r.href, a.siteRoot), r.title) : `<span>${e(r.title)}</span>`;
+        return r.kind === "job-aid" ? `<span class="jp-presenter-only">${link}</span>` : link;
+      });
       out.push(`<p class="jp-lab-res">${icon("book")} ${rs.join(" ")}</p>`);
     }
     return out.join("\n");
   };
 
+  // An answer shown in two steps (a module's questions in its own step and in the matrix step) is one answer: the summary lists it once, under the first.
+  const listed = new Set<string>();
   const steps = lab.steps.map((st, n) => {
-    const items: LabSummaryItem[] = [];
-    const body = part(st, items);
+    const all: LabSummaryItem[] = [];
+    const body = part(st, all);
+    const items = all.filter((x) => !listed.has(x.name) && (listed.add(x.name), true));
     if (items.length) summary.push({ id: st.id, n, label: st.label, items });
     return { st, n, body };
   });
+  // The application components the room marked as its own (How it works), in the summary too.
+  const systems = markableElements(p, links);
+  if (systems.length && lab.steps.some((x) => x.summary)) {
+    summary.push({
+      id: "systems",
+      n: lab.steps.length,
+      label: "Our systems",
+      items: systems.flatMap((x) => [
+        { label: `${x.name}: we have this`, name: elementKey(ws.id, x, "have"), type: "check" as const, group: "Our systems" },
+        { label: `${x.name}: our name for it`, name: elementKey(ws.id, x, "name"), type: "text" as const },
+      ]),
+    });
+  }
   const takeaways = p.steps.filter((s) => s.step.policy);
-  const summaryBody = `<div class="jp-lab-sum-act jp-noprint"><button type="button" class="jp-btn-line" data-jp-lab-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-lab-csv>${icon("file")} Download CSV</button></div>
+  const summaryBody = `${canvasPdf(p, !lab.steps.some((x) => x.canvas?.length))}<div class="jp-lab-sum-act jp-noprint"><button type="button" class="jp-btn-line" data-jp-lab-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-lab-csv>${icon("file")} Download CSV</button></div>
 <p class="jp-small">Assembled from every step, <b>in this browser only</b>: nothing is sent anywhere.</p>
 <script type="application/json" data-jp-lab-model>${jsonInHtml(summary)}</script>
 <div class="jp-lab-sum" data-jp-lab-summary></div>
@@ -772,11 +759,11 @@ ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("l
     .map(({ st, n, body }) => {
       const next = steps[n + 1];
       return `<section class="jp-card jp-lab-step${st.summary ? " jp-lab-summary" : ""}" id="lab-${e(st.id)}" data-jp-lab-step="${e(st.id)}">
-<div class="jp-lab-head"><div><span class="jp-lab-kick">${n}. ${e(st.label)}</span><h3>${e(st.title)}</h3>${st.lede ? `<p class="jp-lab-lede">${e(st.lede)}</p>` : ""}</div>${st.minutes ? `<button type="button" class="jp-lab-timer jp-noprint" data-jp-timer="${st.minutes}">${icon("clock")} <span>Start ${st.minutes} min timer</span></button>` : ""}</div>
-${st.discuss ? `<div class="jp-lab-discuss"><b>Discuss</b><span>${e(st.discuss)}</span></div>` : ""}
+<div class="jp-lab-head"><div><span class="jp-lab-kick">${n}. ${e(st.label)}</span><h3>${e(st.title)}</h3>${st.lede ? `<p class="jp-lab-lede">${e(st.lede)}</p>` : ""}</div>${st.minutes ? `<button type="button" class="jp-lab-timer jp-noprint jp-presenter-only" data-jp-timer="${st.minutes}">${icon("clock")} <span>Start ${st.minutes} min timer</span></button>` : ""}</div>
+${st.discuss ? `<div class="jp-lab-discuss jp-presenter-only"><b>Discuss</b><span>${e(st.discuss)}</span></div>` : ""}
 ${body}
-${st.summary ? summaryBody : ""}
-${st.note ? `<p class="jp-lab-note">${e(st.note)}</p>` : ""}
+${st.summary ? `${summaryBody}\n${sheetsPanel(corpus, p)}` : ""}
+${st.note ? `<p class="jp-lab-note jp-presenter-only">${e(st.note)}</p>` : ""}
 ${next ? `<div class="jp-lab-nav jp-noprint"><a class="jp-btn-dark" href="#lab-${e(next.st.id)}" data-jp-lab-go="${e(next.st.id)}">${e(next.st.label)} ${icon("right")}</a></div>` : ""}
 </section>`;
     })
@@ -786,8 +773,93 @@ ${next ? `<div class="jp-lab-nav jp-noprint"><a class="jp-btn-dark" href="#lab-$
   const body = `<section class="jp-dhero"><span class="jp-kicker">${icon("message")} ${e(lab.name ?? "Questions for the room")}</span><h2>${e(pr.closingQuestion ?? "Closing discussion")}</h2>${lab.intro ? `<p>${e(lab.intro)}</p>` : ""}</section>
 <nav class="jp-lab-tabs" aria-label="Steps">${tabs}</nav>
 <div class="jp-lab" data-jp-lab="${e(ws.id)}"><div class="jp-lab-steps">${sections}</div>${aside}</div>
+${lab.steps.some((st) => st.summary) ? "" : sheetsPanel(corpus, p)}
 ${credit}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(model ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussHead(p, a, Boolean(model)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+}
+
+// ── the module × journey matrix (JV-05) ───────────────────────────────────
+
+/** One cell of the matrix: whether the module's question is asked at the step, or the module only draws on it, and the workshop's words for it. */
+export interface MatrixCellView {
+  module: string;
+  step: PresentedStep;
+  kind: "asked" | "draws";
+  questions: string[];
+  technical?: string;
+  policy?: string;
+}
+
+/**
+ * The matrix's cells, modules in the workshop's order and steps in the
+ * walkthrough's: `asked` wherever a step's questions name the module (from
+ * `steps[].questions`), `draws` wherever `workshop.matrix` says the module
+ * reads the step without asking; each with the cell's text, if any.
+ */
+export function matrixCells(corpus: JourneyCorpus, p: Presentation): MatrixCellView[] {
+  const ws = p.w.workshop;
+  const text = new Map<string, { kind?: "draws"; technical?: string; policy?: string }>();
+  for (const c of ws.matrix?.cells ?? []) {
+    const s = stepByRef(corpus, p, c.step);
+    if (s) text.set(`${c.module} ${s.key}`, c);
+  }
+  const out: MatrixCellView[] = [];
+  for (const m of ws.modules) {
+    for (const s of p.steps) {
+      if (!s.ws) continue;
+      const questions = (s.ws.questions ?? []).filter((q) => q.module === m.id).map((q) => q.text);
+      const t = text.get(`${m.id} ${s.key}`);
+      if (questions.length === 0 && t?.kind !== "draws") continue;
+      out.push({ module: m.id, step: s, kind: questions.length ? "asked" : "draws", questions, ...(t?.technical ? { technical: t.technical } : {}), ...(t?.policy ? { policy: t.policy } : {}) });
+    }
+  }
+  return out;
+}
+
+/**
+ * The module × journey matrix: a row per module that meets any step, a
+ * column per step the workshop has, ● where the module's question is asked
+ * and ○ where it only draws on the step. Each cell links to its step in the
+ * walkthrough and shows its technical and policy text on hover or focus;
+ * the same text, cell by cell, is under the matrix to expand (and print),
+ * then the overlaps across modules.
+ */
+function matrixHtml(corpus: JourneyCorpus, p: Presentation, a: At, mod: (id: string) => string): string {
+  const ws = p.w.workshop;
+  const cells = matrixCells(corpus, p);
+  const cols = p.steps.filter((s) => s.ws);
+  const rows = ws.modules.filter((m) => cells.some((c) => c.module === m.id));
+  const at = new Map(cells.map((c) => [`${c.module} ${c.step.key}`, c]));
+  const words = (c: MatrixCellView) =>
+    `${c.questions.length ? `<p class="jp-mx-q">${c.questions.map((q) => e(q)).join("<br>")}</p>` : ""}${c.technical ? `<p><b>Technical.</b> ${e(c.technical)}</p>` : ""}${c.policy ? `<p><b>Policy.</b> ${e(c.policy)}</p>` : ""}`;
+  const label = (c: MatrixCellView) => `${c.module} × ${c.step.step.id}: ${c.kind === "asked" ? "the module’s question is asked here" : "the module draws on this step"}`;
+  const head = `<tr><th scope="col" class="jp-mx-corner">Module</th>${cols.map((s) => `<th scope="col"><a href="${e(walkHref(a, s))}" title="${e(s.step.title)}">${e(s.step.id)}</a></th>`).join("")}</tr>`;
+  const body = rows
+    .map((m) => `<tr><th scope="row">${mod(m.id)} <span>${e(m.title)}</span></th>${cols
+      .map((s) => {
+        const c = at.get(`${m.id} ${s.key}`);
+        if (!c) return `<td class="jp-mx-none"></td>`;
+        const w = words(c);
+        return `<td class="jp-mx-${c.kind}"><a class="jp-mx-cell" href="${e(walkHref(a, s))}" aria-label="${e(label(c))}"><span aria-hidden="true">${c.kind === "asked" ? "●" : "○"}</span></a>${w ? `<div class="jp-mx-pop" role="tooltip"><b>${e(c.module)} × ${e(c.step.step.id)}</b> <small>${e(c.step.step.title)}</small>${w}</div>` : ""}</td>`;
+      })
+      .join("")}</tr>`)
+    .join("");
+  const detail = rows
+    .map((m) => {
+      const mine = cells.filter((c) => c.module === m.id && (c.technical || c.policy));
+      return mine.length ? `<div class="jp-mx-mod"><h4>${mod(m.id)} ${e(m.title)}</h4><ul>${mine.map((c) => `<li class="jp-mx-${c.kind}">${stepChip(a, c.step, c.step.step.id)}<span class="jp-mx-k">${c.kind === "asked" ? "● asked" : "○ draws"}</span><div>${c.technical ? `<p><b>Technical.</b> ${e(c.technical)}</p>` : ""}${c.policy ? `<p><b>Policy.</b> ${e(c.policy)}</p>` : ""}</div></li>`).join("")}</ul></div>` : "";
+    })
+    .join("");
+  const ov = ws.matrix?.overlaps;
+  const overlapList = (title: string, list: NonNullable<NonNullable<typeof ov>["technical"]> | undefined) =>
+    list?.length
+      ? `<div class="jp-mx-ov"><h4>${e(title)}</h4>${list.map((o) => `<div class="jp-card jp-dt"><b>${e(o.label)}</b><p>${e(o.text)}</p><div class="jp-dq-rev"><span>Modules:</span>${o.modules.map((x) => mod(x)).join("")}</div><div class="jp-dq-rev"><span>Steps:</span>${o.steps.map((r) => stepChip(a, stepByRef(corpus, p, r), r)).join("")}</div></div>`).join("")}</div>`
+      : "";
+  const overlaps = overlapList("Technical overlaps", ov?.technical) + overlapList("Policy overlaps", ov?.policy);
+  return `<div class="jp-mx">${ws.matrix?.intro ? `<p class="jp-small">${e(ws.matrix.intro)}</p>` : ""}<div class="jp-mx-scroll"><table class="jp-mx-tbl"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+<p class="jp-small jp-mx-key"><span>● the module’s question is asked at this step</span>${cells.some((c) => c.kind === "draws") ? `<span>○ the module draws on this step without asking there</span>` : ""}<span>Each cell opens its step${detail ? "; hover or focus it for the technical and policy text" : ""}.</span></p>
+${detail ? `<details class="jp-mx-detail"><summary>Every meeting point, technical and policy</summary>${detail}</details>` : ""}
+${overlaps ? `<div class="jp-mx-ovs">${overlaps}</div>` : ""}</div>`;
 }
 
 // ── the gap report ───────────────────────────────────────────────────────
@@ -835,26 +907,50 @@ export function gapReportModel(p: Presentation, href: (s: PresentedStep) => stri
 /** JSON safe inside a `<script>` element: no `</script>` or `<!--` can end it early. */
 const jsonInHtml = (v: unknown): string => JSON.stringify(v).replace(/</g, "\\u003c");
 
-// ── the table sheets ─────────────────────────────────────────────────────
+// ── the table sheets, folded into the discussion ─────────────────────────
 
-function sheetsPageFramed(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): string {
-  const a = at(1, links);
+/** The id of the Table sheets panel on the discussion page; `sheets/` redirects to it. */
+export const SHEETS_PANEL = "sheets";
+
+/** Whether a workshop has sheets to print: drawn ones, or its own canvas. */
+export const hasSheets = (p: Presentation): boolean => Boolean(p.w.workshop.sheets?.length || p.w.workshop.sheetsSource);
+
+/**
+ * The Table sheets as an expanding panel (owner, 2026-11-17: fold them into the
+ * discussion): folded, at the foot of the lab's summary step, or of the
+ * discussion when the workshop has no lab. The workshop's own canvas when it
+ * names one, the drawn sheets otherwise; its print button prints the sheets alone.
+ */
+function sheetsPanel(corpus: JourneyCorpus, p: Presentation): string {
+  if (!hasSheets(p)) return "";
   const ws = p.w.workshop;
+  const canvas = canvasOf(corpus, p.w);
   const sizes = [...new Set((ws.sheets ?? []).map((s) => s.size))].join(" and ");
-  const body = `<section class="jp-card jp-sheets-h jp-noprint"><div><h2>Table canvas: ${e(sizes)} sheets</h2><p class="jp-small">A cover and ${(ws.sheets ?? []).length} sheet${(ws.sheets ?? []).length === 1 ? "" : "s"}, each with this journey’s questions for its module${(ws.sheets ?? []).some((s) => s.assessmentStrip) ? " and the gap strip at its foot" : ""}. Print on ${e(sizes)}, landscape, at 100% with background graphics on.</p></div><button type="button" class="jp-btn-dark" data-jv-print>${icon("printer")} Print the sheets</button></section>
+  const label = canvas ? canvas.title : "Table sheets";
+  const hint = canvas ? `Print the ${canvas.size} canvas, or download it` : `Print the ${sizes} sheets`;
+  const body = canvas
+    ? `<section class="jp-sheets-h jp-noprint"><div><h2>${e(canvas.title)}</h2><p class="jp-small">${canvas.description ? e(canvas.description) : `${canvas.previews.length ? `${canvas.previews.length} page${canvas.previews.length === 1 ? "" : "s"}, ` : ""}${e(canvas.size)} landscape. Print at 100% with background graphics on, or download the file to fill in on screen.`}</p></div><span class="jp-sheets-act">${canvasDownloads(canvas, "jp-btn-line", { file: icon("file") })}${canvas.previews.length ? `<button type="button" class="jp-btn-dark" data-jp-sheets-print>${icon("printer")} Print the canvas</button>` : ""}</span></section>
+${canvasHtml(canvas)}`
+    : `<section class="jp-sheets-h jp-noprint"><div><h2>Table canvas: ${e(sizes)} sheets</h2><p class="jp-small">A cover and ${(ws.sheets ?? []).length} sheet${(ws.sheets ?? []).length === 1 ? "" : "s"}, each with this journey’s questions for its module${(ws.sheets ?? []).some((s) => s.assessmentStrip) ? " and the gap strip at its foot" : ""}. Print on ${e(sizes)}, landscape, at 100% with background graphics on.</p></div><button type="button" class="jp-btn-dark" data-jp-sheets-print>${icon("printer")} Print the sheets</button></section>
 <div class="jp-sheetlist">${sheetsHtml(corpus, p.w)}</div>`;
-  return frame({
-    p,
-    root: a.root,
-    toWorkshop: a.toWorkshop,
-    view: "sheets",
-    title: `Table sheets — ${presentationName(p)}`,
-    ...note(p, "sheets"),
-    head: `<link rel="stylesheet" href="${a.root}assets/journeys.css">`,
-    bodyClass: "jv-print-sheets",
-    body,
-    foot: drawerOf(corpus, p, a, p.steps, "Table sheets"),
-  });
+  return `<details class="jp-card jp-sheets-panel" id="${SHEETS_PANEL}" data-jp-sheets><summary class="jp-sheets-sum jp-noprint">${icon("printer", "jp-indigo")}<span><b>${e(label)}</b><small>${e(hint)}</small></span><span class="jp-sheets-chev" aria-hidden="true">${icon("right")}</span></summary>
+<div class="jp-sheets-in">${body}</div></details>`;
+}
+
+/**
+ * Where `sheets/` was: a redirect to the panel on the discussion page, keeping
+ * an old address's own anchor (`sheets/#sheet-s1` opens that sheet there).
+ */
+export function sheetsRedirect(): string {
+  const to = `../discuss/#${SHEETS_PANEL}`;
+  return withRenderedBy(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Table sheets: now in the discussion</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="${to}">
+<script>location.replace("../discuss/" + location.search + (location.hash || "#${SHEETS_PANEL}"));</script>
+<meta http-equiv="refresh" content="0; url=${to}">
+</head><body><p>The Table sheets are in the <a href="${to}">discussion</a>.</p></body></html>
+`, TOOL_ID);
 }
 
 // ── the device demo ──────────────────────────────────────────────────────
@@ -977,18 +1073,8 @@ ${moments}`;
 /** The views' pages for one workshop, paths relative to its directory. */
 export function renderViewPages(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): PageFile[] {
   const out: PageFile[] = [];
-  out.push({ path: "map/index.html", content: mapPage(corpus, p, links) });
-  // The map's process thumbnails, one copy per drawing.
-  const drawn = new Set<string>();
-  for (const s of p.steps) for (const r of s.step.realisedBy ?? []) {
-    const f = drawingFile(r.process);
-    if (drawn.has(f)) continue;
-    const d = processDrawing(corpus, s.journey.instance, r.process);
-    if (d) {
-      drawn.add(f);
-      out.push({ path: `map/${f}`, content: d.svg });
-    }
-  }
+  // The journey map is folded into How it works (owner, 2026-11-17); its address redirects there.
+  if (p.steps.length) out.push({ path: "map/index.html", content: mapRedirect() });
   if (p.cast.length) {
     out.push({ path: "personas/index.html", content: personaPage(corpus, p, links, p.cast[0]!, 1) });
     for (const x of p.cast) out.push({ path: `personas/${x.id}/index.html`, content: personaPage(corpus, p, links, x, 2) });
@@ -997,7 +1083,11 @@ export function renderViewPages(corpus: JourneyCorpus, p: Presentation, links: S
   const cat = catalogueOf(corpus, p);
   for (const b of cat?.blocks.keys() ?? []) out.push({ path: `how/${b}/index.html`, content: howPage(corpus, p, links, b) });
   out.push({ path: "discuss/index.html", content: discussPage(corpus, p, links) });
-  if (p.w.workshop.sheets?.length) out.push({ path: "sheets/index.html", content: sheetsPageFramed(corpus, p, links) });
+  if (hasSheets(p)) {
+    // The sheets are a panel of the discussion (owner, 2026-11-17); the old address redirects to it.
+    for (const f of canvasFiles(canvasOf(corpus, p.w))) out.push({ path: `discuss/${f.path}`, content: f.content });
+    out.push({ path: "sheets/index.html", content: sheetsRedirect() });
+  }
   if (p.screens.length) {
     out.push({ path: "demo/index.html", content: demoIndex(corpus, p, links) });
     p.screens.forEach((x, i) => out.push({ path: `demo/${x.id}/index.html`, content: demoPage(corpus, p, links, i) }));

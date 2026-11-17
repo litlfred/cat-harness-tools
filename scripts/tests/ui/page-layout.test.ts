@@ -9,6 +9,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  DRAFT_BANNER_JS_FILE,
+  DRAFT_BANNER_JS_SOURCE,
+  DRAFT_BANNER_NOSCRIPT,
   PAGE_BAR_CLASS,
   PAGE_LAYOUT_CSS_FILE,
   PAGE_LAYOUT_CSS_SOURCE,
@@ -61,8 +64,14 @@ describe("page-layout.css", () => {
       .split("}")
       .map((r) => r.split("{")[0]!.trim())
       .filter(Boolean);
-    for (const s of selectors) expect(s).toMatch(/^(:root|body\b|\.fa-page-|body:has\(\.fa-page-)/);
+    // The one exception is the rail's own scrolling (`:root .fa-nav`), which every railed page needs and asserts below.
+    for (const s of selectors) expect(s).toMatch(/^(:root(?! \.)|:root \.fa-nav\b|body\b|\.fa-page-|body:has\(\.fa-page-)/);
     expect(rule("body")).toBe("margin:0");
+  });
+
+  it("makes the rail its own scroller, so a wheel or touch over it never scrolls the page (owner, 2026-11-17)", () => {
+    expect(rule(":root .fa-nav")).toBe("overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain");
+    expect(rule(":root .fa-nav :is(.fa-nav-graphs,.fa-nav-pop)")).toBe("overscroll-behavior:contain");
   });
 
   it("knows nothing of FHIR, an IG or WHO", () => {
@@ -98,9 +107,10 @@ describe("page-layout.js", () => {
 });
 
 describe("tags, stamping and writing", () => {
-  it("links both files relative to the site root, marked so they are written once", () => {
+  it("links the layout and the DRAFT banner relative to the site root, marked so they are written once", () => {
     expect(pageLayoutTags("../")).toBe(
-      `<link rel="stylesheet" href="../${PAGE_LAYOUT_CSS_FILE}" ${PAGE_LAYOUT_MARK}><script src="../${PAGE_LAYOUT_JS_FILE}" defer ${PAGE_LAYOUT_MARK}></script>`,
+      `<link rel="stylesheet" href="../${PAGE_LAYOUT_CSS_FILE}" ${PAGE_LAYOUT_MARK}><script src="../${PAGE_LAYOUT_JS_FILE}" defer ${PAGE_LAYOUT_MARK}></script>` +
+        `<script src="../${DRAFT_BANNER_JS_FILE}" defer ${PAGE_LAYOUT_MARK}></script>${DRAFT_BANNER_NOSCRIPT}`,
     );
     const page = "<html><head><title>x</title></head><body></body></html>";
     const once = withPageLayout(page, "");
@@ -118,10 +128,11 @@ describe("tags, stamping and writing", () => {
     expect(html.indexOf(PAGE_LAYOUT_CSS_FILE)).toBeLessThan(html.indexOf("own.css"));
   });
 
-  it("writes the two files, and leaves bytes that already match alone", () => {
+  it("writes the three files, and leaves bytes that already match alone", () => {
     const dir = mkdtempSync(join(tmpdir(), "page-layout-"));
     try {
-      expect(writePageLayout(dir)).toEqual([PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE]);
+      expect(writePageLayout(dir)).toEqual([PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE, DRAFT_BANNER_JS_FILE]);
+      expect(readFileSync(join(dir, DRAFT_BANNER_JS_FILE), "utf-8")).toBe(readFileSync(DRAFT_BANNER_JS_SOURCE, "utf-8"));
       expect(readFileSync(join(dir, PAGE_LAYOUT_CSS_FILE), "utf-8")).toBe(css);
       expect(writePageLayout(dir)).toEqual([]);
       writeFileSync(join(dir, PAGE_LAYOUT_JS_FILE), "stale");
@@ -129,5 +140,21 @@ describe("tags, stamping and writing", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("draft-banner.js (owner, 2026-11-17: DRAFT everywhere but the official host)", () => {
+  const banner = readFileSync(DRAFT_BANNER_JS_SOURCE, "utf-8");
+  it("decides from the host at load, against one official host, by exact match", () => {
+    expect(banner).toContain('var OFFICIAL_HOSTS = ["smart.who.int"];');
+    expect(banner).toContain("window.location.hostname");
+    expect(banner).toContain("OFFICIAL_HOSTS.indexOf(host) >= 0");
+  });
+  it("builds no markup from a string", () => {
+    expect(banner).not.toMatch(/innerHTML|insertAdjacentHTML|document\.write/);
+  });
+  it("says DRAFT with no script, since a page that cannot read its host cannot tell it is official", () => {
+    expect(DRAFT_BANNER_NOSCRIPT).toMatch(/^<noscript[^>]*><style>body::before\{content:"DRAFT /);
+    expect(DRAFT_BANNER_NOSCRIPT.endsWith("</style></noscript>")).toBe(true);
   });
 });

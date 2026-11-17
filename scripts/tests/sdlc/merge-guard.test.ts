@@ -45,6 +45,7 @@ import {
   contentReviewRecord,
   CONTENT_LABEL,
   SELF_WORKFLOW_FILE,
+  SIGNAL_WORKFLOW_FILE,
   NOT_WAITED_FOR_WORKFLOW_FILES,
   DEPLOY_ONLY_STEP,
   AGENT_BUILD_CONTEXT,
@@ -72,6 +73,7 @@ const SCAN: TriggerScan = {
     { file: ".github/workflows/jsonld-gen-check.yml", name: "JSON-LD generated-file drift", requirement: "conditional", filters: ["paths"] },
     { file: ".github/workflows/feature-staging.yml", name: "Feature Staging (GitHub Pages)", requirement: "conditional", filters: ["paths"] },
     { file: SELF_WORKFLOW_FILE, name: "Merge guard", requirement: "conditional", filters: ["types"] },
+    { file: SIGNAL_WORKFLOW_FILE, name: "Merge guard trigger", requirement: "required", filters: [] },
   ],
   unreadable: [],
 };
@@ -522,6 +524,21 @@ describe("check 5 — the head's own pull_request CI", () => {
     expect(status(s, "ci").status).toBe("pass");
   });
 
+  test("the guard's signal is never evidence, and never owed: held, running or absent, it holds nothing", () => {
+    for (const st of [
+      { status: "completed", conclusion: "action_required" },
+      { status: "in_progress", conclusion: null },
+      { status: "completed", conclusion: "failure" },
+    ]) {
+      const s = real(1957);
+      if (s.runs.state !== "has-run") throw new Error("fixture");
+      s.runs.runs.push({ id: 99_999_999_997, name: "Merge guard trigger", event: "pull_request", html_url: "", ...st } as GuardRun);
+      expect(status(s, "ci").status).toBe("pass");
+    }
+    // Absent: the fixture's runs have no signal run, and SCAN owes it as `required`.
+    expect(status(real(1957), "ci").status).toBe("pass");
+  });
+
   test("a later success supersedes an earlier failure of the same workflow", () => {
     const s = real(1937);
     if (s.runs.state !== "has-run") throw new Error("fixture");
@@ -546,6 +563,37 @@ describe("check 5 — the head's own pull_request CI", () => {
     const c = status(s, "ci");
     expect(c.status).toBe("refuse");
     expect(c.detail).toContain("Code-quality gates: failure");
+  });
+
+  test("a later cancelled run (superseded on the same head) never displaces an earlier verdict, green or red", () => {
+    // smart-trust-phw#24, 2026-11-17: marked ready (run cancelled by the next)
+    // then labelled `ready-to-merge` (run skipped); the green full tier stood.
+    const green = real(1957);
+    if (green.runs.state !== "has-run") throw new Error("fixture");
+    for (const r of [...(green.runs.runs as GuardRun[])]) {
+      if (r.event === "pull_request") {
+        green.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "cancelled" } as GuardRun);
+        green.runs.runs.push({ ...r, id: (r.id ?? 0) + 2_000_000, status: "completed", conclusion: "skipped" } as GuardRun);
+      }
+    }
+    expect(status(green, "ci").status).toBe("pass");
+    const red = real(1937);
+    if (red.runs.state !== "has-run") throw new Error("fixture");
+    for (const r of [...(red.runs.runs as GuardRun[])]) {
+      if (r.event === "pull_request") red.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "cancelled" } as GuardRun);
+    }
+    const c = status(red, "ci");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toContain("Code-quality gates: failure");
+  });
+
+  test("a cancelled run stands, and is not green, when it is the only run of its workflow", () => {
+    const s = real(1957);
+    if (s.runs.state !== "has-run") throw new Error("fixture");
+    s.runs.runs.push({ id: 99_999_999_996, name: "Cancelled-only checks", event: "pull_request", status: "completed", conclusion: "cancelled", html_url: "" } as GuardRun);
+    const c = status(s, "ci");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toContain("Cancelled-only checks: cancelled");
   });
 
   test("an all-skipped run stands when it is the only run of its workflow", () => {
