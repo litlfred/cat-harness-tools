@@ -12,9 +12,15 @@
  *
  * A changed block is covered when a `content-change-review` instance:
  *
- * 1. is **in this diff** — its `beans/workflows/<id>.json` is one of the
- *    changed files. This ties the record to the PR that makes the change, so
- *    an old change set cannot authorise a later edit of the same block;
+ * 1. is **tied to this PR**, one of two ways:
+ *    - **in this diff**: its `beans/workflows/<id>.json` is one of the changed
+ *      files; or
+ *    - **started since the PR's base**: a running instance in the layer's
+ *      workflow store (kept on `cat/<instance>/beans` and mounted, so it can
+ *      never be in the PR's diff) whose `startedAt` is after the commit the
+ *      PR's diff starts from ({@link startedSince}; owner, 2026-11-17).
+ *    Either way an old change set cannot authorise a later edit of the same
+ *    block;
  * 2. is **still running** — a completed instance is a change set that has
  *    already been published;
  * 3. **names the block** in `scope.blocks`;
@@ -76,6 +82,22 @@ export function changeSetCover(
 }
 
 /**
+ * The running change-set instances in a store that were started after
+ * `baseTime` (an ISO timestamp, the commit time of the PR's base). Pure: the
+ * caller lists the store. An instance with no parseable `startedAt` is left
+ * out, since it cannot be shown to be newer than the base.
+ */
+export function startedSince(stored: readonly InstanceState[], baseTime: string): InstanceState[] {
+  const base = Date.parse(baseTime);
+  if (Number.isNaN(base)) return [];
+  return stored.filter((s) => {
+    if (s.processId !== CHANGE_REVIEW_PROCESS || s.status !== "running") return false;
+    const at = Date.parse(s.startedAt ?? "");
+    return !Number.isNaN(at) && at > base;
+  });
+}
+
+/**
  * Why a change-set instance in the diff does NOT cover `label`, for the
  * refusal message, or `undefined` when no instance in the diff is close.
  */
@@ -84,7 +106,7 @@ export function nearMiss(changedInstances: readonly InstanceState[], label: stri
   if (mine.length === 0) return undefined;
   const naming = mine.filter((s) => s.scope?.blocks.includes(label));
   if (naming.length === 0) {
-    return `change set(s) ${mine.map((s) => s.scope?.changeSet ?? s.id).join(", ")} in this diff do not list ${label} in scope.blocks`;
+    return `change set(s) ${mine.map((s) => s.scope?.changeSet ?? s.id).join(", ")} in this diff or started since the PR's base do not list ${label} in scope.blocks`;
   }
   const s = naming[0]!;
   if (s.status !== "running") return `${s.id} is already completed, so it cannot authorise a new edit`;

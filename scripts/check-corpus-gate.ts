@@ -92,7 +92,12 @@ const files = changedContentFiles(
     : git(["diff", "--name-status", "-M100%", "--diff-filter=d", `${since}...HEAD`]),
 );
 
-const findings = await checkCorpusGate(repoRoot, { files, platformRoot, labelFor });
+// The commit the diff starts from, as a time: a change-set instance in the
+// workflow store started after it also covers its blocks (change-set-coverage.ts).
+const baseRef = staged ? "HEAD" : git(["merge-base", since!, "HEAD"])[0];
+const baseTime = baseRef ? git(["show", "-s", "--format=%cI", baseRef])[0] : undefined;
+
+const findings = await checkCorpusGate(repoRoot, { files, platformRoot, labelFor, baseTime });
 const refused = findings.filter((f) => !f.allowed);
 
 if (findings.length === 0) {
