@@ -174,22 +174,49 @@ export function svgStamp(svgPath: string): string | null {
   return STAMP.exec(readFileSync(svgPath, "utf8"))?.[1] ?? null;
 }
 
+/**
+ * GET `url`, retrying a network error or a non-OK status with backoff. One
+ * attempt was not enough: every CI job that renders fetches the jar from Maven
+ * Central, and a single refused request failed `uml:overview` on a head whose
+ * diagrams it had nothing to do with (a layer's PR, 2026-11-17). The reason for
+ * the last failure is kept, so the log says why rather than only "could not fetch".
+ */
+export async function fetchWithRetry(
+  url: string,
+  opts: { tries?: number; delayMs?: (attempt: number) => number; fetchImpl?: (u: string) => Promise<Response> } = {},
+): Promise<{ bytes: Buffer } | { error: string }> {
+  const tries = opts.tries ?? 4;
+  const delayMs = opts.delayMs ?? ((a: number) => 2000 * 2 ** a);
+  const get = opts.fetchImpl ?? ((u: string) => fetch(u));
+  let error = "no attempt made";
+  for (let attempt = 0; attempt < tries; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, delayMs(attempt - 1)));
+    try {
+      const res = await get(url);
+      if (res.ok) return { bytes: Buffer.from(await res.arrayBuffer()) };
+      error = `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+  return { error: `${error} after ${tries} attempt(s)` };
+}
+
 /** The pinned PlantUML jar: `PLANTUML_JAR`, else the tool-releases cache or a verified download into the user cache. */
-async function plantumlJar(): Promise<string | null> {
-  if (process.env.PLANTUML_JAR) return process.env.PLANTUML_JAR;
+async function plantumlJar(): Promise<{ jar: string } | { error: string }> {
+  if (process.env.PLANTUML_JAR) return { jar: process.env.PLANTUML_JAR };
   const resolved = await resolvePlantumlRelease();
   if (resolved.cachedPath && existsSync(resolved.cachedPath) && sha256(readFileSync(resolved.cachedPath)) === resolved.sha256) {
-    return resolved.cachedPath;
+    return { jar: resolved.cachedPath };
   }
   const jar = join(homedir(), ".cache", "folio-assistant", `plantuml-${PLANTUML.version}.jar`);
-  if (existsSync(jar)) return jar;
-  const res = await fetch(PLANTUML.url).catch(() => null);
-  if (!res?.ok) return null;
-  const bytes = Buffer.from(await res.arrayBuffer());
-  if (sha256(bytes) !== PLANTUML.sha256) throw new Error(`${PLANTUML.url}: sha256 mismatch, refusing to run it`);
+  if (existsSync(jar)) return { jar };
+  const got = await fetchWithRetry(PLANTUML.url);
+  if ("error" in got) return got;
+  if (sha256(got.bytes) !== PLANTUML.sha256) throw new Error(`${PLANTUML.url}: sha256 mismatch, refusing to run it`);
   mkdirSync(dirname(jar), { recursive: true });
-  writeFileSync(jar, bytes);
-  return jar;
+  writeFileSync(jar, got.bytes);
+  return { jar };
 }
 
 export interface RenderJob {
@@ -241,8 +268,9 @@ export async function renderSvgs(
     return "java";
   })();
   if (spawnSync(java, ["-version"]).status !== 0) return { rendered: 0, skipped: "no java on PATH" };
-  const jar = await plantumlJar();
-  if (!jar) return { rendered: 0, skipped: `could not fetch ${PLANTUML.url}` };
+  const got = await plantumlJar();
+  if ("error" in got) return { rendered: 0, skipped: `could not fetch ${PLANTUML.url}: ${got.error}` };
+  const jar = got.jar;
 
   const work = mkdtempSync(join(tmpdir(), "uml-svg-"));
   try {
