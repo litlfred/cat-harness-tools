@@ -4,7 +4,11 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { judgeFile } from "../workflow-pins.ts";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { judgeFile, mergeGuardTrigger, MERGE_GUARD_TRIGGER_FILE, MERGE_GUARD_TRIGGER_NAME, MERGE_GUARD_TRIGGER_TEXT } from "../workflow-pins.ts";
 
 const TOOLS = "a".repeat(40);
 const refs = new Map([["cat-harness-tools", TOOLS]]);
@@ -138,5 +142,64 @@ describe("workflow-pins: a layer-pr-checks caller starts on `labeled`", () => {
   test("a job if without the label clause is reported for a hand fix", () => {
     const { findings } = judge(CALLER.replace("  checks:\n", "  checks:\n    if: github.actor != 'bot'\n"));
     expect(findings.find((f) => f.have.startsWith("if:"))?.want).toBeNull();
+  });
+});
+
+describe("workflow-pins: a merge-guard caller leaves pull_request_target", () => {
+  // Owner, 2026-11-17: GitHub is changing pull_request_target's defaults, and
+  // its 2026-11-16 brownout failed the guard. The caller runs from main only;
+  // pull-request events arrive as the signal's completion.
+  const CALLER = [
+    "name: Merge guard",
+    "on:",
+    "  pull_request_target:",
+    "    types: [opened, synchronize, labeled, unlabeled, edited]",
+    "  issue_comment:",
+    "    types: [created, edited]",
+    "  workflow_run:",
+    '    workflows: ["Layer PR checks"]',
+    "    types: [completed]",
+    "  workflow_dispatch:",
+    "permissions: { statuses: write }",
+    "jobs:",
+    "  guard:",
+    `    uses: litlfred/cat-harness-tools/.github/workflows/layer-merge-guard.yml@${TOOLS} # index.lock.json`,
+    "",
+  ].join("\n");
+
+  test("--write drops pull_request_target and adds the signal to workflow_run; the findings trail; a second pass is clean", () => {
+    const { findings, text } = judge(CALLER);
+    expect(findings).toHaveLength(2);
+    expect(findings.every((f) => f.trailing && f.want !== null)).toBe(true);
+    expect(text).not.toContain("pull_request_target");
+    expect(text).toContain("  issue_comment:\n    types: [created, edited]\n  workflow_run:\n");
+    expect(text).toContain(`    workflows: ["Layer PR checks", "${MERGE_GUARD_TRIGGER_NAME}"]\n`);
+    expect(judge(text).findings).toHaveLength(0);
+  });
+
+  test("a block list of workflows gets the signal; a caller with no workflow_run gets one", () => {
+    const block = judge(CALLER.replace('    workflows: ["Layer PR checks"]', '    workflows:\n      - "Layer PR checks"')).text;
+    expect(block).toContain(`      - "Layer PR checks"\n      - "${MERGE_GUARD_TRIGGER_NAME}"\n`);
+    const none = judge(CALLER.replace('  workflow_run:\n    workflows: ["Layer PR checks"]\n    types: [completed]\n', "")).text;
+    expect(none).toContain(`  workflow_run:\n    workflows: ["${MERGE_GUARD_TRIGGER_NAME}"]\n    types: [completed]\npermissions:`);
+    expect(judge(none).findings).toHaveLength(0);
+  });
+
+  test("a workflow that does not call layer-merge-guard is not judged", () => {
+    expect(judge(CALLER.replace("layer-merge-guard.yml", "other.yml")).findings).toHaveLength(0);
+  });
+
+  test("the signal file is written when missing or changed, and is then current", () => {
+    const root = mkdtempSync(join(tmpdir(), "wf-pins-signal-"));
+    mkdirSync(join(root, ".github", "workflows"), { recursive: true });
+    expect(mergeGuardTrigger(root, false, true)).toHaveLength(0);
+    const missing = mergeGuardTrigger(root, true, false);
+    expect(missing.map((f) => [f.file, f.have, f.trailing])).toEqual([[MERGE_GUARD_TRIGGER_FILE, "(missing)", true]]);
+    expect(existsSync(join(root, MERGE_GUARD_TRIGGER_FILE))).toBe(false);
+    expect(mergeGuardTrigger(root, true, true)).toHaveLength(1);
+    expect(readFileSync(join(root, MERGE_GUARD_TRIGGER_FILE), "utf8")).toBe(MERGE_GUARD_TRIGGER_TEXT);
+    expect(mergeGuardTrigger(root, true, false)).toHaveLength(0);
+    writeFileSync(join(root, MERGE_GUARD_TRIGGER_FILE), MERGE_GUARD_TRIGGER_TEXT.replace("permissions: {}", "permissions: write-all"));
+    expect(mergeGuardTrigger(root, true, false)[0].have).toBe("(differs from the canonical signal)");
   });
 });

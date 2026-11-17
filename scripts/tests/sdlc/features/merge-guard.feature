@@ -272,6 +272,12 @@ Feature: Merge guard
     When the "ci" check is read
     Then it passes
 
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_—_the_head's_own_pull_request_CI::the_guard's_signal_is_never_evidence,_and_never_owed:_held,_running_or_absent,_it_holds_nothing
+  Scenario: The guard's signal is never evidence and never owed
+    Given PR #1957 and a scan that owes "Merge guard trigger" as required
+    When a held, running or failed "Merge guard trigger" pull_request run is added, or none is
+    Then the "ci" check passes each time
+
   @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_—_the_head's_own_pull_request_CI::a_later_success_supersedes_an_earlier_failure_of_the_same_workflow
   Scenario: A later success supersedes an earlier failure of the same workflow
     Given PR #1937 with a later successful rerun of every pull_request run

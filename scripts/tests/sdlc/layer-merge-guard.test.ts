@@ -7,6 +7,13 @@
  * event payload, for each event a caller wires; the rest is read from the
  * file: the guard runs from the caller's default branch with `--status
  * --full-tier`, and nothing in it merges.
+ *
+ * Since 2026-11-17 (owner, card) no caller runs on `pull_request_target`: the
+ * pull-request events arrive as the completion of the permissionless
+ * `Merge guard trigger` signal, which `workflow-pins --write` writes. The
+ * safety properties of that split are held here: the signal has no token and
+ * runs nothing, the guard refuses a `pull_request` event, and nothing the
+ * privileged side runs comes from the PR head.
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
@@ -15,7 +22,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
 
-import { STATUS_CONTEXT } from "../../merge-guard.ts";
+import { SIGNAL_WORKFLOW_FILE, STATUS_CONTEXT } from "../../merge-guard.ts";
+import { MERGE_GUARD_PR_TYPES, MERGE_GUARD_TRIGGER_FILE, MERGE_GUARD_TRIGGER_NAME, MERGE_GUARD_TRIGGER_TEXT } from "../../workflow-pins.ts";
 
 const WF = join(import.meta.dir, "..", "..", "..", ".github", "workflows");
 const text = readFileSync(join(WF, "layer-merge-guard.yml"), "utf8");
@@ -32,7 +40,7 @@ const steps = wf.jobs.guard.steps;
 const named = (n: string) => steps.find((s) => s.name?.startsWith(n))!;
 
 /** Run "Which PRs" for `event` with `payload`; `gh` answers from `gh`. */
-function whichPrs(event: string, payload: unknown, opts: { input?: string; gh?: string } = {}): { prs: string; calls: string[] } {
+function whichPrs(event: string, payload: unknown, opts: { input?: string; gh?: string } = {}): { prs: string; calls: string[]; code: number; stdout: string } {
   const dir = mkdtempSync(join(tmpdir(), "merge-guard-wf-"));
   const log = join(dir, "calls.log");
   writeFileSync(join(dir, "gh"), `#!/usr/bin/env bash\necho "gh $*" >> "${log}"\necho '${opts.gh ?? ""}'\n`);
@@ -54,20 +62,40 @@ function whichPrs(event: string, payload: unknown, opts: { input?: string; gh?: 
       INPUT_PR: opts.input ?? "",
     },
   });
-  expect(r.status).toBe(0);
   let calls: string[] = [];
   try {
     calls = readFileSync(log, "utf8").trim().split("\n");
   } catch {
     calls = [];
   }
-  return { prs: /^prs=(.*)$/m.exec(readFileSync(out, "utf8"))?.[1] ?? "", calls };
+  return { prs: /^prs=(.*)$/m.exec(readFileSync(out, "utf8"))?.[1] ?? "", calls, code: r.status ?? -1, stdout: r.stdout };
 }
 
 describe("layer-merge-guard: which PRs a run judges", () => {
-  test("a pull_request_target or pull_request event judges its PR", () => {
-    expect(whichPrs("pull_request_target", { pull_request: { number: 12 } }).prs).toBe("12");
-    expect(whichPrs("pull_request", { pull_request: { number: 3 } }).prs).toBe("3");
+  test("a pull_request event is refused: the caller's file would be the PR's own", () => {
+    const r = whichPrs("pull_request", { pull_request: { number: 3 } });
+    expect(r.code).toBe(1);
+    expect(r.prs).toBe("");
+    expect(r.stdout).toContain("::error::the merge guard does not run on pull_request");
+  });
+
+  test("a caller not yet re-pinned (pull_request_target) is still judged, with a warning", () => {
+    const r = whichPrs("pull_request_target", { pull_request: { number: 12 } });
+    expect(r.code).toBe(0);
+    expect(r.prs).toBe("12");
+    expect(r.stdout).toContain("::warning::this caller still runs on pull_request_target");
+  });
+
+  test("a fork PR's signal names no PR and no open PR on its sha: its run name `#<n>` is judged, digits only", () => {
+    const fork = whichPrs("workflow_run", { workflow_run: { name: MERGE_GUARD_TRIGGER_NAME, display_title: `${MERGE_GUARD_TRIGGER_NAME} #41`, head_sha: "abc", pull_requests: [] } });
+    expect(fork.prs).toBe("41");
+    for (const title of [`${MERGE_GUARD_TRIGGER_NAME} #41; rm -rf /`, "Some other run #41", `${MERGE_GUARD_TRIGGER_NAME} #`, ""]) {
+      const r = whichPrs("workflow_run", { workflow_run: { display_title: title, head_sha: "abc", pull_requests: [] } });
+      expect(r.code).toBe(0);
+      expect(r.prs).toBe("");
+    }
+    // A run that names its PR is judged by that, never by its title.
+    expect(whichPrs("workflow_run", { workflow_run: { display_title: `${MERGE_GUARD_TRIGGER_NAME} #41`, head_sha: "abc", pull_requests: [{ number: 6 }] } }).prs).toBe("6");
   });
 
   test("a comment on a PR judges that PR; a comment on an issue judges none", () => {
@@ -118,16 +146,63 @@ describe("layer-merge-guard: what it runs", () => {
     expect(wf.jobs.guard.permissions.contents).toBe("read");
   });
 
-  test("this layer's caller is `merge-guard.yml` on pull_request_target, comments and the PR checks' runs", () => {
+  test("this layer's caller is `merge-guard.yml`, from the default branch only: comments, the PR checks' runs and the signal's", () => {
     const caller = parse(readFileSync(join(WF, "merge-guard.yml"), "utf8")) as {
       on: Record<string, { types?: string[]; workflows?: string[] }>;
       jobs: { guard: { uses: string } };
     };
     expect(caller.jobs.guard.uses).toBe("./.github/workflows/layer-merge-guard.yml");
-    expect(Object.keys(caller.on).sort()).toEqual(["issue_comment", "pull_request_target", "workflow_dispatch", "workflow_run"]);
-    expect(caller.on.pull_request_target!.types).toEqual(expect.arrayContaining(["synchronize", "labeled", "unlabeled", "ready_for_review"]));
+    expect(Object.keys(caller.on).sort()).toEqual(["issue_comment", "workflow_dispatch", "workflow_run"]);
     const prChecks = parse(readFileSync(join(WF, "pr-tests.yml"), "utf8")) as { name: string };
-    expect(caller.on.workflow_run!.workflows).toEqual([prChecks.name]);
+    expect(caller.on.workflow_run!.workflows).toEqual([prChecks.name, MERGE_GUARD_TRIGGER_NAME]);
+  });
+
+  test("the privileged side never takes code from the PR head and holds no secret", () => {
+    // Only the caller's default branch is checked out, and nothing names the head as a ref.
+    expect(steps.filter((s) => s.uses?.startsWith("actions/checkout"))).toHaveLength(1);
+    // The head sha is only a concurrency key and an API lookup; nothing fetches the head's tree.
+    expect(text).not.toMatch(/pull_request\.head|head_ref|head_branch|head_repository/);
+    for (const s of steps) {
+      expect(JSON.stringify(s.with ?? {})).not.toMatch(/head|secrets\./);
+      expect(s.run ?? "").not.toMatch(/head_ref|head\.ref|secrets\./);
+    }
+    expect(text).not.toContain("secrets.");
+  });
+});
+
+describe("layer-merge-guard: the signal (`Merge guard trigger`)", () => {
+  const signalText = readFileSync(join(WF, "merge-guard-trigger.yml"), "utf8");
+  const signal = parse(signalText) as {
+    name: string;
+    "run-name": string;
+    on: Record<string, { types?: string[] }>;
+    permissions: Record<string, string>;
+    jobs: Record<string, { permissions: Record<string, string>; steps: Step[] }>;
+  };
+
+  test("this layer's copy is the one workflow-pins writes, at the file merge-guard ignores", () => {
+    expect(signalText).toBe(MERGE_GUARD_TRIGGER_TEXT);
+    expect(MERGE_GUARD_TRIGGER_FILE).toBe(SIGNAL_WORKFLOW_FILE);
+  });
+
+  test("it runs on pull_request only, on every type the old caller listed, and its run name carries the PR number", () => {
+    expect(signal.name).toBe(MERGE_GUARD_TRIGGER_NAME);
+    expect(Object.keys(signal.on)).toEqual(["pull_request"]);
+    expect(signal.on.pull_request!.types).toEqual([...MERGE_GUARD_PR_TYPES]);
+    expect(signal.on.pull_request!.types).toEqual(expect.arrayContaining(["synchronize", "labeled", "unlabeled", "ready_for_review", "edited"]));
+    expect(signal["run-name"]).toBe(`${MERGE_GUARD_TRIGGER_NAME} #\${{ github.event.pull_request.number }}`);
+  });
+
+  test("it holds no token, uses no action, checks nothing out and reads no secret", () => {
+    expect(signal.permissions).toEqual({});
+    for (const job of Object.values(signal.jobs)) {
+      expect(job.permissions).toEqual({});
+      for (const s of job.steps) {
+        expect(s.uses).toBeUndefined();
+        expect(s.run ?? "").not.toContain("${{");
+      }
+    }
+    expect(signalText).not.toContain("secrets.");
   });
 });
 
