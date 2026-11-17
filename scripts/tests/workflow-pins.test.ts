@@ -89,3 +89,54 @@ describe("workflow-pins: layers under more than one owner", () => {
     expect(judgeAt("jobs:\n  c:\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node/sub@v4\n").findings).toHaveLength(0);
   });
 });
+
+describe("workflow-pins: a layer-pr-checks caller starts on `labeled`", () => {
+  // The dth-* callers (2026-11-16): `types` without `labeled`, so adding
+  // `release` started nothing and every PR ran the fast tier (full=false).
+  const CALLER = [
+    "on:",
+    "  pull_request:",
+    "    types: [opened, synchronize, reopened, ready_for_review]",
+    "  push:",
+    "    branches: [main]",
+    "concurrency:",
+    "  group: harness-pr-checks-${{ github.ref }}",
+    "  cancel-in-progress: true",
+    "jobs:",
+    "  checks:",
+    `    uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@${TOOLS} # index.lock.json`,
+    "    with:",
+    "      mode: index",
+    "",
+  ].join("\n");
+
+  test("--write adds `labeled`, the no-op label group and the job's if; a second pass is clean", () => {
+    const { findings, text } = judge(CALLER);
+    expect(findings).toHaveLength(3);
+    expect(findings.every((f) => f.want !== null && !f.trailing)).toBe(true);
+    expect(text).toContain("    types: [opened, synchronize, reopened, ready_for_review, labeled]\n");
+    expect(text).toContain("group: harness-pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id) || github.ref }}");
+    expect(text).toContain("  checks:\n    if: github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview'\n    uses:");
+    expect(judge(text).findings).toHaveLength(0);
+  });
+
+  test("a pull_request with no types gets a types line", () => {
+    const { text } = judge(CALLER.replace("    types: [opened, synchronize, reopened, ready_for_review]\n", ""));
+    expect(text).toContain("  pull_request:\n    types: [opened, synchronize, reopened, ready_for_review, labeled]\n");
+  });
+
+  test("a block list of types gets `- labeled`", () => {
+    const { text } = judge(CALLER.replace("    types: [opened, synchronize, reopened, ready_for_review]", "    types:\n      - opened\n      - synchronize"));
+    expect(text).toContain("      - synchronize\n      - labeled\n");
+  });
+
+  test("a workflow that does not call layer-pr-checks, or not on pull_request, is not judged", () => {
+    expect(judge(CALLER.replace("layer-pr-checks.yml", "other.yml")).findings).toHaveLength(0);
+    expect(judge(CALLER.replace("  pull_request:\n    types: [opened, synchronize, reopened, ready_for_review]\n", "")).findings).toHaveLength(0);
+  });
+
+  test("a job if without the label clause is reported for a hand fix", () => {
+    const { findings } = judge(CALLER.replace("  checks:\n", "  checks:\n    if: github.actor != 'bot'\n"));
+    expect(findings.find((f) => f.have.startsWith("if:"))?.want).toBeNull();
+  });
+});

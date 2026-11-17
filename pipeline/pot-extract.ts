@@ -404,7 +404,7 @@ export function cleanMarkdownWithTokens(text: string): CleanedMarkdown {
   const linkTargets: string[] = [];
   // A target is recorded as the author wrote it: the Liquid, code and math
   // set aside above are put back, since `po-inject` writes the target out
-  // verbatim (smart-trust#158: `{{game_lang}}` came out as `<NUL>LQD0<NUL>`).
+  // verbatim (a downstream page's `{{game_lang}}` link came out as `<NUL>LQD0<NUL>`).
   const asWritten = (target: string): string =>
     target.replace(/\x00(LQD|LQT|CODE|MATH)(\d+)\x00/g, (m, kind: string, i: string) => {
       const n = Number(i);

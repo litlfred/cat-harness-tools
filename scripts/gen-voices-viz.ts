@@ -42,6 +42,7 @@ import {
 } from "../schemas/kg/cat-harness.ts";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { makeEmit } from "./viewer-page.ts";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
@@ -475,7 +476,30 @@ let stale = 0;
  * `nav` since 2026-10-07: the pages are themed, so the theme's sidebar is
  * their navigation and there is no rail to inject.
  */
-const emit = makeEmit({ check, onStale: () => { stale++; } });
+const emitPage = makeEmit({ check, onStale: () => { stale++; } });
+
+/**
+ * Whether the harness declares `path` built at publish (`builtAtPublish`).
+ * Every page here is: the voices of every layer in the checkout, so no
+ * commit of the harness holds them, and `derive:publish` runs this writer.
+ * Exported for the test.
+ */
+export function builtAtPublishHere(path: string, root: string = ROOT): boolean {
+  const rel = relative(root, path).split(sep).join("/");
+  return !rel.startsWith("..") && isBuiltAtPublish(readDeclaration(root)?.builtAtPublish ?? [], rel);
+}
+
+/**
+ * The established rule (`methodologies:viz`, `external-schemas:viz`,
+ * `folio:viz`): a page built at publish has no committed bytes for `--check`
+ * to compare, so `--check` does not judge it, and a checkout that has not run
+ * `derive:publish` is not told 55 pages are missing. Written as before
+ * otherwise, and judged where it is not built at publish (`--site`).
+ */
+const emit = (path: string, content: string): void => {
+  if (check && builtAtPublishHere(path)) return;
+  emitPage(path, content);
+};
 
 if (import.meta.main) {
   const repoRoot = repoRootFor(ROOT);

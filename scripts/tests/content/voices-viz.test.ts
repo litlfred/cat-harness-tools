@@ -19,11 +19,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { readVoicesGraph, type VoicesGraph } from "../../voices-graph.ts";
-import { projection, viewerHtml } from "../../gen-voices-viz.ts";
+import { builtAtPublishHere, projection, viewerHtml } from "../../gen-voices-viz.ts";
 import { unscopedSelectors } from "../../lib/themed-page.ts";
 import { shippedVoices, overlaySeverityOf } from "../../../pipeline/voice-criteria.ts";
 import { overlayCriterionId } from "../../../pipeline/voice-criteria.ts";
-import { directoriesForGraph, layerRootsIn, repoRootFor } from "../../../schemas/kg/cat-harness.ts";
+import { directoriesForGraph, layerRootsIn, readDeclaration, repoRootFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
@@ -351,5 +351,24 @@ describe("citations carry their links (qgjh)", () => {
   });
   test("a citation nothing resolves carries no links", () => {
     expect(c!.links).toBeUndefined();
+  });
+});
+
+describe("--check does not judge a page the harness builds at publish", () => {
+  // The voices pages are every layer's in the checkout, so the harness lists
+  // them in `builtAtPublish` and no commit holds them: a checkout that has not
+  // run `derive:publish` must not be told every page is missing.
+  const declared = (readDeclaration(INSTANCE)?.builtAtPublish ?? []).filter((e) => e.writer.includes("voices:viz"));
+
+  test("every page the harness builds at publish with this writer is skipped by --check", () => {
+    expect(declared.length).toBeGreaterThan(0);
+    for (const e of declared) {
+      const page = e.path.endsWith("/") ? join(INSTANCE, e.path, "a-layer", "a-voice", "index.html") : join(INSTANCE, e.path);
+      expect({ page: e.path, skipped: builtAtPublishHere(page) }).toEqual({ page: e.path, skipped: true });
+    }
+  });
+
+  test("a page outside the harness (a --site build) is still judged", () => {
+    expect(builtAtPublishHere(join(INSTANCE, "..", "elsewhere", "docs", "en", "cat-harness", "voices", "index.html"))).toBe(false);
   });
 });
