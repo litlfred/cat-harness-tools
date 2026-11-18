@@ -392,3 +392,29 @@ describe("every site build writes its search scopes (who-iris search, owner 2026
     for (const after of ['join(site, ".nojekyll")', "siteCoverageShortfall(", "parityReport("]) expect(at(after)).toBeGreaterThan(split);
   });
 });
+
+describe("every site build publishes its knowledge-graph search (owner, 2026-11-18)", () => {
+  // "KG slice only, linked": the kg slice, its payloads and the harness's search
+  // page, before the rail so the page gets the chrome, and before the split,
+  // whose manifest links the page only when it is there.
+  const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
+  const body = src.slice(src.indexOf("export async function buildInstanceSite("));
+  const at = (s: string) => {
+    const i = body.indexOf(s);
+    expect(i).toBeGreaterThan(-1);
+    return i;
+  };
+  test("after the mounted docs, before the rail and the search split", () => {
+    const kg = at("publishKgSearch(site, root)");
+    expect(at("mount-instance-docs.ts")).toBeLessThan(kg);
+    expect(at("rail-standalone-pages.ts")).toBeGreaterThan(kg);
+    expect(at("splitSite(site, root)")).toBeGreaterThan(kg);
+  });
+  test("builds the kg slice with its payloads, and a failure is said, not a refused publish", () => {
+    const fn = src.slice(src.indexOf("function publishKgSearch("), src.indexOf("function run("));
+    expect(fn).toContain("--slice kg");
+    expect(fn).toContain("--with-published-payloads");
+    expect(fn).toContain("the site publishes no KG search");
+    expect(fn).not.toContain("throw ");
+  });
+});

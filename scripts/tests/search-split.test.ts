@@ -43,6 +43,9 @@ import {
   postBuildPages,
   relUrlOfPage,
   withPageEntries,
+  publishedKgSearch,
+  KG_SEARCH_PAGE,
+  KG_SLICE_MANIFEST,
   type SearchManifest,
 } from "../search-split.ts";
 import { SEARCH_EXCLUDE_META, SEARCH_POST_BUILD_META } from "../lib/site-bar.ts";
@@ -503,5 +506,28 @@ describe("a layer's own pages are indexed after the build — owner, 2026-11-17"
   test("withPageEntries leaves a tree with no marked page byte for byte as the theme wrote it", () => {
     const text = JSON.stringify({ 0: { relUrl: "/" } });
     expect(withPageEntries(text, [])).toBe(text);
+  });
+});
+
+describe("the knowledge-graph search link — owner, 2026-11-18 (KG slice only, linked)", () => {
+  test("named only when both the page and the kg slice are published", () => {
+    const dir = mkdtempSync(join(tmpdir(), "search-split-kg-"));
+    try {
+      expect(publishedKgSearch(dir)).toBeUndefined();
+      mkdirSync(join(dir, "slices"), { recursive: true });
+      writeFileSync(join(dir, KG_SEARCH_PAGE), "<html></html>");
+      expect(publishedKgSearch(dir)).toBeUndefined(); // a page with no slice opens nothing
+      mkdirSync(join(dir, "assets/slices"), { recursive: true });
+      writeFileSync(join(dir, KG_SLICE_MANIFEST), "{}");
+      expect(publishedKgSearch(dir)).toBe("slices/search.html?slice=kg");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  test("the manifest carries it when given, and not otherwise", () => {
+    const text = JSON.stringify({ 0: { relUrl: "/" } });
+    const m = (kg?: string) => JSON.parse(render(text, INSTANCES, LOCALES, SECTION_BUDGET_BYTES, [], PREBUILT_TOKEN_BUDGET, WHOLE_SITE_BUDGET_BYTES, kg).get(`${SCOPES_DIR}/manifest.json`)!) as SearchManifest;
+    expect(m("slices/search.html?slice=kg").kgSearch).toBe("slices/search.html?slice=kg");
+    expect(m().kgSearch).toBeUndefined();
   });
 });

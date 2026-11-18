@@ -150,6 +150,13 @@ export interface SearchManifest {
    * still has layers to filter by. Absent when the checkout declares none.
    */
   layers?: string[];
+  /**
+   * The site's knowledge-graph search page, site-relative, when the build
+   * published the `kg` slice and its page (`publishedKgSearch`). The search
+   * panel links it with the reader's query; the slice downloads only when
+   * that page is opened. Absent when the site has none.
+   */
+  kgSearch?: string;
 }
 
 /** Where `publish-id-lookup.ts` puts the lookup client and its indexes, under the site root. */
@@ -178,6 +185,20 @@ export function publishedLookups(site: string): RemoteScope[] {
     out.push({ id: name, kind: "id-lookup", href: `${ID_LOOKUP_DIR}/?index=${encodeURIComponent(name)}/`, entries });
   }
   return out;
+}
+
+/** Where the knowledge-graph search page and the `kg` slice's manifest sit, site-relative. */
+export const KG_SEARCH_PAGE = "slices/search.html";
+export const KG_SLICE_MANIFEST = "assets/slices/kg.sqlite3.json";
+
+/**
+ * The knowledge-graph search a built site publishes, as the link the search
+ * panel opens (`slices/search.html?slice=kg`), or `undefined` when either the
+ * page or the slice is missing: a link to a search that cannot open would be
+ * worse than none.
+ */
+export function publishedKgSearch(site: string): string | undefined {
+  return existsSync(join(site, KG_SEARCH_PAGE)) && existsSync(join(site, KG_SLICE_MANIFEST)) ? `${KG_SEARCH_PAGE}?slice=kg` : undefined;
 }
 
 /** The id the platform scope uses. Not a possible layer or locale name, so it cannot collide. */
@@ -407,6 +428,7 @@ export function render(
   remote: readonly RemoteScope[] = [],
   prebuiltBudget: number = PREBUILT_TOKEN_BUDGET,
   wholeSiteBudget: number = 0,
+  kgSearch?: string,
 ): Map<string, string> {
   const index = JSON.parse(sourceText) as Record<string, SearchEntry>;
   const files = new Map<string, string>();
@@ -443,6 +465,7 @@ export function render(
     scopes,
     ...(remote.length > 0 ? { remote: [...remote] } : {}),
     ...(instances.size > 0 ? { layers: [...instances].sort() } : {}),
+    ...(kgSearch ? { kgSearch } : {}),
   };
   files.set(`${SCOPES_DIR}/manifest.json`, JSON.stringify(manifest, null, 2) + "\n");
   return files;
@@ -664,6 +687,7 @@ export function splitSite(
     publishedLookups(site),
     PREBUILT_TOKEN_BUDGET,
     opts.wholeSiteBudget ?? WHOLE_SITE_BUDGET_BYTES,
+    publishedKgSearch(site),
   );
   for (const [rel, body] of scoped) files.set(rel, body);
   const stale: string[] = [];
