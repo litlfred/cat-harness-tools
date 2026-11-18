@@ -35,7 +35,7 @@ import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { stripInlineCode } from "../schemas/content/inline-code.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
-import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
+import { PAGE_LOCALE, declaredPageRoute, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { writeProvenanceListing } from "./provenance-footer.ts";
 import { readPathAt, writePathAt } from "./lib/layer-output.ts";
@@ -153,6 +153,44 @@ const drifted: string[] = [];
  * the only moment the promotion is free.
  */
 const collisions: Array<{ published: string; kept: string; from: string }> = [];
+
+/**
+ * THE SKILLS HUB: the page at the route of the visualiser `skill-docs`
+ * draws, `<locale>/<harness>/<id>/` (owner card "Skills hub", option A,
+ * 2026-11-18). The instruction pages stay at `reference/skill-instructions/`;
+ * the hub forwards there, carrying `?query` and `#fragment`, the way
+ * `redirectStub` in `compose-docs.ts` forwards an old address. It names
+ * `skill-docs` as `rendered-by` so `check:visualiser-routes` can tell it is
+ * the route's own page. Plain HTML with no front matter, so Jekyll copies it
+ * verbatim.
+ *
+ * Before this, a harness could only point its sidebar at the index by the
+ * retired `coverage.visualiser` (cat-harness#1373, reverted by #1379).
+ */
+export function skillsHubPage(href: string): string {
+  const t = href.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const js = JSON.stringify(href).replace(/</g, "\\u003c");
+  return (
+    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Skills</title>\n` +
+    `<meta name="rendered-by" content="skill-docs">\n` +
+    `<link rel="canonical" href="${t}">\n` +
+    `<script>location.replace(${js} + location.search + location.hash);</script>\n` +
+    `<meta http-equiv="refresh" content="0; url=${t}"><meta name="robots" content="noindex">\n` +
+    `</head><body><p>The skill instructions are at <a href="${t}">${t}</a>.</p></body></html>\n`
+  );
+}
+
+/**
+ * The hub's site-relative directory and the relative href from it to the
+ * published skill-instructions index — `undefined` when the harness declares
+ * no visualiser drawn by `skill-docs`: no declaration, no route, no page.
+ */
+export function skillsHub(siteRoot: string, harnessRoot: string, indexPage: string): { dir: string; href: string } | undefined {
+  const route = declaredPageRoute(harnessRoot, "skill-docs");
+  if (route === undefined) return undefined;
+  const up = "../".repeat(route.split("/").filter(Boolean).length);
+  return { dir: route, href: `${up}${publishedPagePath(siteRoot, indexPage)}` };
+}
 
 function emit(path: string, content: string): void {
   if (CHECK_ONLY) {
@@ -1497,6 +1535,13 @@ async function main(): Promise<void> {
   }
   const total = Object.values(indexRows).reduce((n, r) => n + r.length, 0);
   console.log(`  ✓ index.md (${total} instruction bodies)`);
+  {
+    const hub = skillsHub(SITE_ROOT, INSTANCE_ROOT, `${SKILL_PAGES_REL}/index`);
+    if (hub !== undefined) {
+      emit(join(SITE_ROOT, hub.dir, "index.html"), skillsHubPage(hub.href));
+      console.log(`  ✓ ${hub.dir}/index.html (Skills hub → ${hub.href})`);
+    }
+  }
   // THE PROVENANCE FOOTER (owner, 2026-11-05, "2B"): one site-data slice for
   // these pages, read by `footer_custom.html` like every other slice.
   {
