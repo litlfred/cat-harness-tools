@@ -28,7 +28,7 @@
  * The theme indexes only the pages Jekyll builds. A mounted layer's own HTML,
  * such as a handbook under `/en/<layer>/`, is written after Jekyll, so
  * it was never in the index. The site bar marks those pages with
- * `SEARCH_POST_BUILD_META` (`lib/site-bar.ts`), and {@link splitSite} adds
+ * `SEARCH_POST_BUILD_META` (`lib/search-markers.ts`), and {@link splitSite} adds
  * their sections to `search-data.json`, in the theme's own entry shape,
  * before it cuts the scopes ({@link withPageEntries}). Re-running it replaces
  * those entries rather than repeating them, so a borrowed index stays one
@@ -86,7 +86,7 @@ import lunr from "lunr";
 import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { targetLocales } from "../pipeline/translation-index.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { SEARCH_POST_BUILD_META } from "./lib/site-bar.ts";
+import { SEARCH_POST_BUILD_META } from "./lib/search-markers.ts";
 
 /** Where the theme writes the whole index, relative to the site root. */
 export const SOURCE_PATH = "assets/js/search-data.json";
