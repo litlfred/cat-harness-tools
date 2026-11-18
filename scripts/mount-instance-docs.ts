@@ -1019,7 +1019,7 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
   const pageTree = opts.themeSource && existsSync(opts.themeSource) ? jekyllNavPages(opts.themeSource) : undefined;
   // A page that declares its own navigation gives its Pages subtree (read before any page is railed).
   const declared = pageTree ? declaredNavsIn(siteAbs, pageTree) : undefined;
-  const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
+  const themeSearch = themeSearchScripts(siteAbs);
   for (const m of mounts) byInstance.set(m.name, [...(byInstance.get(m.name) ?? []), m]);
 
   const htmlUnder = (dir: string): string[] => {
@@ -1155,6 +1155,21 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
     }
   }
   return { injected, skipped, unpublished };
+}
+
+/**
+ * The theme's search scripts a page the theme did not lay out gets: both of
+ * {@link THEME_SEARCH_SCRIPTS} when the site publishes them, else none (the
+ * bar then has no box). Lunr is left OUT when the site's theme script loads
+ * it itself on first use (its `fa-lazy-lunr` hunk; owner, 2026-11-18: "lazy
+ * load the search indices"), so a page nobody searches never fetches it. A
+ * site built with an older harness keeps the tag, and its search still works.
+ */
+export function themeSearchScripts(siteAbs: string): readonly string[] | undefined {
+  if (!THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s)))) return undefined;
+  const jtd = THEME_SEARCH_SCRIPTS.find((s) => s.endsWith("just-the-docs.js"))!;
+  const lazy = readFileSync(join(siteAbs, jtd), "utf-8").includes("fa-lazy-lunr");
+  return lazy ? THEME_SEARCH_SCRIPTS.filter((s) => !s.endsWith("lunr.min.js")) : THEME_SEARCH_SCRIPTS;
 }
 
 /**
@@ -1471,7 +1486,7 @@ export function railStandalonePages(
   const declared = pageTree ? declaredNavsIn(siteAbs, pageTree) : undefined;
   // The theme's search, where the site publishes it: the top bar of a page
   // the theme did not lay out searches the same index (`lib/site-bar.ts`).
-  const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
+  const themeSearch = themeSearchScripts(siteAbs);
   // A page inside a layer's folio pages is railed as that layer's (#1902).
   const scopes = pageTree && !foreign ? railScopesOf(built) : [];
 

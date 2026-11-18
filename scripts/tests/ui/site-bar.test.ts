@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { expandRail, railDataJson } from "../../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS, bodyTag, injectNavbar } from "../../lib/navbar.ts";
 import { SEARCH_EXCLUDE_META, SEARCH_POST_BUILD_META, elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../../lib/site-bar.ts";
-import { railStandalonePages } from "../../mount-instance-docs.ts";
+import { railStandalonePages, themeSearchScripts } from "../../mount-instance-docs.ts";
 import { PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE } from "../../page-layout.ts";
 import { firstPaintSchemeScript } from "../../lib/scheme-css.ts";
 
@@ -258,5 +258,24 @@ describe("the real <body>, never one a comment or a script names", () => {
   test("the rail lands in the body", () => {
     const out = injectNavbar(page, { instance: "x" })!;
     expect(out.indexOf('<nav class="fa-nav"')).toBeGreaterThan(out.indexOf('<body class="x">'));
+  });
+});
+
+describe("themeSearchScripts — lunr is left to the theme script when it loads it lazily (owner, 2026-11-18)", () => {
+  const site = (jtd: string | undefined, lunr = true) => {
+    const dir = mkdtempSync(join(tmpdir(), "theme-search-"));
+    if (lunr) put(dir, { "assets/js/vendor/lunr.min.js": "/* lunr */" });
+    if (jtd !== undefined) put(dir, { "assets/js/just-the-docs.js": jtd });
+    return dir;
+  };
+  test("a theme script with the fa-lazy-lunr loader: only that script, no lunr tag", () => {
+    expect(themeSearchScripts(site("// fa-lazy-lunr\nfunction withLunr(){}"))).toEqual(["assets/js/just-the-docs.js"]);
+  });
+  test("an older theme script: both, as before, so its search still works", () => {
+    expect(themeSearchScripts(site("/* jtd */"))).toEqual(["assets/js/vendor/lunr.min.js", "assets/js/just-the-docs.js"]);
+  });
+  test("a site that publishes either file missing: no box at all", () => {
+    expect(themeSearchScripts(site("// fa-lazy-lunr", false))).toBeUndefined();
+    expect(themeSearchScripts(site(undefined))).toBeUndefined();
   });
 });
