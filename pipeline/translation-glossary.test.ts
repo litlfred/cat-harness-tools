@@ -201,6 +201,25 @@ describe("subject areas are read from the glossary each scheme catalogue names",
     expect(sc.terms.has("actor")).toBe(false); // the scheme's subject applies
     expect(readSchemeScope(w("scope/not.json", "{}"))).toBeUndefined();
   });
+  test("readSchemeScope: LangText prefLabel and altLabel are read by their source text", () => {
+    const f = w(
+      "scope/lang.glossary.json",
+      JSON.stringify({
+        $schema: "folio-glossary/v1",
+        id: "terms",
+        terms: [
+          { id: "policy", prefLabel: { fr: "Politique", en: "Policy" }, altLabel: [{ en: "Rulebook", fr: "Règlement" }], subject: "s1", status: "authored" },
+          { id: "rule", prefLabel: { en: "Rule" }, altLabel: { en: ["Constraint"], fr: ["Contrainte"] }, subject: "s2", status: "authored" },
+        ],
+      }),
+    );
+    const sc = readSchemeScope(f)!;
+    expect(sc.terms.get("policy")).toBe("s1");
+    expect(sc.terms.get("rulebook")).toBe("s1");
+    expect(sc.terms.get("constraint")).toBe("s2");
+    expect(sc.terms.has("politique")).toBe(false);
+    expect(sc.terms.has("[object object]")).toBe(false);
+  });
   test("readSchemeScope: a schema publishing its terms in $defs carries its subject as data", () => {
     const f = w(
       "scope/graph.schema.json",

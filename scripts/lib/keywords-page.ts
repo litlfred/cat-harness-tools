@@ -25,6 +25,7 @@ import { instanceDirectoriesForGraph, layerRootsIn } from "../../schemas/kg/cat-
 import { tokenize } from "../../pipeline/lsi.ts";
 import type { KeywordVariant, KeywordsGraph, ScoredKeyword } from "../../schemas/library/library-keywords.ts";
 import type { LibraryLinks, LibraryResolver } from "./library-links.ts";
+import { schemeSourceLanguage, sourceText, sourceTexts } from "../../schemas/content/lang-text.ts";
 
 /** One entry, reduced to what the page draws. */
 export interface KeywordsPageEntry {
@@ -261,8 +262,11 @@ export function glossaryLabels(repo: string): { labels: Set<string>; files: stri
     for (const f of readdirSync(dir).filter((n) => n.endsWith(".glossary.json")).sort()) {
       try {
         const g = JSON.parse(readFileSync(join(dir, f), "utf8")) as { terms?: { prefLabel?: unknown; altLabel?: unknown }[] };
+        const lang = schemeSourceLanguage(g);
+        // The SOURCE text of each label: a translated label is a language
+        // map (`folio-glossary/v1`), and dropping it dropped the term.
         for (const t of g.terms ?? [])
-          for (const l of [t.prefLabel, ...(Array.isArray(t.altLabel) ? t.altLabel : [t.altLabel])])
+          for (const l of [sourceText(t.prefLabel, lang), ...sourceTexts(t.altLabel, lang)])
             if (typeof l === "string" && norm(l)) labels.add(norm(l));
         files.push(relative(repo, join(dir, f)).split(sep).join(posix.sep));
       } catch {

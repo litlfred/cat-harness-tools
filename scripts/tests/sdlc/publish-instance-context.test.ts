@@ -126,6 +126,27 @@ describe("term pages (owner report, 2026-11-18: …/v0/ns/graphTypology/skills a
   });
 });
 
+describe("a language-tagged label or definition shows its source text, never [object Object]", () => {
+  const ns = "https://x.github.io/y/v0/ns/";
+  const doc = {
+    "@context": { y: ns },
+    "@id": ns,
+    "@graph": [
+      { "@id": "y:Policy", prefLabel: { fr: "Politique", en: "Policy" }, definition: [{ "@value": "Une règle.", "@language": "fr" }, { "@value": "A rule.", "@language": "en" }] },
+    ],
+  };
+  test("the term page and the index", () => {
+    const r = termPages("y", ns, "https://x.github.io/y/", doc);
+    if (!("pages" in r)) throw new Error(r.problems.join("; "));
+    const page = r.pages["v0/ns/Policy/index.html"]!;
+    expect(page).toContain("<h1>Policy</h1>");
+    expect(page).toContain("<p>A rule.</p>");
+    const html = vocabularyHtml("y", ns, doc);
+    expect(html).toContain("Policy — A rule.");
+    expect(html).not.toContain("[object Object]");
+  });
+});
+
 describe("an instance whose `ns` is a document (D1)", () => {
   test("its context is built for, and served at, the path beside the vocabulary", () => {
     put("doc/doc.json", { name: "doc", needs: [], iriBase: "https://example.github.io/doc/", jsonldPrefixes: { skos: "http://www.w3.org/2004/02/skos/core#" } });
