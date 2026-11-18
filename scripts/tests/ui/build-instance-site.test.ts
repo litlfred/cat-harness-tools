@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, isGraphData, writeBuildQa, BUILD_QA_REPORT, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages, linkedDataSteps, softRun } from "../../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, isGraphData, writeBuildQa, BUILD_QA_REPORT, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages, linkedDataSteps, softRun, siteIriCheckStep, declaredIriBase } from "../../build-instance-site.ts";
 import type { DeclaredArtefact } from "../../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -452,5 +452,45 @@ describe("build-instance-site — every layer's site serves its JSON-LD context 
   test("the build runs the steps for every declared layer, whatever its recipe", () => {
     const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
     expect(src).toContain("if (declared) for (const st of linkedDataSteps(TOOLS, o.instance, site)) softRun(st.label, st.argv, root);");
+  });
+});
+
+describe("build-instance-site — a built site serves the IRIs it mints (IRI fix 1A, f)", () => {
+  test("the step checks the tree against the declared iriBase, and no JSON-LD (78) is a pass", () => {
+    const st = siteIriCheckStep("cat-harness-tools/scripts", "/tmp/site", "https://example.org/layer/");
+    expect(st.argv).toEqual(["run", "cat-harness-tools/scripts/check-site-iris.ts", "--site", "/tmp/site", "--base", "https://example.org/layer/"]);
+    expect(st.ok).toEqual([0, 78]);
+  });
+
+  test("softRun honours the passing exits it is given", () => {
+    const orig = console.log;
+    console.log = () => undefined;
+    try {
+      const exit78 = (() => ({ status: 78 })) as unknown as typeof spawnSync;
+      expect(softRun("x", ["x"], ".", exit78)).toBe(false);
+      expect(softRun("x", ["x"], ".", exit78, [0, 78])).toBe(true);
+    } finally {
+      console.log = orig;
+    }
+  });
+
+  test("declaredIriBase reads the declaration's iriBase, and nothing from a file without one", () => {
+    const d = mkdtempSync(join(tmpdir(), "iribase-"));
+    writeFileSync(join(d, "a.json"), JSON.stringify({ name: "a", iriBase: "https://example.org/a/" }));
+    writeFileSync(join(d, "b.json"), JSON.stringify({ name: "b" }));
+    writeFileSync(join(d, "c.json"), "not json");
+    expect(declaredIriBase(join(d, "a.json"))).toBe("https://example.org/a/");
+    expect(declaredIriBase(join(d, "b.json"))).toBeUndefined();
+    expect(declaredIriBase(join(d, "c.json"))).toBeUndefined();
+    // Removed: a temp directory holding two declarations is an ambiguous
+    // instance to any other test that scans the temp root.
+    rmSync(d, { recursive: true, force: true });
+  });
+
+  test("the build and the folio path both run the check", () => {
+    const build = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
+    const stage = readFileSync(join(import.meta.dir, "..", "..", "stage-local.ts"), "utf-8");
+    expect(build).toContain("const st = siteIriCheckStep(TOOLS, site, iriBase);");
+    expect(stage).toContain("siteIriCheckStep(dirname(script(\"check-site-iris.ts\")), site, iriBase)");
   });
 });

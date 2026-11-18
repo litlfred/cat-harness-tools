@@ -1464,6 +1464,14 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "check:site-iris",
+    kind: "covered-by",
+    reason:
+      "judges a BUILT site tree (`--site <dir> --base <iriBase>`), so it has nothing to read on a checkout: every site build " +
+      "runs it over the tree it built, as a QA finding — `build-instance-site.ts` and `stage-local.ts`'s folio path, " +
+      "`siteIriCheckStep` (IRI fix 1A, f; owner, 2026-11-18). Covered by `scripts/tests/check-site-iris.test.ts` in `bun test`",
+  },
+  {
     script: "iri-base:check",
     kind: "no-folio",
     reason:

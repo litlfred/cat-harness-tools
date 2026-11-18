@@ -990,15 +990,42 @@ export function linkedDataSteps(tools: string, instance: string, site: string): 
 }
 
 /**
+ * The QA step that holds a built site to the IRIs it mints (IRI fix 1A, f):
+ * `check:site-iris` over the tree, against the layer's declared `iriBase`.
+ * The tree has the same layout wherever it is uploaded (main, or a preview
+ * under `branches/`), so the check is against the address the IRIs are
+ * minted under, not the address this build is published at. Exit 78 (the
+ * site publishes no JSON-LD) is a pass.
+ */
+export function siteIriCheckStep(tools: string, site: string, iriBase: string): { label: string; argv: string[]; ok: readonly number[] } {
+  return {
+    label: "minted IRIs are served",
+    argv: ["run", join(tools, "check-site-iris.ts"), "--site", site, "--base", iriBase],
+    ok: [0, 78],
+  };
+}
+
+/** The `iriBase` a declaration file names, if any. */
+export function declaredIriBase(declFile: string): string | undefined {
+  try {
+    const v = (JSON.parse(readFileSync(declFile, "utf-8")) as { iriBase?: unknown }).iriBase;
+    return typeof v === "string" && v !== "" ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Run `bun <argv>` as a step whose failure is a finding, not a refusal: it is
  * reported as an error annotation and the build goes on, so one layer's
  * unresolved prefix does not take its whole site down. No shell: the argv is
- * passed as it is. Returns whether it passed.
+ * passed as it is. Returns whether it passed; an exit in `ok` (default 0) is
+ * a pass.
  */
-export function softRun(label: string, argv: readonly string[], cwd: string, spawn = spawnSync): boolean {
+export function softRun(label: string, argv: readonly string[], cwd: string, spawn = spawnSync, ok: readonly number[] = [0]): boolean {
   console.log(`▶ ${label}`);
   const r = spawn("bun", [...argv], { cwd, stdio: "inherit", env: process.env });
-  if (r.status === 0) return true;
+  if (r.status !== null && ok.includes(r.status)) return true;
   console.log(`::error::${label} failed (exit ${r.status}): bun ${argv.join(" ")} — the site is published without it`);
   return false;
 }
@@ -1380,6 +1407,12 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // After every page writer, so the documents never shadow a page; before the
     // guards below, which see the documents as part of the site.
     if (o.rootIndex) run("graph documents and root index", `bun run ${TOOLS}/publish-root-index.ts --site ${s} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}`)}`, root);
+    // Every declared layer's site: the IRIs it mints resolve on it (IRI fix 1A, f).
+    const iriBase = declFile === undefined ? undefined : declaredIriBase(join(root, declFile));
+    if (iriBase !== undefined) {
+      const st = siteIriCheckStep(TOOLS, site, iriBase);
+      softRun(st.label, st.argv, root, spawnSync, st.ok);
+    }
     if (o.scope) {
       const pruned = pruneUnreferencedImages(site);
       console.log(`scope: ${pruned.files.length} image(s) no page shows left out (${(pruned.bytes / 1e6).toFixed(1)} MB)`);
