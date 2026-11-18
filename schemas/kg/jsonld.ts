@@ -60,6 +60,7 @@ import type { ContributionRegistry } from "../content/contributions";
  * module's note.
  */
 import { z } from "zod";
+import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 
 import { CAT_HARNESS_NS, FOLIO_BASE, ownNamespace, termCurie } from "./namespaces";
 
@@ -148,6 +149,36 @@ export { FOLIO_BASE };
 export const CONTENT_DOCUMENT_CONTEXT = [CONTENT_CONTEXT_URL, { "@base": FOLIO_BASE }] as const;
 
 /**
+ * The `@base` a content document written into a layer resolves its relative
+ * `@id`s against: the layer's release, `<iriBase>v<major>/` (IRI fix 1A,
+ * owner 2026-11-18, finding 1). {@link FOLIO_BASE} is served by no site, so
+ * every block, paper and library node it based was a 404; under the layer's
+ * own release an `@id` names `<iriBase>v<major>/<id>`, which the layer's site
+ * publishes as `<id>.jsonld` with a page at `<id>.html` (core's site build).
+ *
+ * Throws when the version is not `MAJOR.MINOR.PATCH`: a base needs a major
+ * to mint under (`release-iri.ts`).
+ */
+export function instanceKgBase(iriBase: string, version: string | undefined): string {
+  const r = releaseIris({ iriBase, version });
+  if (r === undefined) throw new Error("instanceKgBase: an empty iriBase has no release");
+  return r.agent;
+}
+
+/** A local context with the shared {@link FOLIO_BASE} replaced by `base`, keys in place; anything else unchanged. */
+export function rebased(local: unknown, base: string): unknown {
+  if (local === null || typeof local !== "object" || Array.isArray(local)) return local;
+  const rec = local as Record<string, unknown>;
+  if (rec["@base"] !== FOLIO_BASE) return local;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rec)) out[k] = k === "@base" ? base : v;
+  return out;
+}
+
+/** The shape of {@link instanceKgBase}'s answer: an absolute URL ending `/v<major>/`. */
+export const INSTANCE_KG_BASE_PATTERN = /^https?:\/\/\S+\/v(0|[1-9]\d*)\/$/;
+
+/**
  * The published docs site's root — `_config.yml` `url` + `baseurl`, from the
  * own-namespaces code list (`docs-site`). The same value `library-iri.ts`
  * mints library assets under.
@@ -188,6 +219,11 @@ export const ContentContextSchema = z.union([
   // which layer owns the file is the emitter's to know, not a schema's.
   z.tuple([z.string().url().regex(/\/ns\/context\/v1\.jsonld$/), z.object({ "@base": z.literal(FOLIO_BASE) }).strict()]),
   z.tuple([z.string().url().regex(/\/ns\/context\/v1\.jsonld$/), z.object({ "@base": z.literal(DOCS_SITE_BASE) }).strict()]),
+  // A layer's own context with the layer's own release as `@base`
+  // (`instanceKgBase`, IRI fix 1A): what the write boundary emits from
+  // 2026-11-18. The two forms above stay accepted until every layer re-pins
+  // and regenerates.
+  z.tuple([z.string().url().regex(/\/ns\/context\/v1\.jsonld$/), z.object({ "@base": z.string().regex(INSTANCE_KG_BASE_PATTERN) }).strict()]),
 ]);
 
 // ── Block kind → RDF types ───────────────────────────────────────

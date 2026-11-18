@@ -69,11 +69,12 @@
  */
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { fetchQa, parseQaRef, QaUsageError } from "./qa-store.ts";
-import { siteFetchStatePath } from "./qa-result-link.ts";
+import { fetchQa, parseQaRef, QaUsageError, resolveQaLocation, type QaLocation } from "./qa-store.ts";
+import { qaResultLinkFor, siteFetchStatePath } from "./qa-result-link.ts";
+import { logicalPathOf, mountedInstances } from "./lib/layer-output.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 
 export const AVAILABILITY_SCHEMA = "folio-qa-availability/v1" as const;
@@ -312,6 +313,80 @@ function args(argv: string[]) {
   return { pos, one: (n: string) => vals.get(n)?.at(-1), many: (n: string) => vals.get(n) ?? [], has: (n: string) => bools.has(n) };
 }
 
+/** A witness projection's place in an entry: `<layer>/test/results/witnesses/…`, the layer the part before. */
+const WITNESS_TREE = new RegExp(`^(?:(.*)/)?test/results/${WITNESS_SUBDIR}/.+\\.json$`);
+
+/**
+ * Re-stamp the `sidecarLinks` of every witness projection the entry at
+ * `entryDir` materialised into `root`.
+ *
+ * The site build copies a layer's witness tree into `_site/assets/qa/` as it
+ * finds it. For a mounted layer, the docs generator writes its fresh
+ * projections to the layer output root (`build/layers/<instance>/…`), so the
+ * copied tree is the FETCHED one, whose links were stamped by the run that
+ * published the entry, with that run's tools. On folio-assistant#3186 that was
+ * the previous commit, before #2448, and the stage gate refused 220 of its
+ * `blob/main/build/layers/…` links. A projection's links are derived from its
+ * `sidecars` (layer-root-relative), so they are composed again here by
+ * {@link qaResultLinkFor}, keyed by `key`, the entry the evidence came from.
+ *
+ * Returns how many were re-stamped, and how many could not be (unparseable,
+ * or the declarations would not resolve), with the first reason.
+ */
+export function restampWitnessLinks(
+  root: string,
+  entryDir: string,
+  key: string,
+  ctx: { repoWeb?: string; location?: QaLocation } = {},
+): { restamped: number; failed: number; why?: string } {
+  const out: { restamped: number; failed: number; why?: string } = { restamped: 0, failed: 0 };
+  const fail = (why: string) => {
+    out.failed++;
+    out.why ??= why;
+  };
+  const files = walkFiles(entryDir)
+    .map((f) => relative(entryDir, f).split(sep).join("/"))
+    .filter((f) => WITNESS_TREE.test(f));
+  if (files.length === 0) return out;
+  let location = ctx.location;
+  if (location === undefined) {
+    try {
+      location = resolveQaLocation(root);
+    } catch (e) {
+      fail(`the qa declarations do not resolve: ${String(e)}`);
+      out.failed = files.length;
+      return out;
+    }
+  }
+  const repoWeb = ctx.repoWeb ?? detectRepoUrl(root);
+  const mounted = mountedInstances(root);
+  for (const rel of files) {
+    const abs = join(root, rel);
+    let doc: { $schema?: unknown; sidecars?: unknown; sidecarLinks?: unknown };
+    try {
+      doc = JSON.parse(readFileSync(abs, "utf-8")) as typeof doc;
+    } catch (e) {
+      fail(`${rel} does not parse: ${String(e)}`);
+      continue;
+    }
+    if (doc?.$schema !== "qa-witness/v1" || !Array.isArray(doc.sidecars)) continue;
+    // The sidecars are relative to the LAYER root, which is where the tree
+    // sits LOGICALLY: an entry may hold a mounted layer's build copy.
+    const layerRel = WITNESS_TREE.exec(rel)![1] ?? "";
+    const layerRoot = logicalPathOf(root, join(root, layerRel), mounted);
+    try {
+      doc.sidecarLinks = (doc.sidecars as string[]).map((p) => qaResultLinkFor(resolve(layerRoot, p), { repoRoot: root, repoWeb, key, location }));
+    } catch (e) {
+      fail(`${rel}: ${String(e)}`);
+      continue;
+    }
+    // Minified, as the generator writes them.
+    writeFileSync(abs, JSON.stringify(doc) + "\n");
+    out.restamped++;
+  }
+  return out;
+}
+
 function repoRoot(): string {
   const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf-8" });
   if (r.status !== 0) throw new QaUsageError(`not inside a git checkout: ${process.cwd()}`);
@@ -367,6 +442,12 @@ function cmdFetch(a: ReturnType<typeof args>): number {
       // and kg sidecars across every layer's results tree, not only the
       // tree this build publishes from.
       cpSync(hitDir, root, { recursive: true });
+      // The entry's witness projections carry the links the run that WROTE
+      // them stamped, with that run's tools. The site copies them as they
+      // are, so they are re-addressed here, by today's rule and at the entry
+      // the evidence really came from.
+      const n = restampWitnessLinks(root, hitDir, hit.key);
+      if (n.failed) annotate("warning", `qa-site-assets: ${n.failed} fetched witness projection(s) could not be re-addressed: ${n.why}`);
     }
     const state: QaFetchState = {
       $schema: STATE_SCHEMA,
