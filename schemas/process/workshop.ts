@@ -26,6 +26,7 @@
  * | `matrix` | where each module meets each step, technical and policy, and the overlaps across modules: drawn by a lab step's `matrix` |
  * | `resources` | job aids, handouts, readings, slides and links, each tied to modules or steps |
  * | `presentation` | how the journeys viewer presents the workshop in a room: the app frame's words, the story in one sentence, whose record the trust ladder follows, the presenter's note, the outward links |
+ * | `schedule` | the days as a calendar: tracks side by side, and the joint sessions, breaks and logistics across them, each slot linked to its module |
  * | `lab` | the Discussion view as a table's working steps (team, use case, readiness, who decides, components, mapping, pathway, summary), each with a timer and a DISCUSS prompt, after DPI-H Lab; what a table writes is kept in its browser and assembled into one summary |
  *
  * A question is a question: a module asks a room to NAME, not to decide.
@@ -533,6 +534,55 @@ export const WorkshopCanvasSchema = z
   .strict();
 export type WorkshopCanvas = z.infer<typeof WorkshopCanvasSchema>;
 
+/** A clock time in a day, `HH:MM`, 24-hour. */
+const Clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "a time is HH:MM, 24-hour");
+
+/** A track of the schedule: a column of the calendar. `workshop` names the sibling workshop (same layer) whose modules the track's slots name; absent, this workshop. */
+export const WorkshopScheduleTrackSchema = z.object({ id: Id, label: Text, workshop: Id.optional() }).strict();
+
+/**
+ * One slot of a day. A `session` sits in one `track`; a `joint` session, a
+ * `break` and `logistics` span every track and name none.
+ */
+export const WorkshopScheduleSlotSchema = z
+  .object({
+    start: Clock,
+    end: Clock,
+    kind: z.enum(["session", "joint", "break", "logistics"]),
+    track: Id.optional(),
+    /** The module the slot teaches, in the track's workshop: the calendar links to its page. */
+    module: ModuleId.optional(),
+    title: Text,
+    /** What sort of session ("Talk", "Lab"). */
+    type: Text.optional(),
+    /** Who leads it, or what to know (a role, never a name). */
+    note: Text.optional(),
+    /** The parts of a joint session, in order ("P1.1 Welcome"). */
+    sessions: z.array(Text).optional(),
+  })
+  .strict();
+export type WorkshopScheduleSlot = z.infer<typeof WorkshopScheduleSlotSchema>;
+
+/**
+ * The days as a calendar: time down the side, a column per track, and joint
+ * sessions, breaks and logistics across them all. Data, not markup: the
+ * journeys viewer draws it (`scripts/journeys/schedule.ts`). A workshop with
+ * none shows the schedule of a sibling workshop that names it as a track's
+ * `workshop`, so two tracks of one event share one schedule.
+ */
+export const WorkshopScheduleSchema = z
+  .object({
+    title: Text.optional(),
+    /** One paragraph above the days, Markdown. */
+    intro: Text.optional(),
+    tracks: z.array(WorkshopScheduleTrackSchema).min(1),
+    days: z
+      .array(z.object({ day: z.number().int().min(1), title: Text.optional(), summary: Text.optional(), slots: z.array(WorkshopScheduleSlotSchema).min(1) }).strict())
+      .min(1),
+  })
+  .strict();
+export type WorkshopSchedule = z.infer<typeof WorkshopScheduleSchema>;
+
 /** The keys a canvas field keeps its answer under, after `<workshop>:cv:`: `<sheet>:<field>[:<row>[:<col>]]`. */
 export function canvasFieldRefs(sheet: string, f: WorkshopCanvasField): string[] {
   const at = `${sheet}:${f.id}`;
@@ -584,6 +634,7 @@ export const WorkshopKind = nodeKind(
     resources: z.array(WorkshopResourceSchema).optional(),
     presentation: WorkshopPresentationSchema.optional(),
     lab: WorkshopLabSchema.optional(),
+    schedule: WorkshopScheduleSchema.optional(),
   },
   { strict: true, refine: (w, ctx) => {
     const issue = (message: string) => ctx.addIssue({ code: "custom", message });
@@ -676,6 +727,29 @@ export const WorkshopKind = nodeKind(
       for (const [side, list] of Object.entries(w.matrix.overlaps ?? {})) for (const o of list ?? []) {
         for (const m of o.modules) mod(`matrix overlap "${o.label}" (${side})`, m);
         for (const r of o.steps) stepRef(`matrix overlap "${o.label}" (${side})`, r);
+      }
+    }
+    if (w.schedule) {
+      const sc = w.schedule;
+      dup("schedule track", sc.tracks.map((t) => t.id));
+      dup("schedule day", sc.days.map((d) => String(d.day)));
+      const tracks = new Map(sc.tracks.map((t) => [t.id, t]));
+      for (const d of sc.days) {
+        for (const x of d.slots) {
+          const where = `schedule day ${d.day} ${x.start}–${x.end} "${x.title}"`;
+          if (x.end <= x.start) issue(`${where} ends before it starts`);
+          if (x.kind === "session") {
+            const t = x.track === undefined ? undefined : tracks.get(x.track);
+            if (x.track === undefined) issue(`${where} is a session in no track`);
+            else if (!t) issue(`${where} names track "${x.track}", which the schedule does not list`);
+            else if (t.workshop === undefined || t.workshop === w.id) mod(where, x.module);
+          } else if (x.track !== undefined) issue(`${where} is a ${x.kind}, which spans every track: drop its track`);
+        }
+        for (const t of sc.tracks) {
+          const own = d.slots.filter((x) => x.track === t.id || x.kind !== "session").sort((a, b) => a.start.localeCompare(b.start));
+          for (let i = 1; i < own.length; i++)
+            if (own[i]!.start < own[i - 1]!.end) issue(`schedule day ${d.day}: "${own[i]!.title}" (${own[i]!.start}) overlaps "${own[i - 1]!.title}" (until ${own[i - 1]!.end}) in track ${t.id}`);
+        }
       }
     }
     if (w.lab) {

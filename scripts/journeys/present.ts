@@ -35,6 +35,7 @@
  */
 import { escHtml } from "../thin-page.ts";
 import { renderViewPages, VIEW_SEGMENTS } from "./present-views.ts";
+import { scheduleFor, scheduleHtml } from "./schedule.ts";
 import { demoScreensOf, DEVICE_GLYPH, type DemoScreen, type DemoSource } from "./screens.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
@@ -47,6 +48,7 @@ import {
   bpmnFigure,
   childrenOf,
   illustrationPath,
+  mdHtml,
   moduleSegment,
   panelHead,
   parentOf,
@@ -718,6 +720,28 @@ export function chapterScene(c: Chapter): { icon: string; label: string }[] | un
   return c.journey.scenario.scene ?? c.steps.find((s) => s.journey.scenario.scene)?.journey.scenario.scene;
 }
 
+/**
+ * The hero's sentence when the workshop gives no `presentation.story`: the
+ * first sentence of its description's first paragraph, as plain text. Never
+ * the whole description, which is Markdown (headings, tables) and would be
+ * drawn as one heading.
+ */
+export function storyOf(description: string): string {
+  const para =
+    description
+      .trim()
+      .split(/\n\s*\n/)
+      .find((b) => !/^\s*(#|\||[-*+] |\d+\. |>|```)/.test(b)) ?? "";
+  const plain = para
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|__|\*|_|`)(.+?)\1/g, "$2")
+    .replace(/\s+/g, " ")
+    .trim();
+  const first = plain.match(/^.+?[.!?](?=\s+[\p{Lu}\p{N}“"(]|$)/u)?.[0];
+  return first ?? plain;
+}
+
 function overviewPage(corpus: JourneyCorpus, p: Presentation, links?: SiteLinks): string {
   const root = "../../../../";
   const pl = links ? personaHref(corpus, p.w.workshop.presentation ?? {}, siteRootFrom(root, links)) : undefined;
@@ -766,10 +790,12 @@ ${pic}
         })
         .join("")}</ol></section>`
     : "";
+  const sched = scheduleFor(corpus, p.w);
+  const calendar = sched ? `<div class="jp-card jp-pad jp-cal-wrap">${scheduleHtml({ corpus, here: p.w, owner: sched.owner, schedule: sched.schedule, toWorkshops: "../../", level: 3, md: mdHtml })}</div>` : "";
   const body = `<section class="jp-hero">
 <div class="jp-hero-in">
 <span class="jp-kicker">${icon("route")} The story in one sentence</span>
-<h2>${e(pr.story ?? ws.description)}</h2>
+<h2>${e(pr.story ?? storyOf(ws.description))}</h2>
 ${pr.lede ? `<p>${e(pr.lede)}</p>` : ""}
 <div class="jp-ctas">${first ? `<a class="jp-cta" href="${e(walk(first))}">${icon("play")} Start the walkthrough</a>` : ""}<a class="jp-cta jp-cta-2" href="../how/">See how it works ${icon("arrow")}</a></div>
 </div>
@@ -783,12 +809,14 @@ ${band}
 <section class="jp-card jp-pad jp-col-3"><h3 class="jp-h">${icon("users", "jp-sky")} Meet the people</h3><div class="jp-people">${castHtml}</div></section>
 ${ladderHtml}
 </div>
+${calendar}
 ${countriesPanel(p)}`;
   return frame({
     p,
     root,
     toWorkshop,
     view: "overview",
+    ...(calendar ? { head: `<link rel="stylesheet" href="${root}assets/calendar.css">` } : {}),
     title: `${pr.name ?? ws.title} — overview`,
     ...(pr.presenterNote ? { note: pr.presenterNote } : {}),
     ...(first ? { next: walk(first) } : {}),
