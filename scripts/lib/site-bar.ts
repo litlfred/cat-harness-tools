@@ -26,6 +26,11 @@
  */
 import { PAGE_BAR_CLASS, PAGE_LAYOUT_MARK, pageLayoutTags } from "../page-layout.ts";
 import { beforeHeadEnd, bodyTag } from "./navbar.ts";
+// The search markers live in a leaf module so that `search-split.ts`, which runs
+// under Node too, can read them without loading this module's Bun-only imports.
+import { SEARCH_EXCLUDE_META, SEARCH_POST_BUILD_META } from "./search-markers.ts";
+
+export { SEARCH_EXCLUDE_META, SEARCH_POST_BUILD_META };
 
 /** The class the bar carries beside the page layout's. */
 export const SITE_BAR_CLASS = "fa-site-bar";
@@ -102,22 +107,6 @@ export function themeSearchHtml(placeholder = "Search this site"): string {
     `</div><div id="search-results" class="search-results"></div></div>`
   );
 }
-
-/** The marker `publish-verify` reads for a page left out of the search index on purpose. */
-export const SEARCH_EXCLUDE_META = '<meta name="fa-search-exclude" content="true">';
-
-/**
- * The marker for a page the theme's index cannot hold but the SITE's search
- * should: a mounted layer's own HTML, laid out by its own generator, such as
- * a handbook under `/en/<layer>/`. `search-split.ts` reads each such
- * page of the built site and adds its sections to the index before cutting
- * the scopes (owner, 2026-11-17: "we've lost some of the search indexing
- * features and layered knowledge graph"; measured that day: one handbook site
- * indexed 0 of its handbook's pages). The page keeps
- * {@link SEARCH_EXCLUDE_META} too, because a tree that is never split (a
- * build that stops before `search-split`) still has the theme's index only.
- */
-export const SEARCH_POST_BUILD_META = '<meta name="fa-search-post-build" content="true">';
 
 export interface SiteBarOptions {
   /** Back to the site's root from this page: `.`, `..`, … */

@@ -415,6 +415,12 @@ describe("a small site is one scope — dth-phc, 2026-11-17", () => {
     const m = JSON.parse(render(JSON.stringify(idx), INSTANCES, LOCALES, SECTION_BUDGET_BYTES, [], PREBUILT_TOKEN_BUDGET, 10).get(`${SCOPES_DIR}/manifest.json`)!) as SearchManifest;
     expect(m.scopes.map((s) => s.id).sort()).toEqual([PLATFORM, "locale-fr", "smart-trust"]);
   });
+  test("the manifest still names the layers, for the search panel's knowledge-graph filter", () => {
+    const m = JSON.parse(render(JSON.stringify(idx), INSTANCES, LOCALES, SECTION_BUDGET_BYTES, [], PREBUILT_TOKEN_BUDGET, WHOLE_SITE_BUDGET_BYTES).get(`${SCOPES_DIR}/manifest.json`)!) as SearchManifest;
+    expect(m.layers).toEqual([...INSTANCES].sort());
+    const none = JSON.parse(render(JSON.stringify(idx), new Set(), LOCALES).get(`${SCOPES_DIR}/manifest.json`)!) as SearchManifest;
+    expect(none.layers).toBeUndefined();
+  });
   test("splitSite applies it by default", () => {
     const repo = mkdtempSync(join(tmpdir(), "search-split-small-repo-"));
     const dir = mkdtempSync(join(tmpdir(), "search-split-small-site-"));

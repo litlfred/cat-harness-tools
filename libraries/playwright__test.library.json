@@ -90,6 +90,7 @@
     "test/sdlc/sticky-todos.e2e.ts",
     "test/search-band.e2e.ts",
     "test/search-lazy.e2e.ts",
+    "test/search-panel.e2e.ts",
     "test/search-scoped.e2e.ts",
     "test/settings-crosslinks.e2e.ts",
     "test/sidebar-rail.e2e.ts",

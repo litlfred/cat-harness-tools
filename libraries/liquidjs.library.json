@@ -21,6 +21,7 @@
     "scripts/tests/search-split.test.ts",
     "scripts/tests/ui/navbar-include-unique-ids.test.ts",
     "test/search-lazy.e2e.ts",
+    "test/search-panel.e2e.ts",
     "test/search-scoped.e2e.ts",
     "test/sticky-todo-graph.e2e.ts",
     "test/todos-page-board.e2e.ts"
