@@ -46,7 +46,9 @@
  * build is right wherever it is served. It is a file of its own so the
  * layout itself stays free of any one publisher's host; the host is named
  * once, in it. With no script the page cannot tell where it is, so the
- * `<noscript>` style draws the banner: "could not tell" is a draft.
+ * `<noscript>` links a stylesheet that draws the banner: "could not tell" is
+ * a draft. It is a linked file, never an inline `<style>`, so a thin page
+ * stays a shell of links (fhir-harness `ig-thin-pages`, `ig-search`).
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -60,15 +62,20 @@ export const PAGE_LAYOUT_JS_SOURCE = join(import.meta.dir, "templates", "page-la
 /** The DRAFT banner's script: served beside the layout, linked with it. */
 export const DRAFT_BANNER_JS_FILE = "assets/draft-banner.js";
 export const DRAFT_BANNER_JS_SOURCE = join(import.meta.dir, "templates", "draft-banner.js");
+/** The DRAFT banner's no-script stylesheet: served beside the layout, linked only from a `<noscript>`. */
+export const DRAFT_BANNER_NOSCRIPT_CSS_FILE = "assets/draft-banner-noscript.css";
+export const DRAFT_BANNER_NOSCRIPT_CSS_SOURCE = join(import.meta.dir, "templates", "draft-banner-noscript.css");
 
 /**
- * The banner with no script: the page cannot read its host, so it says
- * DRAFT. A `<style>` in a `<noscript>` in `<head>`, valid HTML, drawn before
- * the content as the script's strip is.
+ * The banner with no script, for a page whose site root is `up` away: the
+ * page cannot read its host, so it says DRAFT. A `<link>` in a `<noscript>`
+ * in `<head>` (valid HTML), so only a page with scripting off fetches it, and
+ * it draws before the content as the script's strip does. A linked file and
+ * not an inline `<style>`, so pages built from this layout stay thin shells.
  */
-export const DRAFT_BANNER_NOSCRIPT =
-  `<noscript data-fa-draft-noscript><style>body::before{content:"DRAFT \\2014  not an official publication";display:block;` +
-  `margin:0;padding:6px 16px;background:#b3261e;color:#fff;text-align:center;font:600 14px/1.5 system-ui,sans-serif}</style></noscript>`;
+export function draftBannerNoscript(up: string): string {
+  return `<noscript data-fa-draft-noscript><link rel="stylesheet" href="${up}${DRAFT_BANNER_NOSCRIPT_CSS_FILE}"></noscript>`;
+}
 
 /** The classes a page opts in with (browser-safe, in `lib/page-layout-classes.ts`). */
 export { PAGE_BAR_CLASS, PAGE_FOOT_CLASS, PAGE_MAIN_CLASS, PAGE_WIDE_TABLE_CLASS } from "./lib/page-layout-classes.ts";
@@ -86,7 +93,7 @@ export function pageLayoutTags(up: string): string {
     `<link rel="stylesheet" href="${up}${PAGE_LAYOUT_CSS_FILE}" ${PAGE_LAYOUT_MARK}>` +
     `<script src="${up}${PAGE_LAYOUT_JS_FILE}" defer ${PAGE_LAYOUT_MARK}></script>` +
     `<script src="${up}${DRAFT_BANNER_JS_FILE}" defer ${PAGE_LAYOUT_MARK}></script>` +
-    DRAFT_BANNER_NOSCRIPT
+    draftBannerNoscript(up)
   );
 }
 
@@ -102,7 +109,7 @@ export function withPageLayout(html: string, up: string): string {
 }
 
 /**
- * Write the layout's files (its stylesheet, its script and the DRAFT banner's) under `root` (the site root, or the directory served
+ * Write the layout's files (its stylesheet, its script, and the DRAFT banner's script and no-script stylesheet) under `root` (the site root, or the directory served
  * there). A file already there with the same bytes is left alone; one with
  * different bytes is replaced, since there is one layout and this is it.
  * Returns the paths written, relative to `root`.
@@ -113,6 +120,7 @@ export function writePageLayout(root: string): string[] {
     [PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_CSS_SOURCE],
     [PAGE_LAYOUT_JS_FILE, PAGE_LAYOUT_JS_SOURCE],
     [DRAFT_BANNER_JS_FILE, DRAFT_BANNER_JS_SOURCE],
+    [DRAFT_BANNER_NOSCRIPT_CSS_FILE, DRAFT_BANNER_NOSCRIPT_CSS_SOURCE],
   ] as const) {
     const to = join(root, rel);
     if (existsSync(to) && readFileSync(to, "utf-8") === readFileSync(src, "utf-8")) continue;

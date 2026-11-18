@@ -11,7 +11,8 @@ import { join } from "node:path";
 import {
   DRAFT_BANNER_JS_FILE,
   DRAFT_BANNER_JS_SOURCE,
-  DRAFT_BANNER_NOSCRIPT,
+  DRAFT_BANNER_NOSCRIPT_CSS_FILE,
+  DRAFT_BANNER_NOSCRIPT_CSS_SOURCE,
   PAGE_BAR_CLASS,
   PAGE_LAYOUT_CSS_FILE,
   PAGE_LAYOUT_CSS_SOURCE,
@@ -19,6 +20,7 @@ import {
   PAGE_LAYOUT_JS_SOURCE,
   PAGE_LAYOUT_MARK,
   PAGE_MAIN_CLASS,
+  draftBannerNoscript,
   pageLayoutTags,
   withPageLayout,
   writePageLayout,
@@ -110,7 +112,7 @@ describe("tags, stamping and writing", () => {
   it("links the layout and the DRAFT banner relative to the site root, marked so they are written once", () => {
     expect(pageLayoutTags("../")).toBe(
       `<link rel="stylesheet" href="../${PAGE_LAYOUT_CSS_FILE}" ${PAGE_LAYOUT_MARK}><script src="../${PAGE_LAYOUT_JS_FILE}" defer ${PAGE_LAYOUT_MARK}></script>` +
-        `<script src="../${DRAFT_BANNER_JS_FILE}" defer ${PAGE_LAYOUT_MARK}></script>${DRAFT_BANNER_NOSCRIPT}`,
+        `<script src="../${DRAFT_BANNER_JS_FILE}" defer ${PAGE_LAYOUT_MARK}></script><noscript data-fa-draft-noscript><link rel="stylesheet" href="../${DRAFT_BANNER_NOSCRIPT_CSS_FILE}"></noscript>`,
     );
     const page = "<html><head><title>x</title></head><body></body></html>";
     const once = withPageLayout(page, "");
@@ -128,10 +130,11 @@ describe("tags, stamping and writing", () => {
     expect(html.indexOf(PAGE_LAYOUT_CSS_FILE)).toBeLessThan(html.indexOf("own.css"));
   });
 
-  it("writes the three files, and leaves bytes that already match alone", () => {
+  it("writes the four files, and leaves bytes that already match alone", () => {
     const dir = mkdtempSync(join(tmpdir(), "page-layout-"));
     try {
-      expect(writePageLayout(dir)).toEqual([PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE, DRAFT_BANNER_JS_FILE]);
+      expect(writePageLayout(dir)).toEqual([PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE, DRAFT_BANNER_JS_FILE, DRAFT_BANNER_NOSCRIPT_CSS_FILE]);
+      expect(readFileSync(join(dir, DRAFT_BANNER_NOSCRIPT_CSS_FILE), "utf-8")).toBe(readFileSync(DRAFT_BANNER_NOSCRIPT_CSS_SOURCE, "utf-8"));
       expect(readFileSync(join(dir, DRAFT_BANNER_JS_FILE), "utf-8")).toBe(readFileSync(DRAFT_BANNER_JS_SOURCE, "utf-8"));
       expect(readFileSync(join(dir, PAGE_LAYOUT_CSS_FILE), "utf-8")).toBe(css);
       expect(writePageLayout(dir)).toEqual([]);
@@ -154,7 +157,10 @@ describe("draft-banner.js (owner, 2026-11-17: DRAFT everywhere but the official 
     expect(banner).not.toMatch(/innerHTML|insertAdjacentHTML|document\.write/);
   });
   it("says DRAFT with no script, since a page that cannot read its host cannot tell it is official", () => {
-    expect(DRAFT_BANNER_NOSCRIPT).toMatch(/^<noscript[^>]*><style>body::before\{content:"DRAFT /);
-    expect(DRAFT_BANNER_NOSCRIPT.endsWith("</style></noscript>")).toBe(true);
+    expect(draftBannerNoscript("../")).toBe(`<noscript data-fa-draft-noscript><link rel="stylesheet" href="../${DRAFT_BANNER_NOSCRIPT_CSS_FILE}"></noscript>`);
+    expect(readFileSync(DRAFT_BANNER_NOSCRIPT_CSS_SOURCE, "utf-8")).toMatch(/body::before \{\s*content: "DRAFT /);
+  });
+  it("puts no inline <style> in a page, so a thin page stays a shell of links (fhir-harness ig-thin-pages, ig-search)", () => {
+    expect(pageLayoutTags("")).not.toContain("<style");
   });
 });

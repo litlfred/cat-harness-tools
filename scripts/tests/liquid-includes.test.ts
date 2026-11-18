@@ -42,11 +42,22 @@ const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 // chrome (`site-chrome/`) and the harness pages (`docs/`) are two layers.
 const INCLUDE_DIRS = siteLayersFor(INSTANCE_ROOT).map((l) => join(INSTANCE_ROOT, l, "_includes")).filter((d) => existsSync(d));
 
-/** Tags that take no expression. Anything else must carry one. */
-const NO_EXPRESSION = new Set(["else", "endif", "endfor", "endunless", "endcase", "endraw", "raw", "endcomment", "comment", "endtablerow", "break", "continue"]);
+/**
+ * Tags that take no expression. Anything else must carry one.
+ *
+ * `seo` is not core Liquid: it is jekyll-seo-tag's, which the just-the-docs
+ * theme depends on and whose own `head.html` calls it. `site-chrome/` carries
+ * a verbatim copy of that include (cat-harness#1382), so the tag appears here.
+ */
+const NO_EXPRESSION = new Set(["else", "endif", "endfor", "endunless", "endcase", "endraw", "raw", "endcomment", "comment", "endtablerow", "break", "continue", "seo"]);
 
-/** Tags that must carry an expression to parse at all. */
-const NEEDS_EXPRESSION = new Set(["if", "elsif", "unless", "for", "case", "when", "assign", "include", "cycle", "capture", "increment", "decrement", "tablerow", "echo", "render"]);
+/**
+ * Tags that must carry an expression to parse at all.
+ *
+ * `include_cached` is jekyll-include-cache's, the other plugin just-the-docs
+ * depends on; like `include` it names the file it includes.
+ */
+const NEEDS_EXPRESSION = new Set(["if", "elsif", "unless", "for", "case", "when", "assign", "include", "include_cached", "cycle", "capture", "increment", "decrement", "tablerow", "echo", "render"]);
 
 interface Tag {
   /** 1-based line the tag starts on. */
