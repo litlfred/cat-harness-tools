@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -482,6 +482,9 @@ describe("build-instance-site — a built site serves the IRIs it mints (IRI fix
     expect(declaredIriBase(join(d, "a.json"))).toBe("https://example.org/a/");
     expect(declaredIriBase(join(d, "b.json"))).toBeUndefined();
     expect(declaredIriBase(join(d, "c.json"))).toBeUndefined();
+    // Removed: a temp directory holding two declarations is an ambiguous
+    // instance to any other test that scans the temp root.
+    rmSync(d, { recursive: true, force: true });
   });
 
   test("the build and the folio path both run the check", () => {
