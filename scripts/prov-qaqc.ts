@@ -47,6 +47,13 @@
  * report: nothing is written, and only a report it already committed is
  * judged.
  *
+ * ## Records in the earlier shape
+ *
+ * An instance file without `id` and `source` (the earlier
+ * `folio-workflow-instance/v1` shape: `instanceId`, `bpmnPath`, history keyed
+ * by `elementId`) is listed with one `legacy-record` finding and not walked;
+ * its row on the page appears only when one occurs.
+ *
  * Usage:  bun run cat-harness-tools/scripts/prov-qaqc.ts [--check]
  *
  * @module cat-harness/scripts/prov-qaqc
@@ -105,6 +112,7 @@ export const FINDING_KINDS = [
   "source-moved",
   "source-missing",
   "unaddressed",
+  "legacy-record",
 ] as const;
 export type FindingKind = (typeof FINDING_KINDS)[number];
 
@@ -123,7 +131,41 @@ export const FINDING_MEANING: Readonly<Record<FindingKind, string>> = {
   "source-missing": "the `.bpmn` the instance recorded is gone and no diagram with that name and process id exists; nothing in it can be checked",
   unaddressed:
     "the agent, role or plan has no release address — its owning instance declares no `iriBase`, or no instance declares it — so the PROV-JSONLD record carries it as a literal, not a link (`linked-data` voice, `ld-link-is-the-node-release-address`)",
+  "legacy-record":
+    "the instance file is in the earlier record shape (`instanceId`, `bpmnPath`, history entries keyed by `elementId`), not the one `workflow_start` writes (`id`, `source`, entries keyed by `node`); it is listed, and nothing in it is checked",
 };
+
+/** Kinds whose row the page shows only when one occurs, so a page with none is unchanged by their addition. */
+const SHOWN_WHEN_PRESENT: ReadonlySet<FindingKind> = new Set(["legacy-record"]);
+
+/**
+ * A workflow instance file as read, in either shape. `workflow_start` writes
+ * `id` and `source`; records written before it (the earlier
+ * `folio-workflow-instance/v1` shape) carry `instanceId` and `bpmnPath`, and
+ * their history entries name `elementId`, not `node`.
+ */
+type ReadInstance = InstanceState & { instanceId?: string; bpmnPath?: string };
+
+/** The instance's id in either shape; `""` when it carries neither. */
+export function instanceIdOf(s: ReadInstance): string {
+  return typeof s.id === "string" && s.id ? s.id : typeof s.instanceId === "string" ? s.instanceId : "";
+}
+
+/**
+ * True when `s` is in the shape this report reads: an `id`, a `source`, and a
+ * history whose every entry names its `node`. Anything else is reported as a
+ * `legacy-record` finding instead of being walked, so one old file cannot
+ * stop the report (it used to throw on `a.id.localeCompare`).
+ */
+export function isCurrentShape(s: ReadInstance): boolean {
+  return (
+    typeof s.id === "string" &&
+    s.id !== "" &&
+    typeof s.source === "string" &&
+    Array.isArray(s.history) &&
+    s.history.every((h) => typeof (h as { node?: unknown }).node === "string")
+  );
+}
 
 export interface Finding {
   instance: string;
@@ -372,8 +414,22 @@ export async function buildReport(
   const book = () => (addresses ??= addressBook(repo));
   const instances = new Map<string, InstanceReport[]>();
   const invalid: string[] = [];
-  const all = (opts.instances ?? listInstances(repo)).slice().sort((a, b) => a.id.localeCompare(b.id, "en"));
-  for (const top of all) {
+  const all = (opts.instances ?? listInstances(repo))
+    .map((s, i) => ({ s: s as ReadInstance, key: instanceIdOf(s as ReadInstance) || `(unnamed instance ${i + 1})` }))
+    .sort((a, b) => a.key.localeCompare(b.key, "en"));
+  for (const { s: top, key } of all) {
+    if (!isCurrentShape(top)) {
+      const source = typeof top.source === "string" ? top.source : typeof top.bpmnPath === "string" ? top.bpmnPath : "";
+      const finding: Finding = {
+        instance: key,
+        entry: -1,
+        node: typeof top.processId === "string" ? top.processId : "",
+        kind: "legacy-record",
+        detail: `${key} is in the earlier record shape (no \`id\`/\`source\`, or history entries without \`node\`); not checked`,
+      };
+      instances.set(key, [{ id: key, source, activities: [], checked: 0, findings: [finding] }]);
+      continue;
+    }
     const out: InstanceReport[] = [];
     const walk = async (id: string, s: InstanceState) => {
       const where = await locate(repo, s, candidates);
@@ -464,7 +520,9 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export function renderPage(r: Report): string {
   const t = totals(r);
   const totalFindings = FINDING_KINDS.reduce((n, k) => n + t.byKind[k], 0);
-  const kindRows = FINDING_KINDS.map((k) => `| \`${k}\` | ${t.byKind[k]} | ${FINDING_MEANING[k]} |`).join("\n");
+  const kindRows = FINDING_KINDS.filter((k) => !SHOWN_WHEN_PRESENT.has(k) || t.byKind[k] > 0)
+    .map((k) => `| \`${k}\` | ${t.byKind[k]} | ${FINDING_MEANING[k]} |`)
+    .join("\n");
   const sections = [...r.instances].map(([top, parts]) => {
     const n = parts.reduce((a, p) => a + p.findings.length, 0);
     const acts = parts.reduce((a, p) => a + p.activities.length, 0);
@@ -569,7 +627,7 @@ if (import.meta.main) {
     process.exit(1);
   }
   const t = totals(r);
-  const summary = `${r.instances.size} instance(s), ${t.checked} step(s), ${t.activities} activit${t.activities === 1 ? "y" : "ies"}; findings (advisory): ${FINDING_KINDS.map((k) => `${k} ${t.byKind[k]}`).join(", ")}`;
+  const summary = `${r.instances.size} instance(s), ${t.checked} step(s), ${t.activities} activit${t.activities === 1 ? "y" : "ies"}; findings (advisory): ${FINDING_KINDS.filter((k) => !SHOWN_WHEN_PRESENT.has(k) || t.byKind[k] > 0).map((k) => `${k} ${t.byKind[k]}`).join(", ")}`;
   const files = outputs(r);
   const { stale, orphans } = staleness(files);
   if (check) {
