@@ -42,7 +42,7 @@ import { folioDir } from "../schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname, basename } from "path";
 import { documentContext } from "../schemas/content/content-context.ts";
-import { atInstanceContext } from "./instance-document-context.ts";
+import { atInstanceContext, awaitingRebase, awaitingRebaseNote } from "./instance-document-context.ts";
 import {
   resolveLabel,
   mintNodeId,
@@ -225,6 +225,7 @@ async function run(): Promise<number> {
   let written = 0;
   let unchanged = 0;
   const stale: string[] = [];
+  let rebasePending = 0;
   const dangling: DanglingRef[] = [];
   const unconventional: UnconventionalRef[] = [];
   let anyLoadFailure = false;
@@ -260,7 +261,8 @@ async function run(): Promise<number> {
         continue;
       }
       if (check) {
-        stale.push(out.slice(root.length + 1));
+        if (awaitingRebase(prev, next)) rebasePending++;
+        else stale.push(out.slice(root.length + 1));
         continue;
       }
       writeFileSync(out, next);
@@ -309,6 +311,8 @@ async function run(): Promise<number> {
       return 1;
     }
     console.log(`gen-block-jsonld --check: ${unchanged} sibling(s) up to date.`);
+    const note = awaitingRebaseNote("gen-block-jsonld", rebasePending);
+    if (note) console.warn(note);
     return anyLoadFailure ? 1 : 0;
   }
 

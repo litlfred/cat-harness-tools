@@ -83,7 +83,7 @@ import {
 import { termCurie } from "../schemas/kg/namespaces.ts";
 import { LABEL_PREFIXES } from "../schemas/constraints.ts";
 import { findContentRepoRoot } from "./repo-root";
-import { serialisedAtInstanceContext } from "./instance-document-context.ts";
+import { awaitingRebase, awaitingRebaseNote, serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import type { ImagesSidecar } from "../schemas/content/document-image.ts";
@@ -1430,6 +1430,7 @@ async function run(): Promise<number> {
   let docsDone = 0;
   let blocks = 0;
   const stale: string[] = [];
+  let rebasePending = 0;
   const skipped: string[] = [];
   // An input that is THERE and did not parse is NOT the same fact as an entry
   // with no input at all, and collapsing them would report an ingest failure
@@ -1456,7 +1457,8 @@ async function run(): Promise<number> {
         continue;
       }
       if (check) {
-        stale.push(`${docId}/${f.path}`);
+        if (awaitingRebase(prev, f.content)) rebasePending++;
+        else stale.push(`${docId}/${f.path}`);
         continue;
       }
       mkdirSync(join(abs, ".."), { recursive: true });
@@ -1518,6 +1520,8 @@ async function run(): Promise<number> {
     }
     if (unreadable.length) return 1;
     console.log(`gen-library-jsonld --check: ${unchanged} node(s) up to date.`);
+    const note = awaitingRebaseNote("gen-library-jsonld", rebasePending);
+    if (note) console.warn(note);
     return 0;
   }
 

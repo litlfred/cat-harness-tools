@@ -21,7 +21,7 @@
 import { dirname, resolve, sep } from "node:path";
 
 import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
-import { CONTENT_CONTEXT_URL } from "../schemas/kg/jsonld.js";
+import { CONTENT_CONTEXT_URL, FOLIO_BASE, instanceKgBase, rebased } from "../schemas/kg/jsonld.js";
 
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -38,6 +38,8 @@ export interface InstanceContextDecl {
   root: string;
   name: string;
   iriBase?: string;
+  /** The declared `version`, whose major the layer's `@base` is minted under ({@link instanceKgBase}). */
+  version?: string;
 }
 
 /** Every layer under `checkoutRoot`, with its declared `iriBase`. */
@@ -47,8 +49,13 @@ export function instancesIn(checkoutRoot: string): InstanceContextDecl[] {
     if (decl === undefined) return [];
     // `iriBase` is declared (`CatHarnessSchema`) but not named by the
     // declaration TYPE; read structurally, as `releaseIris` does.
-    const iriBase = (decl as { iriBase?: unknown }).iriBase;
-    return [{ root: resolve(root), name: decl.name, ...(typeof iriBase === "string" ? { iriBase } : {}) }];
+    const { iriBase, version } = decl as { iriBase?: unknown; version?: unknown };
+    return [{
+      root: resolve(root),
+      name: decl.name,
+      ...(typeof iriBase === "string" ? { iriBase } : {}),
+      ...(typeof version === "string" ? { version } : {}),
+    }];
   });
 }
 
@@ -66,8 +73,13 @@ function defaultInstances(): InstanceContextDecl[] {
 /**
  * `doc` as it should be WRITTEN at `outputPath`: a document naming the shared
  * content context by URL names its own layer's context instead. Everything
- * else about the context — its local `@base` and bindings — and the key order
- * are kept, since `--check` compares bytes.
+ * else about the context — its other local bindings, and the key order — is
+ * kept, since `--check` compares bytes.
+ *
+ * The local `@base` moves too when it is the shared {@link FOLIO_BASE},
+ * which no site serves: to the layer's own release, `<iriBase>v<major>/`
+ * ({@link instanceKgBase}; IRI fix 1A, owner 2026-11-18). Any other `@base`,
+ * the docs site's for one, is the emitter's choice and is kept.
  *
  * - A document naming any other context is returned unchanged.
  * - A path inside NO layer (a staged entry) is returned unchanged: no
@@ -94,9 +106,44 @@ export function atInstanceContext<T extends Record<string, unknown>>(
     throw new Error(`instance-document-context: ${owner.name} declares no iriBase, so ${outputPath} has no context URL (<iriBase>${INSTANCE_CONTEXT_PATH}) — declare one in ${owner.name}.json`);
   }
   const url = instanceContextUrl(owner.iriBase);
+  let base: string;
+  try {
+    base = instanceKgBase(owner.iriBase, owner.version);
+  } catch (e) {
+    throw new Error(`instance-document-context: ${owner.name} has no release to base ${outputPath} under: ${(e as Error).message}`);
+  }
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(doc)) out[k] = k === "@context" ? (Array.isArray(v) ? [url, ...v.slice(1)] : url) : v;
+  for (const [k, v] of Object.entries(doc)) out[k] = k === "@context" ? (Array.isArray(v) ? [url, ...v.slice(1).map((c) => rebased(c, base))] : url) : v;
   return out as T;
+}
+
+/**
+ * The transition to a layer's own `@base` (IRI fix 1A, owner 2026-11-18):
+ * whether `committed` is `regenerated` but for still carrying the shared
+ * {@link FOLIO_BASE} where `regenerated` carries the layer's release base.
+ *
+ * The base move rewrites every emitted file in every layer, and the layers
+ * regenerate when they re-pin, not when this layer merges. Until then a
+ * `--check` that called each such file stale would be red over thousands of
+ * files no PR here can change. So a generator's `--check` counts these as
+ * AWAITING REGENERATION and passes; any other difference is stale as before,
+ * and a write (no `--check`) always writes the new base.
+ *
+ * REMOVE once every layer's committed output carries its own base.
+ */
+export function awaitingRebase(committed: string | undefined, regenerated: string): boolean {
+  if (committed === undefined || committed === regenerated) return false;
+  const old = `"@base": ${JSON.stringify(FOLIO_BASE)}`;
+  if (!committed.includes(old)) return false;
+  const m = /"@base": ("https?:\/\/[^"]+\/v(?:0|[1-9]\d*)\/")/.exec(regenerated);
+  if (m === null) return false;
+  return committed.split(old).join(`"@base": ${m[1]}`) === regenerated;
+}
+
+/** The line a `--check` prints for the files {@link awaitingRebase} let through, or nothing. */
+export function awaitingRebaseNote(tool: string, count: number): string | undefined {
+  if (count === 0) return undefined;
+  return `${tool} --check: ${count} file(s) differ only by the old shared @base (${FOLIO_BASE}) and await regeneration under the layer's own release (IRI fix 1A); run ${tool} to write them`;
 }
 
 /** {@link atInstanceContext} over a serialised document (`JSON.stringify(doc, null, 2) + "\n"`, the emitters' one format). */

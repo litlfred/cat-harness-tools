@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { layerRootsIn, readDeclaration } from "../kg/cat-harness.js";
 import { checkoutRootFor, declarationChain } from "../kg/harness-config.js";
 import { instanceNamespace } from "../kg/instance-repositories.js";
-import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL, FOLIO_BASE, instanceContextUrl } from "../kg/jsonld.js";
+import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL, FOLIO_BASE, instanceContextUrl, instanceKgBase, rebased } from "../kg/jsonld.js";
 
 import { harnessRoot } from "../harness-root.ts";
 /**
@@ -86,8 +86,11 @@ export function documentContext(
 ): [string, Record<string, string>] {
   // `instance` names the document's OWN instance context (see
   // {@link instanceContext}); without it, the shared content context.
-  const url = opts.instance === undefined ? CONTENT_CONTEXT_URL : instanceContext(opts.instance, opts.instances).url;
-  const local: Record<string, string> = { "@base": opts.base ?? FOLIO_BASE };
+  // With `instance`, the base is that layer's release too, unless `opts.base`
+  // names another (IRI fix 1A).
+  const own = opts.instance === undefined ? undefined : instanceContext(opts.instance, opts.instances);
+  const url = own?.url ?? CONTENT_CONTEXT_URL;
+  const local: Record<string, string> = { "@base": opts.base ?? own?.base ?? FOLIO_BASE };
   // CONTENT_CONTEXT still decides what needs no LOCAL binding: a layer
   // context binds every prefix its documents' types use (it is generated from
   // them), and the ones CONTENT_CONTEXT binds are what those types draw on.
@@ -108,6 +111,8 @@ export interface InstanceContextDecl {
   root: string;
   name: string;
   iriBase?: string;
+  /** The declared `version`, whose major the layer's `@base` is minted under (`instanceKgBase`). */
+  version?: string;
 }
 
 let checkoutInstances: InstanceContextDecl[] | undefined;
@@ -121,8 +126,13 @@ function defaultCheckoutInstances(): InstanceContextDecl[] {
       if (decl === undefined) return [];
       // `iriBase` is declared (`CatHarnessSchema`), read structurally as
       // `releaseIris` does: the declaration type does not name it.
-      const iriBase = (decl as { iriBase?: unknown }).iriBase;
-      return [{ root: resolve(root), name: decl.name, ...(typeof iriBase === "string" ? { iriBase } : {}) }];
+      const { iriBase, version } = decl as { iriBase?: unknown; version?: unknown };
+      return [{
+        root: resolve(root),
+        name: decl.name,
+        ...(typeof iriBase === "string" ? { iriBase } : {}),
+        ...(typeof version === "string" ? { version } : {}),
+      }];
     });
   }
   return checkoutInstances;
@@ -146,7 +156,7 @@ function defaultCheckoutInstances(): InstanceContextDecl[] {
 export function instanceContext(
   instance: string,
   instances: readonly InstanceContextDecl[] = defaultCheckoutInstances(),
-): { name: string; url: string } {
+): { name: string; url: string; base: string } {
   let found = instances.find((d) => d.name === instance);
   if (found === undefined && (instance.includes("/") || instance.includes(sep))) {
     const abs = resolve(instance);
@@ -158,7 +168,13 @@ export function instanceContext(
   if (found.iriBase === undefined) {
     throw new Error(`content-context: ${found.name} declares no iriBase, so it has no context URL (<iriBase>ns/context/v1.jsonld) — declare one in ${found.name}.json`);
   }
-  return { name: found.name, url: instanceContextUrl(found.iriBase) };
+  let base: string;
+  try {
+    base = instanceKgBase(found.iriBase, found.version);
+  } catch (e) {
+    throw new Error(`content-context: ${found.name} has no release to base its documents under: ${(e as Error).message}`);
+  }
+  return { name: found.name, url: instanceContextUrl(found.iriBase), base };
 }
 
 /**
@@ -172,7 +188,8 @@ export function instanceDocumentContext(
   instance: string,
   instances?: readonly InstanceContextDecl[],
 ): [string, { "@base": string }] {
-  return [instanceContext(instance, instances).url, { "@base": FOLIO_BASE }];
+  const ctx = instanceContext(instance, instances);
+  return [ctx.url, { "@base": ctx.base }];
 }
 
 /**
@@ -202,11 +219,11 @@ export function atInstanceContext<T extends Record<string, unknown>>(
   if (!names) return doc;
   const abs = resolve(outputPath);
   if (!instances.some((d) => abs === d.root || abs.startsWith(d.root + sep))) return doc;
-  const url = instanceContext(abs, instances).url;
+  const { url, base } = instanceContext(abs, instances);
   // Rebuilt key by key so `@context` keeps its place: emitted bytes are
   // compared by `--check`, and key order is part of them.
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(doc)) out[k] = k === "@context" ? (Array.isArray(v) ? [url, ...v.slice(1)] : url) : v;
+  for (const [k, v] of Object.entries(doc)) out[k] = k === "@context" ? (Array.isArray(v) ? [url, ...v.slice(1).map((c) => rebased(c, base))] : url) : v;
   return out as T;
 }
 

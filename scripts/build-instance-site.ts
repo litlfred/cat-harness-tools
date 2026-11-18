@@ -974,7 +974,7 @@ function publishKgSearch(site: string, root: string): void {
  * its vocabulary at `<iriBase>v<major>/ns` where it mints terms of its own.
  *
  * Until then only a repository with a `layer-publish-context.yml` caller
- * served its context (aai-programme, who-iris), so most instances' documents
+ * served its context (two of fifteen at the 2026-11-18 scan), so most instances' documents
  * named a 404. Both come from `publish-instance-context.ts`, which skips,
  * with a warning, a layer with nothing to publish (no `iriBase`, no
  * documents, no terms of its own).
