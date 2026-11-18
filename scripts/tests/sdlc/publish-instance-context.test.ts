@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildOne, contextUrl, publishFile, vocabularyPaths, type ApiRequest } from "../../publish-instance-context.ts";
+import { buildOne, contextUrl, publishFile, termPages, vocabularyHtml, vocabularyPaths, type ApiRequest } from "../../publish-instance-context.ts";
 import { PLACEHOLDER_HTML } from "../../pages-bootstrap.ts";
 
 const root = mkdtempSync(join(tmpdir(), "publish-instance-context-"));
@@ -93,6 +93,36 @@ describe("vocabulary paths", () => {
       const r = vocabularyPaths(id, "https://x.github.io/y/");
       expect("problem" in r && r.problem).toContain("collides with the context directory");
     }
+  });
+});
+
+describe("term pages (owner report, 2026-11-18: …/v0/ns/graphTypology/skills answered 404)", () => {
+  const ns = "https://x.github.io/y/v0/ns/";
+  const doc = (ids: string[]) => ({
+    "@context": { y: ns, other: "https://x.github.io/z/v0/ns/" },
+    "@id": ns,
+    "@graph": ids.map((id) => ({ "@id": id, label: id, definition: `def of ${id}` })),
+  });
+  test("a slash namespace gets one page per own term, at the path its IRI names", () => {
+    const r = termPages("y", ns, "https://x.github.io/y/", doc(["y:Subgraph", "y:graphTypology/skills", `${ns}Abs`, "other:Foreign"]));
+    if (!("pages" in r)) throw new Error(r.problems.join("; "));
+    expect(Object.keys(r.pages).sort()).toEqual(["v0/ns/Abs/index.html", "v0/ns/Subgraph/index.html", "v0/ns/graphTypology/skills/index.html"]);
+    const page = r.pages["v0/ns/graphTypology/skills/index.html"]!;
+    expect(page).toContain(`<link rel="canonical" href="${ns}graphTypology/skills">`);
+    expect(page).toContain("def of y:graphTypology/skills");
+    expect(page).toContain(`href="../../"`);
+  });
+  test("a hash namespace needs no pages: its terms are anchors on the one document", () => {
+    expect(termPages("y", "https://x.github.io/y/v0/ns", "https://x.github.io/y/", doc(["y:A"]))).toEqual({ pages: {} });
+  });
+  test("a local name that cannot be a page is refused, never left dangling", () => {
+    const r = termPages("y", ns, "https://x.github.io/y/", doc(["y:a/../b", "y:index.html", "y:x?y"]));
+    expect("problems" in r && r.problems.length).toBe(3);
+  });
+  test("the index anchors each own term and links its page; a foreign term is neither", () => {
+    const html = vocabularyHtml("y", ns, doc(["y:graphTypology/skills", "other:Foreign"]));
+    expect(html).toContain(`<li id="graphTypology/skills"><a href="graphTypology/skills/">`);
+    expect(html).toContain(`<li><code>other:Foreign</code>`);
   });
 });
 
