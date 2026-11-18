@@ -47,8 +47,10 @@
  *
  * @module scripts/publish-instance-context
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { findDeclarationFile } from "../schemas/kg/cat-harness.js";
 
@@ -56,6 +58,8 @@ import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, NS_DOCUMENT_
 import { PLACEHOLDER_HTML } from "./pages-bootstrap.ts";
 import { buildVocabulary, instancesPublishingNs } from "./ns-export.ts";
 import { sourceText } from "../schemas/content/lang-text.ts";
+import { scriptTable } from "../schemas/sdlc/script-table.ts";
+import { layerScript } from "./run-script.ts";
 
 export const PAGES_BRANCH = "gh-pages";
 
@@ -520,6 +524,109 @@ export async function publishFile(api: ApiRequest, o: PublishOptions): Promise<P
 }
 
 /**
+ * The package script a layer declares to write its FULL namespace document
+ * (IRI fix 1A, b/d; merge manager, 2026-11-18): the vocabulary this script
+ * builds plus whatever the layer adds to it (a glossary's concept schemes and
+ * concepts, one anchor per concept IRI). Run as
+ * `<script> --site <dir> --instance <name>`, it writes
+ * `v<major>/ns/index.{html,jsonld,json}` under `<dir>`.
+ *
+ * One writer, so the site build and the publish-context workflow put the
+ * SAME bytes at `v<major>/ns/`, and a `gh-pages` `keep` of `v0/` can never
+ * preserve a poorer copy over a richer one. Named by convention, not by
+ * layer: this layer never names the one above it that declares it.
+ */
+export const NAMESPACE_WRITER_SCRIPT = "ns:document";
+
+/** A namespace writer's output: `v<major>/ns/index.{html,jsonld,json}`. */
+const NS_INDEX = /^v(0|[1-9]\d*)\/ns\/index\.(html|jsonld|json)$/;
+
+/** The namespace-document files under `dir`, site-relative with `/` → contents. */
+export function namespaceWriterFiles(dir: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const walk = (d: string): void => {
+    for (const name of readdirSync(d)) {
+      const p = join(d, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else {
+        const rel = relative(dir, p).split(sep).join("/");
+        if (NS_INDEX.test(rel)) out[rel] = readFileSync(p, "utf-8");
+      }
+    }
+  };
+  if (existsSync(dir)) walk(dir);
+  return out;
+}
+
+/**
+ * Run the checkout's {@link NAMESPACE_WRITER_SCRIPT} for `instance`, when one
+ * is declared, and return the namespace files it wrote: `undefined` when no
+ * layer declares one, `{}` when it wrote none for this instance. Throws when
+ * it fails.
+ */
+export function runNamespaceWriter(
+  root: string,
+  instance: string,
+  spawn: typeof spawnSync = spawnSync,
+  declared: (root: string) => boolean = (r) => scriptTable(r).has(NAMESPACE_WRITER_SCRIPT) || layerScript(r, NAMESPACE_WRITER_SCRIPT) !== undefined,
+): Record<string, string> | undefined {
+  if (!declared(root)) return undefined;
+  const tmp = mkdtempSync(join(tmpdir(), "ns-writer-"));
+  try {
+    const r = spawn("bun", ["run", join(import.meta.dir, "run-script.ts"), NAMESPACE_WRITER_SCRIPT, "--site", tmp, "--instance", instance], { cwd: resolve(root), stdio: "inherit", env: process.env });
+    if (r.status !== 0) throw new Error(`${NAMESPACE_WRITER_SCRIPT} --instance ${instance} failed (exit ${r.status})`);
+    return namespaceWriterFiles(tmp);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The files a vocabulary step writes: the built vocabulary's (`built`, or
+ * none when it was skipped), with its namespace document REPLACED by the
+ * writer's when the writer produced one. The writer's document is the
+ * vocabulary plus the layer's concepts, so the vocabulary's own `ns` paths
+ * (an extensionless `v0/ns` file among them, which would collide with the
+ * writer's `v0/ns/` directory) are dropped; its term pages are kept.
+ */
+export function vocabularyFiles(
+  built: { paths: readonly string[]; termPages: Record<string, string>; html: string; content: string } | undefined,
+  writer: Record<string, string> | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  const writerHasNs = writer !== undefined && Object.keys(writer).length > 0;
+  for (const p of built?.paths ?? []) {
+    const term = built!.termPages[p];
+    if (term !== undefined) out[p] = term;
+    else if (!writerHasNs) out[p] = p.endsWith(".html") ? built!.html : built!.content;
+  }
+  if (writerHasNs) Object.assign(out, writer);
+  return out;
+}
+
+/**
+ * Write `files` (site-relative path → contents) under `outDir`. With
+ * `keepExisting`, a path where anything already sits is left alone and
+ * returned in `kept`, and the workflow's `.paths` list is not written.
+ */
+export function writeSiteFiles(outDir: string, files: Record<string, string>, keepExisting = false): { written: string[]; kept: string[] } {
+  const written: string[] = [];
+  const kept: string[] = [];
+  for (const [p, content] of Object.entries(files)) {
+    const dest = join(outDir, p);
+    if (keepExisting && existsSync(dest)) {
+      kept.push(p);
+      continue;
+    }
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, content);
+    written.push(p);
+  }
+  if (!keepExisting) writeFileSync(join(outDir, ".paths"), `${Object.keys(files).join("\n")}\n`);
+  return { written, kept };
+}
+
+/**
  * Write a built vocabulary's files under `outDir`. With `keepExisting`, a path
  * where anything already sits (a file, or a directory where the vocabulary
  * would write an extensionless file) is left alone and returned in `kept`,
@@ -530,21 +637,7 @@ export function writeVocabularyFiles(
   outcome: { paths: readonly string[]; termPages: Record<string, string>; html: string; content: string },
   keepExisting = false,
 ): { written: string[]; kept: string[] } {
-  const written: string[] = [];
-  const kept: string[] = [];
-  for (const p of outcome.paths) {
-    const dest = join(outDir, p);
-    if (keepExisting && existsSync(dest)) {
-      kept.push(p);
-      continue;
-    }
-    mkdirSync(dirname(dest), { recursive: true });
-    writeFileSync(dest, outcome.termPages[p] ?? (p.endsWith(".html") ? outcome.html : outcome.content));
-    written.push(p);
-  }
-  // The list the workflow publishes, one path per line, so it never restates them.
-  if (!keepExisting) writeFileSync(join(outDir, ".paths"), `${outcome.paths.join("\n")}\n`);
-  return { written, kept };
+  return writeSiteFiles(outDir, vocabularyFiles(outcome, undefined), keepExisting);
 }
 
 // ── CLI ──────────────────────────────────────────────────────────
@@ -599,24 +692,35 @@ async function main(argv: readonly string[]): Promise<number> {
       console.error("usage: publish-instance-context.ts vocab --root <index> --instance <name> --out-dir <dir>");
       return 2;
     }
-    const outcome = buildVocabularyOne(arg(argv, "--root") ?? ".", instance);
-    if (outcome.kind === "skipped") {
-      console.log(`::notice::${outcome.reason}; no vocabulary to publish`);
-      return 0;
-    }
+    const root = arg(argv, "--root") ?? ".";
+    const outcome = buildVocabularyOne(root, instance);
     if (outcome.kind === "failed") {
       for (const p of outcome.problems) console.error(`::error::${p}`);
       return 1;
     }
-    // `--keep-existing`: writing into a site being built, where another step
-    // (core's glossary namespace document) may already have written a richer
-    // `v<major>/ns`. Nothing there is overwritten, and no `.paths` list is left
-    // in the site (IRI fix 1A, d).
+    // The layer's full namespace document, from its declared writer: run even
+    // when the vocabulary is skipped, since a layer minting no terms of its own
+    // may still mint glossary concepts under its namespace.
+    let writer: Record<string, string> | undefined;
+    try {
+      writer = runNamespaceWriter(root, instance);
+    } catch (e) {
+      console.error(`::error::${e instanceof Error ? e.message : String(e)}`);
+      return 1;
+    }
+    const files = vocabularyFiles(outcome.kind === "built" ? outcome : undefined, writer);
+    if (Object.keys(files).length === 0) {
+      console.log(`::notice::${outcome.kind === "skipped" ? outcome.reason : `${instance} has no namespace document`}; no vocabulary to publish`);
+      return 0;
+    }
+    // `--keep-existing`: writing into a site being built, where an earlier step
+    // may already have written `v<major>/ns`. Nothing there is overwritten,
+    // and no `.paths` list is left in the site (IRI fix 1A, d).
     const keepExisting = argv.includes("--keep-existing");
-    const { kept } = writeVocabularyFiles(outDir, outcome, keepExisting);
+    const { kept } = writeSiteFiles(outDir, files, keepExisting);
     for (const p of kept) console.log(`vocabulary: ${p} is already in the site; kept, not overwritten`);
-    const pageCount = Object.keys(outcome.termPages).length;
-    console.log(`built ${outcome.instance}'s vocabulary: ${outcome.terms} term(s), ${pageCount} term page(s); to be served at ${outcome.url} (${outcome.paths.filter((p) => outcome.termPages[p] === undefined).join(", ")})`);
+    const from = writer !== undefined && Object.keys(writer).length > 0 ? ` (namespace document from ${NAMESPACE_WRITER_SCRIPT})` : "";
+    console.log(`built ${instance}'s namespace: ${Object.keys(files).length} file(s)${from}${outcome.kind === "built" ? `; ${outcome.terms} term(s), served at ${outcome.url}` : ""}`);
     return 0;
   }
   if (cmd === "publish") {

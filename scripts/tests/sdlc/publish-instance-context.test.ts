@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildOne, contextUrl, publishFile, termPages, vocabularyHtml, vocabularyPaths, writeVocabularyFiles, type ApiRequest } from "../../publish-instance-context.ts";
+import { buildOne, contextUrl, publishFile, termPages, vocabularyHtml, vocabularyPaths, writeVocabularyFiles, NAMESPACE_WRITER_SCRIPT, namespaceWriterFiles, runNamespaceWriter, vocabularyFiles, writeSiteFiles, type ApiRequest } from "../../publish-instance-context.ts";
 import { PLACEHOLDER_HTML } from "../../pages-bootstrap.ts";
 
 const root = mkdtempSync(join(tmpdir(), "publish-instance-context-"));
@@ -333,5 +333,66 @@ describe("writeVocabularyFiles — into a site being built (IRI fix 1A, d)", () 
     expect(readFileSync(join(d, "v0", "ns", "term", "a.html"), "utf-8")).toBe("<a>");
     expect(() => readFileSync(join(d, ".paths"))).toThrow();
     rmSync(d, { recursive: true, force: true });
+  });
+});
+
+describe("the declared namespace writer — one writer for v<major>/ns (IRI fix 1A, b/d)", () => {
+  const built = { paths: ["v0/ns", "v0/ns.html", "v0/ns/term/a.html"], termPages: { "v0/ns/term/a.html": "<a>" }, html: "<html>", content: "{}" };
+  const full = { "v0/ns/index.html": "<li id=\"glossary/s/t\">", "v0/ns/index.jsonld": "{\"@graph\":[]}", "v0/ns/index.json": "{\"@graph\":[]}" };
+
+  test("the writer's document replaces the vocabulary's own ns files, which would collide with its directory; term pages stay", () => {
+    expect(vocabularyFiles(built, full)).toEqual({ "v0/ns/term/a.html": "<a>", ...full });
+  });
+
+  test("no writer, or a writer that wrote nothing for this layer, leaves the vocabulary as it was", () => {
+    const own = { "v0/ns": "{}", "v0/ns.html": "<html>", "v0/ns/term/a.html": "<a>" };
+    expect(vocabularyFiles(built, undefined)).toEqual(own);
+    expect(vocabularyFiles(built, {})).toEqual(own);
+  });
+
+  test("a layer that mints no terms of its own still gets the writer's document", () => {
+    expect(vocabularyFiles(undefined, full)).toEqual(full);
+    expect(vocabularyFiles(undefined, undefined)).toEqual({});
+  });
+
+  test("namespaceWriterFiles picks out v<major>/ns/index.* and nothing else the writer wrote", () => {
+    const d = mkdtempSync(join(tmpdir(), "ns-files-"));
+    for (const [p, c] of Object.entries({ ...full, "v1/ns/index.html": "v1", "glossary/index.html": "x", "v0/ns/other.html": "y", "assets/a.jsonld": "z" })) {
+      mkdirSync(join(d, p, ".."), { recursive: true });
+      writeFileSync(join(d, p), c);
+    }
+    expect(Object.keys(namespaceWriterFiles(d)).sort()).toEqual(["v0/ns/index.html", "v0/ns/index.json", "v0/ns/index.jsonld", "v1/ns/index.html"]);
+    rmSync(d, { recursive: true, force: true });
+  });
+
+  test("runNamespaceWriter: undefined when no layer declares the script; runs it with --site and --instance; throws on failure", () => {
+    expect(runNamespaceWriter(".", "x", undefined, () => false)).toBeUndefined();
+    const calls: string[][] = [];
+    const fake = ((cmd: string, args: string[]) => {
+      calls.push([cmd, ...args]);
+      const site = args[args.indexOf("--site") + 1]!;
+      mkdirSync(join(site, "v0", "ns"), { recursive: true });
+      writeFileSync(join(site, "v0", "ns", "index.html"), "<doc>");
+      return { status: 0 };
+    }) as unknown as typeof import("node:child_process").spawnSync;
+    expect(runNamespaceWriter(".", "dth-pc", fake, () => true)).toEqual({ "v0/ns/index.html": "<doc>" });
+    expect(calls[0]![0]).toBe("bun");
+    expect(calls[0]!.slice(3, 4)).toEqual([NAMESPACE_WRITER_SCRIPT]);
+    expect(calls[0]!.slice(-2)).toEqual(["--instance", "dth-pc"]);
+    const failing = (() => ({ status: 3 })) as unknown as typeof import("node:child_process").spawnSync;
+    expect(() => runNamespaceWriter(".", "dth-pc", failing, () => true)).toThrow(/ns:document --instance dth-pc failed \(exit 3\)/);
+  });
+
+  test("writeSiteFiles lists what it wrote for the workflow, and keeps what a site already holds", () => {
+    const d = mkdtempSync(join(tmpdir(), "site-files-"));
+    expect(writeSiteFiles(d, full)).toEqual({ written: Object.keys(full), kept: [] });
+    expect(readFileSync(join(d, ".paths"), "utf-8")).toBe(`${Object.keys(full).join("\n")}\n`);
+    const e = mkdtempSync(join(tmpdir(), "site-keep-"));
+    mkdirSync(join(e, "v0", "ns"), { recursive: true });
+    writeFileSync(join(e, "v0", "ns", "index.html"), "site");
+    expect(writeSiteFiles(e, full, true).kept).toEqual(["v0/ns/index.html"]);
+    expect(readFileSync(join(e, "v0", "ns", "index.html"), "utf-8")).toBe("site");
+    rmSync(d, { recursive: true, force: true });
+    rmSync(e, { recursive: true, force: true });
   });
 });
