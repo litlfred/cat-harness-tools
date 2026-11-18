@@ -55,3 +55,16 @@ through `needs`. The nodes are derived at this layer's pins, so a re-pin of
 bootstrap-tools runs `bun run cat libraries:derive` in the same PR, and
 `libraries:check` fails until it does. Never hand-edit a held node, and never
 add a `libraries/` to bootstrap-tools.
+
+## Before a push: the precheck
+
+`bun run cat precheck` (`scripts/precheck.ts`) runs only the fast checks
+whose inputs the push changed, and nothing when it changed none of them
+(owner, card 2026-11-18): `lock:coherence:check` (agreement and freshness)
+and `mount:remote:check` when `index.lock.json` or `index.config.json`
+changed, `check:workflow-pins` when `.github/workflows/` changed, and the
+typecheck when a `.ts` file changed. Never the full tier. It runs as git's
+`pre-push` hook (`scripts/git-hooks/pre-push`), which the session-start primer
+installs; a red check refuses the push, and `git push --no-verify` skips it.
+Without bun, a `cat` runner or `node_modules` it says so in one line and lets
+the push through; it never installs anything.
