@@ -251,8 +251,8 @@ describe("bootstrapVocabularyPath resolves from both the index root and the cat-
       expect(names.size).toBeGreaterThan(0);
       const dangling: string[] = [];
       for (const name of names) {
-        const iri = `${out.url}graphTypology/${name}`;
-        const page = `${iri.slice(out.iriBase.length).replace(/\/$/, "")}/index.html`;
+        const iri: string = `${out.url}graphTypology/${name}`;
+        const page: string = `${iri.slice(out.iriBase.length).replace(/\/$/, "")}/index.html`;
         if (out.termPages[page] === undefined) dangling.push(iri);
       }
       expect(dangling).toEqual([]);
