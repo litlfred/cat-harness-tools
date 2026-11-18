@@ -129,6 +129,32 @@ describe("indexSummary", () => {
     const line = "[a](b.html) " + "x".repeat(200);
     expect(indexSummary(line, 30)).toBe(line.slice(0, 30));
   });
+  test("a cut inside a code span is extended to its closing backtick (folio-assistant#3186)", () => {
+    const line = "Run `bun run cat merge-watch --all` before a push, then more text after it.";
+    const got = indexSummary(line, 20);
+    expect(got).toBe("Run `bun run cat merge-watch --all`");
+    expect(got.split("`").length % 2).toBe(1);
+  });
+  test("a cut inside a linked code span's text is extended to the link's end", () => {
+    const line = "See [`merge-queue`](merge-queue.html) for the order, and more text after it.";
+    expect(indexSummary(line, 10)).toBe("See [`merge-queue`](merge-queue.html)");
+  });
+  test("a backtick in a link target does not open a code span", () => {
+    const line = "[a](b`c.html) " + "x".repeat(200);
+    expect(indexSummary(line, 30)).toBe(line.slice(0, 30));
+  });
+  test("a lone backtick is plain text, so the cut stays at the limit", () => {
+    const line = "a ` b " + "x".repeat(200);
+    expect(indexSummary(line, 30)).toBe(line.slice(0, 30));
+  });
+  test("no summary of a real-shaped line leaves a backtick or bracket open, at any limit", () => {
+    const line = "Drives [`merge-queue`](merge-queue.html) through `bun run cat merge-watch`, reading `index.lock.json` and [the pins](../pins.html).";
+    for (let max = 1; max < line.length; max++) {
+      const got = indexSummary(line, max);
+      expect(got.split("`").length % 2).toBe(1);
+      expect((got.match(/\[/g) ?? []).length).toBe((got.match(/\)/g) ?? []).length);
+    }
+  });
 });
 
 /**

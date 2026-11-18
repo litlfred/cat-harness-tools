@@ -233,20 +233,37 @@ function reportCollisions(): void {
 
 /**
  * The index row's summary: the first 100 characters of a skill's opening
- * paragraph, never ending inside a link.
+ * paragraph, never ending inside a link or an inline code span.
  *
  * A plain cut at 100 lands inside a `](...)` target often enough to publish a
- * dead link in the index (`../../en/cat-harness/proces`). When the cut falls
- * inside a link target, it is extended to that link's closing parenthesis, so
- * the row keeps the link whole.
+ * dead link in the index (`../../en/cat-harness/proces`). Since inline code
+ * became links (#2416) it lands inside a code span too, leaving a backtick
+ * open, and the rest of the index row renders as escaped markup
+ * (`skill-instructions/index.html`, folio-assistant#3186). So the line is
+ * read as tokens (a link `[…](…)`, whatever its text holds, or a code span
+ * `` `…` ``), and a cut that falls inside one is extended to that token's
+ * end, so the row keeps it whole. A backtick with no partner is plain text,
+ * as it is to a Markdown renderer.
  */
 export function indexSummary(line: string, max = 100): string {
-  const cut = line.slice(0, max);
-  if (cut.length === line.length) return cut;
-  const open = cut.lastIndexOf("](");
-  if (open === -1 || cut.includes(")", open)) return cut;
-  const close = line.indexOf(")", open);
-  return close === -1 ? cut : line.slice(0, close + 1);
+  if (line.length <= max) return line;
+  for (let i = 0; i < line.length && i < max; ) {
+    let end = -1;
+    if (line[i] === "[") {
+      const link = /^\[[^\]]*\]\([^)]*\)/.exec(line.slice(i));
+      if (link) end = i + link[0].length;
+    } else if (line[i] === "`") {
+      const close = line.indexOf("`", i + 1);
+      if (close !== -1) end = close + 1;
+    }
+    if (end === -1) {
+      i += 1;
+      continue;
+    }
+    if (end > max) return line.slice(0, end);
+    i = end;
+  }
+  return line.slice(0, max);
 }
 
 export { orphanPages };
