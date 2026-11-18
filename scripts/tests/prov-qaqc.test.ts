@@ -17,6 +17,7 @@ import { join } from "node:path";
 import {
   outputs,
   processStem,
+  reportSite,
   reportInstance,
   stableJson,
   staleness,
@@ -203,5 +204,53 @@ describe("prov-qaqc: outputs", () => {
     const page = outputs(report(), { page: "/p", assets: "/a" }).get("/p")!;
     expect(page).toContain("**Advisory.**");
     expect(page).toContain("| `unknown` | 1 |");
+  });
+});
+
+/**
+ * Owner, 2026-11-17: the report is written to and checked in the site of the
+ * layer whose instances it reads — the checkout root's — never a mounted
+ * dependency's. dth-pc (no instances) judged cat-harness's 12 committed logs
+ * as orphans against its own empty work plan.
+ */
+describe("prov-qaqc: which site", () => {
+  const empty = (): Report => ({ instances: new Map(), policies: [], invalid: [] });
+  const layer = (name: string, site = "docs"): string => {
+    const dir = mkdtempSync(join(tmpdir(), `prov-site-${name}-`));
+    writeFileSync(join(dir, `${name}.json`), JSON.stringify({ name, site: { root: site }, directories: [] }, null, 2));
+    return dir;
+  };
+
+  test("a root that declares a layer publishes in ITS OWN site, not the mounted platform's", () => {
+    const root = layer("dth-x");
+    const s = reportSite(root, HARNESS_ROOT);
+    expect(s.rootLayer).toBe(true);
+    expect(s.page.startsWith(root)).toBe(true);
+    expect(s.assets.startsWith(root)).toBe(true);
+    expect(s.page.startsWith(HARNESS_ROOT)).toBe(false);
+  });
+
+  test("a bare index root (no layer declaration) keeps the platform site", () => {
+    const root = mkdtempSync(join(tmpdir(), "prov-site-index-"));
+    writeFileSync(join(root, "index.config.json"), "{}\n");
+    const s = reportSite(root, HARNESS_ROOT);
+    expect(s.rootLayer).toBe(false);
+    expect(s.page.startsWith(HARNESS_ROOT)).toBe(true);
+  });
+
+  test("a root layer with no instance and no committed page owes nothing: no stale page, no orphan", () => {
+    const s = reportSite(layer("dth-y"), HARNESS_ROOT);
+    const files = outputs(empty(), s);
+    expect(files.size).toBe(0);
+    expect(staleness(files, s.assets)).toEqual({ stale: [], orphans: [] });
+  });
+
+  test("...but a page it already committed is still kept current", () => {
+    const s = reportSite(layer("dth-z"), HARNESS_ROOT);
+    mkdirSync(join(s.page, ".."), { recursive: true });
+    writeFileSync(s.page, "old\n");
+    const files = outputs(empty(), s);
+    expect([...files.keys()]).toEqual([s.page]);
+    expect(staleness(files, s.assets).stale).toEqual([s.page]);
   });
 });
