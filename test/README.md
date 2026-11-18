@@ -73,6 +73,7 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | [`sticky-one-component.e2e.ts`](sticky-one-component.e2e.ts) | a file |  |
 | [`sticky-todo-graph.e2e.ts`](sticky-todo-graph.e2e.ts) | a file |  |
 | [`suggest-editor.e2e.ts`](suggest-editor.e2e.ts) | a file |  |
+| [`task-panel-phone-width.e2e.ts`](task-panel-phone-width.e2e.ts) | a file |  |
 | [`test-server.mjs`](test-server.mjs) | a file |  |
 | [`test_pypdf_compat.py`](test_pypdf_compat.py) | a file |  |
 | [`themed-viewers.e2e.ts`](themed-viewers.e2e.ts) | a file |  |
