@@ -122,6 +122,25 @@ export function outputTwinOf(root: string, abs: string, mounted: Map<string, str
 }
 
 /**
+ * The inverse of {@link outputTwinOf}: the LOGICAL path of a computed file
+ * that sits under {@link LAYER_OUTPUT_ROOT}, i.e. where the mounted layer it
+ * belongs to keeps it (`build/layers/<instance>/<rel>` → `<mount path>/<rel>`).
+ * `abs` itself when it is not under the output root, or names an instance
+ * the checkout does not mount. Anything that ADDRESSES a computed file (a
+ * store key, a forge link, a declaration lookup) goes by the logical path;
+ * only the bytes come from the output root.
+ */
+export function logicalPathOf(root: string, abs: string, mounted: Map<string, string> = mountedInstances(root)): string {
+  const r = resolve(root);
+  const rel = relative(join(r, LAYER_OUTPUT_ROOT), resolve(abs)).split(sep).join("/");
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return abs;
+  const [instance, ...rest] = rel.split("/");
+  const mount = mounted.get(instance!);
+  if (mount === undefined) return abs;
+  return join(r, mount.replace(/^\.\/|\/+$/g, ""), ...rest);
+}
+
+/**
  * {@link readPathFor} for an ABSOLUTE path: the output-root twin when a
  * writer put the file (or directory) there, else `abs` itself. Changes
  * nothing while no writer writes under {@link LAYER_OUTPUT_ROOT}.
