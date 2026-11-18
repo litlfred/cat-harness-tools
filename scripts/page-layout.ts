@@ -48,7 +48,7 @@
  * once, in it. With no script the page cannot tell where it is, so the
  * `<noscript>` links a stylesheet that draws the banner: "could not tell" is
  * a draft. It is a linked file, never an inline `<style>`, so a thin page
- * stays a shell of links (fhir-harness `ig-thin-pages`, `ig-search`).
+ * stays a shell of links, as the thin pages built on this layout must be.
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

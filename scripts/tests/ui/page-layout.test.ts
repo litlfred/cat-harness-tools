@@ -160,7 +160,7 @@ describe("draft-banner.js (owner, 2026-11-17: DRAFT everywhere but the official 
     expect(draftBannerNoscript("../")).toBe(`<noscript data-fa-draft-noscript><link rel="stylesheet" href="../${DRAFT_BANNER_NOSCRIPT_CSS_FILE}"></noscript>`);
     expect(readFileSync(DRAFT_BANNER_NOSCRIPT_CSS_SOURCE, "utf-8")).toMatch(/body::before \{\s*content: "DRAFT /);
   });
-  it("puts no inline <style> in a page, so a thin page stays a shell of links (fhir-harness ig-thin-pages, ig-search)", () => {
+  it("puts no inline <style> in a page, so a thin page stays a shell of links", () => {
     expect(pageLayoutTags("")).not.toContain("<style");
   });
 });
