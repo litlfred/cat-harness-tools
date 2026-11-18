@@ -34,6 +34,19 @@
  * internal error (a process model that cannot be loaded). `unknown` is never
  * read as permit.
  *
+ * ## Which site: the layer whose instances it reads
+ *
+ * The instances are the checkout ROOT's (`beans/workflows/`), so the outputs
+ * are the root's too (owner, 2026-11-17). When the root declares a layer, the
+ * page and logs are written to and checked in THAT layer's own site, never in
+ * a mounted dependency's. Before this, a downstream layer (dth-pc, with no
+ * instances) judged cat-harness's committed logs against its own empty work
+ * plan and found every one an orphan. A root that declares no layer (a bare
+ * index such as folio-assistant's) has no site of its own, so its report stays
+ * in the platform site, as before. A root layer with no instance owes no
+ * report: nothing is written, and only a report it already committed is
+ * judged.
+ *
  * Usage:  bun run cat-harness-tools/scripts/prov-qaqc.ts [--check]
  *
  * @module cat-harness/scripts/prov-qaqc
@@ -45,6 +58,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { layerRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { findDeclarationFile } from "../schemas/kg/instance-roots.js";
 import { addressBook, provJsonldDocument, type AddressBook, type SubjectMinter } from "../schemas/kg/prov-jsonld.js";
 import { ProvActivitySchema, ProvConsentRefSchema, agreementsCited, isConsentBasedRecord, isConsentPolicyUid, verifyProvHashChain, type ProvActivity } from "../schemas/content/prov.js";
 import { actorsDir, laneBinding, type RoleGraph } from "../schemas/process/role-graph.js";
@@ -60,10 +74,21 @@ import { subjectIri } from "./lib/subject-iri.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(HARNESS);
-/** The platform site the report publishes to: the declared site directory, never a literal. */
-const SITE = join(HARNESS, siteDirFor(HARNESS));
-export const PAGE = join(SITE, "prov-qaqc", "index.md");
-export const ASSETS = join(SITE, "assets", "prov");
+/**
+ * Where the report is published: the site of the layer whose instances it
+ * reads. The checkout root's own declared site when the root declares a layer;
+ * the platform's when the root is a bare index with no layer of its own. Never
+ * a literal, and never a mounted dependency's site under a root that has one.
+ */
+export function reportSite(repo: string = REPO, harness: string = HARNESS): { site: string; page: string; assets: string; rootLayer: boolean } {
+  const rootLayer = findDeclarationFile(repo) !== undefined;
+  const owner = rootLayer ? repo : harness;
+  const site = join(owner, siteDirFor(owner));
+  return { site, page: join(site, "prov-qaqc", "index.md"), assets: join(site, "assets", "prov"), rootLayer };
+}
+const SITE = reportSite();
+export const PAGE = SITE.page;
+export const ASSETS = SITE.assets;
 
 /** The PROV-O namespace. `prov:` in every term below expands to it. */
 export const PROV_NS = "http://www.w3.org/ns/prov#";
@@ -495,8 +520,16 @@ ${sections.join("\n\n")}
 `;
 }
 
-/** Every file this generator owns, path → content. */
-export function outputs(r: Report, site: { page: string; assets: string } = { page: PAGE, assets: ASSETS }): Map<string, string> {
+/**
+ * Every file this generator owns, path → content. A ROOT LAYER with no
+ * instance owes no report: it gets the page only if it already committed one
+ * (so a report that emptied is still kept current), and no logs.
+ */
+export function outputs(
+  r: Report,
+  site: { page: string; assets: string; rootLayer?: boolean } = SITE,
+): Map<string, string> {
+  if (site.rootLayer && r.instances.size === 0 && !existsSync(site.page)) return new Map();
   const out = new Map<string, string>([[site.page, renderPage(r)]]);
   const book = addressBook(REPO, publishedSubjects());
   for (const [id, parts] of r.instances) out.set(join(site.assets, assetName(id)), stableJson(provDocument(id, parts, book)));
