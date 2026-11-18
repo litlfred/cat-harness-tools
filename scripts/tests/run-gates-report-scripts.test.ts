@@ -107,6 +107,26 @@ describe("run-gates.py skips gates.ts's `report` scripts", () => {
     expect(gates["tools:separation:cutover:check"]?.exit).toBe(0);
   });
 
+  test("in INDEX mode EVERY `report` script of the real table is skipped, but the two run-gates.py wires (#2460)", () => {
+    // Not only check:draft-beans: each script gates.ts calls `report` would
+    // redden an index-mode run the same way, so every one is asked of here.
+    const real = reportScripts(SCRIPT_EXEMPTIONS);
+    const wired = new Set(["check:test-budgets", "separation:cutover:check"]);
+    const root = fixture();
+    write(root, "cat-harness-tools/scripts/gates.ts", `if (process.argv.includes("--report-scripts")) console.log(${JSON.stringify(JSON.stringify(real))});\n`);
+    write(root, "tools/package.json", {
+      name: "tools",
+      scripts: Object.fromEntries([...Object.keys(real), "check:other"].map((k) => [k, "x"])),
+    });
+    const { r, gates } = runGates(root);
+    expect(r.status).toBe(0);
+    const ran = Object.keys(real).filter((k) => !wired.has(k) && gates[`tools:${k}`]?.skipped === undefined);
+    expect(ran).toEqual([]);
+    // check:draft-beans by its `report` reason; a few are skipped earlier for a reason of their own (needs-input).
+    expect(gates["tools:check:draft-beans"]?.skipped).toContain('kind: "report"');
+    expect(gates["tools:check:other"]?.exit).toBe(0);
+  });
+
   test("with no gates.ts to ask it says so, and skips nothing as a report", () => {
     const { r, gates } = runGates(fixture(false));
     expect(r.stderr).toContain("--report-scripts is absent");

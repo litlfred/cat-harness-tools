@@ -21,7 +21,7 @@
  * @covers bean-defs, beans
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { beanDefsDir, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
@@ -66,11 +66,16 @@ export interface CheckDraftBeansOptions {
   /** Custom isAncestor implementation for unit testing. */
   isAncestorFn?: typeof isAncestor;
   /** Custom git runner for unit testing. */
-  gitFn?: (args: string[], cwd: string) => { status: number; stdout: string; stderr: string };
+  gitFn?: GitRunner;
+  /** The environment the default branch is read from (`GITHUB_BASE_REF`, `GITHUB_EVENT_PATH`). */
+  env?: NodeJS.ProcessEnv;
 }
 
 function runGit(args: string[], cwd: string): { status: number; stdout: string; stderr: string } {
-  const r = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf-8" });
+  const r = spawnSync("git", ["-C", cwd, ...args], {
+    encoding: "utf-8",
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+  });
   return {
     status: r.status ?? (r.error ? 1 : 0),
     stdout: r.stdout ?? "",
@@ -107,26 +112,87 @@ export function hasRecommendationOrDefaultSection(body: string): boolean {
   return false;
 }
 
+/** The git runner {@link resolveDefaultRef} and {@link checkDraftBeans} call. */
+export type GitRunner = (args: string[], cwd: string) => { status: number; stdout: string; stderr: string };
+
+/**
+ * The default branch's NAMES this run can learn without a ref to read it from,
+ * in the order they are trusted: the pull request's base (`GITHUB_BASE_REF`),
+ * then the repository's declared default as the event payload states it
+ * (`repository.default_branch` in `GITHUB_EVENT_PATH`). Empty outside CI.
+ */
+export function declaredDefaultNames(env: NodeJS.ProcessEnv = process.env): string[] {
+  const names: string[] = [];
+  const base = env.GITHUB_BASE_REF?.trim();
+  if (base) names.push(base.replace(/^refs\/heads\//, ""));
+  const eventPath = env.GITHUB_EVENT_PATH;
+  if (eventPath && existsSync(eventPath)) {
+    try {
+      const event = JSON.parse(readFileSync(eventPath, "utf-8")) as { repository?: { default_branch?: unknown } };
+      const declared = event.repository?.default_branch;
+      if (typeof declared === "string" && declared.trim() !== "") names.push(declared.trim());
+    } catch {
+      // An unreadable payload declares nothing; the other sources still answer.
+    }
+  }
+  return [...new Set(names)];
+}
+
 /**
  * Resolves the default branch ref (e.g. "origin/main" or "main").
+ *
+ * A CI checkout is the hard case (cat-harness-tools#2460): `actions/checkout`
+ * fetches one commit on a detached HEAD, sets no `origin/HEAD` and carries no
+ * `origin/main`, so the local candidates alone find nothing. In order:
+ *
+ * 1. `customRef`, when given — and only it.
+ * 2. `origin/HEAD`, where the clone recorded it.
+ * 3. Each known name, as `origin/<name>` then `<name>`: the PR's base and the
+ *    repository's declared default ({@link declaredDefaultNames}), then the
+ *    remote's own HEAD (`git ls-remote --symref origin HEAD`), then `main`
+ *    and `master`.
+ * 4. None present locally: FETCH the first name the run or the remote declared
+ *    (`origin/<name>`, depth 1 — {@link isAncestor} deepens it when it must).
+ *
+ * `null` only when every step fails, and then the caller reports could-not-determine.
  */
 export function resolveDefaultRef(
   repo: string,
   customRef?: string,
-  gitRunner = runGit,
+  gitRunner: GitRunner = runGit,
+  env: NodeJS.ProcessEnv = process.env,
 ): string | null {
   if (customRef) {
     const res = gitRunner(["rev-parse", "-q", "--verify", customRef], repo);
     return res.status === 0 ? customRef : null;
   }
+  const verifies = (ref: string) => gitRunner(["rev-parse", "-q", "--verify", `${ref}^{commit}`], repo).status === 0;
   // Try origin/HEAD symbolic ref first
   const sym = gitRunner(["symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"], repo);
-  if (sym.status === 0 && sym.stdout.trim() !== "") {
+  if (sym.status === 0 && sym.stdout.trim() !== "" && verifies(sym.stdout.trim())) {
     return sym.stdout.trim();
   }
-  for (const cand of ["origin/main", "main", "origin/master", "master"]) {
-    const res = gitRunner(["rev-parse", "-q", "--verify", cand], repo);
-    if (res.status === 0) return cand;
+  const hasOrigin = gitRunner(["remote", "get-url", "origin"], repo).status === 0;
+  const declared = declaredDefaultNames(env);
+  if (hasOrigin && declared.length === 0) {
+    // The remote's own HEAD: what the repository declares its default to be.
+    const ls = gitRunner(["ls-remote", "--symref", "origin", "HEAD"], repo);
+    const m = ls.status === 0 ? /^ref:\s+refs\/heads\/(\S+)\s+HEAD$/m.exec(ls.stdout) : null;
+    if (m) declared.push(m[1]!);
+  }
+  for (const name of [...new Set([...declared, "main", "master"])]) {
+    for (const cand of [`origin/${name}`, name]) {
+      if (verifies(cand)) return cand;
+    }
+  }
+  if (hasOrigin) {
+    for (const name of declared) {
+      const fetched = gitRunner(
+        ["fetch", "-q", "--no-tags", "--depth=1", "origin", `+refs/heads/${name}:refs/remotes/origin/${name}`],
+        repo,
+      );
+      if (fetched.status === 0 && verifies(`origin/${name}`)) return `origin/${name}`;
+    }
   }
   return null;
 }
@@ -182,20 +248,34 @@ export function checkDraftBeans(
   const rawGitRoot = gitTop.stdout.trim();
   const gitRoot = existsSync(rawGitRoot) ? realpathSync(rawGitRoot) : rawGitRoot;
 
-  const defRef = resolveDefaultRef(gitRoot, opts.defaultRef, gitRunner);
+  const draftBeans = beans.filter((b) => b.status === "draft");
+  const decisionDraftBeans = draftBeans.filter((b) => hasRecommendationOrDefaultSection(b.body));
+  if (decisionDraftBeans.length === 0) {
+    // Nothing to place against the default branch, so its ref is never needed:
+    // a CI checkout that cannot name it is not thereby undetermined (#2460).
+    return {
+      store: beanDefsDir(root),
+      total: beans.length,
+      draftCount: draftBeans.length,
+      decisionDraftCount: 0,
+      findings: [],
+      undetermined: [],
+    };
+  }
+
+  const defRef = resolveDefaultRef(gitRoot, opts.defaultRef, gitRunner, opts.env);
   if (!defRef) {
     return {
       store: beanDefsDir(root),
       total: beans.length,
-      draftCount: 0,
-      decisionDraftCount: 0,
+      draftCount: draftBeans.length,
+      decisionDraftCount: decisionDraftBeans.length,
       findings: [],
-      undetermined: ["could not determine default branch ref"],
+      undetermined: [
+        "could not determine default branch ref (no origin/HEAD, GITHUB_BASE_REF, declared default, origin/main or main)",
+      ],
     };
   }
-
-  const draftBeans = beans.filter((b) => b.status === "draft");
-  const decisionDraftBeans = draftBeans.filter((b) => hasRecommendationOrDefaultSection(b.body));
 
   const findings: DraftBeanFinding[] = [];
   const undetermined: string[] = [];
