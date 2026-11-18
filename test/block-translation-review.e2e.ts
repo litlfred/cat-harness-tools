@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { overlayPath } from "../scripts/lib/layer-output.ts";
 import { siteFileAt } from "./support/site-fs.ts";
+import { parseIssueBody, payloadProblems } from "../scripts/lib/translation-adjudication.ts";
 
 /**
  * A block's translation, in its feedback panel (owner, 2026-11-14: "add to
@@ -130,7 +131,7 @@ function harness(meta: object, scheme: "light" | "dark"): string {
   );
 }
 
-async function serve(page: Page, opts: { scheme?: "light" | "dark"; meta?: object; review?: { code: number; body?: unknown }; candidates?: boolean } = {}) {
+async function serve(page: Page, opts: { scheme?: "light" | "dark"; meta?: object; review?: { code: number; body?: unknown }; candidates?: boolean; strings?: unknown } = {}) {
   const rv = opts.review ?? { code: 200, body: review() };
   await page.addInitScript(() => {
     (window as unknown as { __opened: string[] }).__opened = [];
@@ -139,6 +140,7 @@ async function serve(page: Page, opts: { scheme?: "light" | "dark"; meta?: objec
   await page.route("https://tr.test/**", (route) => {
     const url = route.request().url();
     if (url.endsWith("/page.html")) return route.fulfill({ contentType: "text/html", body: harness(opts.meta ?? META, opts.scheme ?? "light") });
+    if (url.endsWith(STRINGS_URL) && opts.strings !== undefined) return route.fulfill({ contentType: "application/json", body: JSON.stringify(opts.strings) });
     if (url.endsWith(REVIEW_URL)) {
       return rv.code === 200
         ? route.fulfill({ contentType: "application/json", body: JSON.stringify(rv.body) })
@@ -329,4 +331,182 @@ test("no candidates sidecar (404): the reviewer types their own", async ({ page 
   const dlg = page.locator("dialog.fa-trf-dialog");
   await expect(dlg.locator(".fa-trf-strings > li")).toHaveCount(2);
   await expect(dlg.locator(".fa-trf-cands")).toHaveCount(0);
+});
+
+// ── The owner's rulings of 2026-11-18 (cat-harness-tools translation-strings.ts) ──
+
+const STRINGS_URL = "/assets/translation-status/strings/demo/docs/guide.json";
+const SAVE_HASH = "1111111111111111";
+/** The review projection as the tools layer now writes it: a strings projection per row. */
+const reviewWithStrings = () => {
+  const r = review() as ReturnType<typeof review> & { strings?: object };
+  r.strings = { schema: "folio-translation-strings/v1", base: "assets/translation-status/strings/", statuses: [], pickTiers: [] };
+  (r.layers[0]!.rows[0] as { strings?: string }).strings = "demo/docs/guide.json";
+  return r;
+};
+const cand = (text: string, kind: string, id: string, extra: object = {}) => ({ text, source: { kind, id }, msgidHash: SAVE_HASH, tier: "mt", stale: false, qaFailures: [], current: false, ...extra });
+const STRINGS = {
+  $schema: "folio-translation-strings/v1",
+  layer: "demo",
+  repository: "o/r",
+  translations: "translations",
+  catalogue: "docs/guide",
+  hashes: { ar: "2222222222222222", fr: HASH },
+  strings: [
+    {
+      msgid: "Hello, reader.",
+      hash: "3333333333333333",
+      sources: ["docs/guide.md"],
+      locales: {
+        ar: { text: "", status: "missing", fuzzy: false, candidates: [] },
+        fr: {
+          text: "Bonjour, lecteur.",
+          status: "adjudicated",
+          fuzzy: false,
+          chosen: { text: "Bonjour, lecteur.", how: "adjudicated", by: "github:alice", at: "2026-11-17T09:00:00Z", issue: 4, reason: "formal register" },
+          candidates: [],
+        },
+      },
+    },
+    {
+      msgctxt: "button",
+      msgid: "Save",
+      hash: SAVE_HASH,
+      sources: ["docs/guide.md"],
+      locales: {
+        fr: {
+          text: "Sauver",
+          status: "agent",
+          fuzzy: true,
+          pick: { text: "Enregistrer", candidate: 0, tier: "human-proposed", unofficial: true },
+          candidates: [
+            cand("Enregistrer", "human", "github:ana", { tier: "human-proposed", source: { kind: "human", id: "github:ana", by: "github:ana", at: "2026-11-16T08:00:00Z", issue: 3 } }),
+            cand("Conserver", "official", "who-glossary", { tier: "official", exactMatch: false, sourceText: "save" }),
+            cand("Sauver", "agent", "claude-opus-5-5", { tier: "agent", current: true, qa: { roundtrip: { score: 0.55, threshold: 0.7, pass: false } }, qaFailures: ["round trip 0.55 < 0.7"] }),
+            cand("Sauvegarder", "web-service", "weblate", { tier: "platform", source: { kind: "web-service", id: "weblate", version: "5.8", by: "jean" }, qa: { glossary: { pass: false, missing: ["save"] }, placeholders: { pass: true } } }),
+            cand("Garder", "open-mt", "opus-mt-en-fr", { stale: true }),
+          ],
+        },
+      },
+    },
+    { msgid: "Elsewhere.", hash: "4444444444444444", sources: ["docs/other.md"], locales: { fr: { text: "Ailleurs.", status: "mt", fuzzy: false, candidates: [] } } },
+  ],
+};
+
+test("a source-language page shows the pane, listing every locale's translation of the block and its status", async ({ page }) => {
+  await serve(page, { meta: { ...META, lang: "en", translationSource: "" }, review: { code: 200, body: reviewWithStrings() }, strings: STRINGS });
+  await expect(page.locator('.block-actions[data-block="b-guide"] .ba-ic[data-pane="translation"]')).toHaveCount(1);
+  const pane = await openPanel(page, "b-guide");
+  await expect(pane).toContainText("In every language");
+  const every = pane.locator(".fa-trf-every > li");
+  await expect(every).toHaveCount(2); // the block's two strings, not "Elsewhere."
+  await expect(every.nth(0).locator('[data-fa-tr-locale="ar"]')).toHaveAttribute("data-fa-tr-status", "missing");
+  await expect(every.nth(0).locator('[data-fa-tr-locale="fr"]')).toContainText("adjudicated by a collaborator");
+  await expect(every.nth(0).locator('[data-fa-tr-locale="fr"]')).toContainText("chosen by alice, 2026-11-17: formal register");
+  await expect(every.nth(1).locator('[data-fa-tr-locale="fr"]')).toContainText("agent translation, not reviewed");
+  await expect(every.nth(1).locator('[data-fa-tr-locale="fr"]')).toContainText("default pick (unofficial): Enregistrer");
+  // A source page has no "translation OK" for its own language, but a fix per locale with a catalogue.
+  await expect(pane.locator(".fa-trf-ok")).toHaveCount(0);
+  await expect(pane.getByRole("button", { name: "✎ Fix translation (fr)" })).toBeVisible();
+  // An empty catalogue too: a missing string is where a proposal matters most.
+  await expect(pane.getByRole("button", { name: "✎ Fix translation (ar)" })).toBeVisible();
+});
+
+test("a translated page lists every locale too, beside its own catalogue's state", async ({ page }) => {
+  await serve(page, { review: { code: 200, body: reviewWithStrings() }, strings: STRINGS });
+  const pane = await openPanel(page, "b-guide");
+  await expect(pane.locator(".fa-trf-state").first()).toHaveAttribute("data-fa-tr-state", "machine");
+  await expect(pane.locator('.fa-trf-loc[data-fa-tr-locale="ar"]').first()).toContainText("missing: the source text is shown");
+});
+
+test("with no review published, the pane says so plainly and shows what the page itself says", async ({ page }) => {
+  await serve(page, { meta: { ...META, lang: "en", translationSource: "" }, review: { code: 404 } });
+  const pane = await openPanel(page, "b-guide");
+  await expect(pane).toContainText("This site publishes no translation review.");
+  await expect(pane).toContainText("This page is published in: en, fr.");
+});
+
+test("fix translation offers EVERY candidate, the current one included, with its provenance and the unofficial default pick", async ({ page }) => {
+  await serve(page, { review: { code: 200, body: reviewWithStrings() }, strings: STRINGS });
+  const pane = await openPanel(page, "b-guide");
+  await pane.getByRole("button", { name: "✎ Fix translation" }).click();
+  const dlg = page.locator("dialog.fa-trf-dialog");
+  await expect(dlg).toContainText("only a collaborator's choice is recorded as the translation");
+  const save = dlg.locator(".fa-trf-strings > li").nth(1);
+  const choices = save.locator(".fa-trf-cands .fa-trf-cand");
+  await expect(choices).toHaveCount(5);
+  await expect(choices.nth(0)).toContainText("Enregistrer — human github:ana · ★ default pick (unofficial) · 2026-11-16 · by ana · issue #3");
+  await expect(choices.nth(1)).toContainText("Conserver — official who-glossary · not an exact match to the official source");
+  await expect(choices.nth(2)).toContainText("Sauver — agent claude-opus-5-5 · round trip 0.55 ✗ · current");
+  await expect(choices.nth(2)).toHaveAttribute("data-fa-tr-qa", "fail");
+  await expect(choices.nth(3)).toContainText("Sauvegarder — web-service weblate · version 5.8 · by jean · glossary ✗: save missing · placeholders ✓");
+  await expect(choices.nth(4)).toContainText("stale: made for an older source text");
+  await expect(choices.nth(4)).toHaveAttribute("data-fa-tr-stale", "true");
+  for (const c of await choices.all()) expect((await c.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // A picked candidate is filed with its source, as before.
+  await save.getByRole("radio", { name: /Sauvegarder/ }).check();
+  await dlg.getByRole("button", { name: "Make the GitHub issue" }).click();
+  const { record, body } = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!);
+  expect(record.items[0].suggestions).toEqual([{ msgid: "Save", current: "Sauver", suggested: "Sauvegarder", source: { kind: "web-service", id: "weblate" }, msgctxt: "button" }]);
+  expect(body).toContain("proposes `Save`");
+  // Choose, with a reason: the record carries both, the summary says "chooses", and the workflow's parser accepts it.
+  await save.getByRole("checkbox", { name: "Choose as the translation" }).check();
+  await save.getByLabel("Why (optional)").fill("the glossary term");
+  await dlg.getByRole("button", { name: "Make the GitHub issue" }).click();
+  const chosen = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!);
+  expect(chosen.record.items[0].suggestions).toEqual([{ msgid: "Save", current: "Sauver", suggested: "Sauvegarder", source: { kind: "web-service", id: "weblate" }, msgctxt: "button", choose: true, reason: "the glossary term" }]);
+  expect(chosen.body).toContain("chooses `Save` (context `button`): `Sauver` → `Sauvegarder` (candidate from web-service `weblate`) because the glossary term");
+  expect(parseIssueBody(chosen.body)).toEqual(chosen.record);
+  expect(payloadProblems(chosen.record)).toEqual([]);
+});
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the every-locale list and the choose controls are readable in the ${scheme} scheme`, async ({ page }) => {
+    await serve(page, { scheme, review: { code: 200, body: reviewWithStrings() }, strings: STRINGS });
+    const pane = await openPanel(page, "b-guide");
+    // A translated page: its own locale shown, the others collapsed.
+    await expect(pane.locator('.fa-trf-every .fa-trf-loc[data-fa-tr-locale="fr"]').first()).toBeVisible();
+    await expect(pane.locator(".fa-trf-every details.fa-trf-others").first()).toBeVisible();
+    await expect(pane.locator('.fa-trf-every .fa-trf-loc[data-fa-tr-locale="ar"]').first()).toBeHidden();
+    await pane.locator(".fa-trf-every details.fa-trf-others > summary").first().click();
+    await expect(pane.locator('.fa-trf-every .fa-trf-loc[data-fa-tr-locale="ar"]').first()).toBeVisible();
+    const c = await pane.evaluate((n) => ({ fg: getComputedStyle(n).color, bg: getComputedStyle(n.closest(".fa-block-panel")!).backgroundColor }));
+    expect(c.fg).not.toBe(c.bg);
+    await pane.getByRole("button", { name: "✎ Fix translation" }).click();
+    const box = page.locator("dialog.fa-trf-dialog .fa-trf-choose").first();
+    await expect(box).toBeVisible();
+    const d = await page.locator("dialog.fa-trf-dialog").evaluate((n) => ({ fg: getComputedStyle(n).color, bg: getComputedStyle(n).backgroundColor }));
+    expect(d.fg).not.toBe(d.bg);
+  });
+}
+
+test("a source page's per-locale fix files a suggestion for that locale", async ({ page }) => {
+  await serve(page, { meta: { ...META, lang: "en", translationSource: "" }, review: { code: 200, body: reviewWithStrings() }, strings: STRINGS });
+  const pane = await openPanel(page, "b-guide");
+  await pane.getByRole("button", { name: "✎ Fix translation (fr)" }).click();
+  const dlg = page.locator("dialog.fa-trf-dialog");
+  await expect(dlg.locator("#fa-trf-dialog-title")).toHaveText("Fix the translation (fr)");
+  await dlg.locator(".fa-trf-strings > li").nth(0).getByLabel("Your suggestion").fill("Salut, lecteur.");
+  await dlg.getByRole("button", { name: "Make the GitHub issue" }).click();
+  const { record } = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!);
+  expect(record.items[0]).toMatchObject({ catalogue: "docs/guide", locale: "fr", verdict: "mistranslation", poHash: HASH });
+});
+
+test("the pane's rank equals the tools layer's rankCandidates, fixture for fixture", async ({ page }) => {
+  const { rankCandidates } = await import("../scripts/lib/translation-strings.ts");
+  const H = "aaaaaaaaaaaaaaaa";
+  const c = (text: string, kind: string, id: string, extra: object = {}) => ({ text, source: { kind, id }, msgidHash: H, ...extra });
+  const fixtures = [
+    { candidates: [c("MT", "open-mt", "opus"), c("Svc", "web-service", "deepl"), c("Ag", "agent", "a"), c("Wb", "web-service", "Weblate"), c("Hu", "human", "github:a"), c("Of", "official", "who")] },
+    { candidates: [c("Fail", "human", "github:a", { qa: { glossary: { pass: false, missing: ["x"] } } }), c("Clean", "open-mt", "m", { qa: { roundtrip: { score: 0.9, threshold: 0.7, pass: true } } }), c("Ph", "agent", "a", { qa: { placeholders: { pass: false } } }), c("None", "open-mt", "n")] },
+    { candidates: [c("Old", "human", "github:a", { source: { kind: "human", id: "github:a", at: "2026-11-01T00:00:00Z" } }), c("New", "human", "github:b", { source: { kind: "human", id: "github:b", at: "2026-11-17T00:00:00Z" } }), c("Stale", "official", "who", { msgidHash: "bbbbbbbbbbbbbbbb" }), c("NoHash", "agent", "a", { msgidHash: undefined })] },
+    { candidates: [c("A", "agent", "a"), c("B", "human", "github:b"), c("C", "open-mt", "m", { qa: { roundtrip: { score: 0.2, threshold: 0.7, pass: false } } })], chosen: { text: "A", how: "adjudicated", by: "github:x", at: "t" } },
+    { candidates: [c("A", "agent", "a"), c("B", "human", "github:b")], chosen: { text: "A", how: "auto", at: "t" } },
+    { candidates: [] },
+  ];
+  await serve(page);
+  const js = await page.evaluate(([fs, h]) => (fs as object[]).map((f) => (window as unknown as { faTranslationReview: { rankCandidates: (e: object, h: string) => Array<{ index: number; tier: string; score: number; stale: boolean; qaFailures: unknown[] }> } }).faTranslationReview.rankCandidates(f, h as string).map((r) => ({ index: r.index, tier: r.tier, score: r.score, stale: r.stale, qa: r.qaFailures.length }))), [fixtures, H] as const);
+  const ts = fixtures.map((f) => rankCandidates(f as never, H).map((r) => ({ index: r.index, tier: r.tier, score: r.score, stale: r.stale, qa: r.qaFailures.length })));
+  expect(js).toEqual(ts);
+  expect(ts[0]!.map((r) => r.tier)).toEqual(["official", "human-proposed", "platform", "agent", "mt", "mt"]);
 });
