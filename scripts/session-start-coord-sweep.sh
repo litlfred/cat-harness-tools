@@ -41,6 +41,29 @@ if [ -n "$SESSION_GIT_ROOT" ] && git -C "$SESSION_GIT_ROOT" remote 2>/dev/null |
   fi
 fi
 
+# ── -0.5. The pre-push precheck hook ────────────────────────────────────────
+# Owner, card 2026-11-18: a push runs the fast checks its own changes can break
+# (scripts/precheck.ts) before it leaves the container. Agent containers are
+# cloned fresh and never run scripts/git-hooks/install.sh, so the hook is put in
+# place here. A hook that is not ours (no marker, no pre-push-gates.ts line) is
+# left alone. Copies one file; installs nothing; never fails the session.
+# `git push --no-verify` skips the hook.
+if [ -n "$SESSION_GIT_ROOT" ]; then
+  PRECHECK_HOOK_SRC="$(dirname "${BASH_SOURCE[0]}")/git-hooks/pre-push"
+  PRECHECK_HOOK_DIR="$(git -C "$SESSION_GIT_ROOT" rev-parse --path-format=absolute --git-path hooks 2>/dev/null || true)"
+  if [ -f "$PRECHECK_HOOK_SRC" ] && [ -n "$PRECHECK_HOOK_DIR" ]; then
+    PRECHECK_HOOK_DST="$PRECHECK_HOOK_DIR/pre-push"
+    if [ ! -e "$PRECHECK_HOOK_DST" ] || grep -qE 'cat-harness-tools pre-push hook|pre-push-gates\.ts' "$PRECHECK_HOOK_DST" 2>/dev/null; then
+      if ! cmp -s "$PRECHECK_HOOK_SRC" "$PRECHECK_HOOK_DST" 2>/dev/null; then
+        if mkdir -p "$PRECHECK_HOOK_DIR" 2>/dev/null && cp "$PRECHECK_HOOK_SRC" "$PRECHECK_HOOK_DST" 2>/dev/null && chmod +x "$PRECHECK_HOOK_DST" 2>/dev/null; then
+          echo "- The pre-push precheck hook is installed: a push runs only the fast checks its changes can break (\`bun run cat precheck\`); \`git push --no-verify\` skips it."
+          echo ""
+        fi
+      fi
+    fi
+  fi
+fi
+
 REPO_ROOT="$(bash "$(dirname "${BASH_SOURCE[0]}")/lib/harness-root.sh")"
 # THE REPOSITORY ROOT, which `REPO_ROOT` is NOT.
 #

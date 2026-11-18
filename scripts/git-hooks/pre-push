@@ -1,5 +1,12 @@
 #!/bin/sh
-# Run the fast gates on the tree being pushed and refuse the push on a red one
+# cat-harness-tools pre-push hook (scripts/git-hooks/pre-push) — the session-start
+# primer re-installs a hook that carries this line, and leaves any other alone.
+#
+# First the precheck (scripts/precheck.ts; owner, card 2026-11-18): only the fast
+# checks whose inputs this push changed, 15-60 s, nothing when nothing relevant
+# changed. A red one refuses the push; `git push --no-verify` skips it.
+#
+# Then run the fast gates on the tree being pushed and refuse the push on a red one
 # (scripts/pre-push-gates.ts says what it decides and why).
 #
 # Bypass, which is logged to .git/cat-gates/push.log:
@@ -20,6 +27,15 @@ refs="$(cat)"
 for p in cat-harness-tools/scripts/state-write-guard.ts scripts/state-write-guard.ts; do
     if [ -f "$p" ]; then
         printf '%s\n' "$refs" | bun run "$p" --git-hook pre-push "$1" || exit 1
+        break
+    fi
+done
+
+# The precheck: by path, as below. Without the script, or set up, it says so in
+# one line and lets the push through.
+for p in cat-harness-tools/scripts/precheck.ts scripts/precheck.ts; do
+    if [ -f "$p" ]; then
+        printf '%s\n' "$refs" | bun run "$p" --git-hook "$1" || exit 1
         break
     fi
 done
