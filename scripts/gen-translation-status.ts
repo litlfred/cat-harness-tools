@@ -52,7 +52,8 @@ import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { officialityFindings, readLocale } from "./check-translation-officiality.ts";
 import { poHeader } from "./kg-viewer-strings.ts";
-import { reviewBody, reviewLayer, type ReviewLayer } from "./lib/translation-review-page.ts";
+import { layerStrings, reviewBody, reviewLayer, STRINGS_BASE, type ReviewLayer } from "./lib/translation-review-page.ts";
+import { PICK_TIERS, STRING_STATUSES, TRANSLATION_STRINGS_SCHEMA } from "./lib/translation-strings.ts";
 import { ADJUDICATION_FENCE_INFO, ADJUDICATION_LABEL, CANDIDATES_SCHEMA, CANDIDATES_SUFFIX, ADJUDICATION_SCHEMA, ADJUDICATION_TITLE_PREFIX, MAX_ISSUE_URL } from "./lib/translation-adjudication.ts";
 import { criteriaAttestationsHome } from "../schemas/sdlc/qa-attestations.ts";
 
@@ -736,6 +737,15 @@ export function statusLine(l: LocaleStatus): string {
  * `repository`, which is where a review of it is filed.
  */
 export function reviewLayers(repoRoot: string, ownRoot: string): ReviewLayer[] {
+  return collectReview(repoRoot, ownRoot).layers;
+}
+
+/**
+ * {@link reviewLayers}, with each layer's strings projections (path under
+ * `STRINGS_BASE` → JSON text): what a block's 🌐 pane lists, every string in
+ * every locale with its status and candidates (owner, 2026-11-18).
+ */
+export function collectReview(repoRoot: string, ownRoot: string): { layers: ReviewLayer[]; strings: Map<string, string> } {
   const roots = [ownRoot];
   for (const e of readdirSync(repoRoot, { withFileTypes: true })) {
     if (!e.isDirectory() || e.name.startsWith(".") || e.name === "node_modules") continue;
@@ -743,6 +753,7 @@ export function reviewLayers(repoRoot: string, ownRoot: string): ReviewLayer[] {
     if (resolve(dir) !== resolve(ownRoot)) roots.push(dir);
   }
   const out: ReviewLayer[] = [];
+  const strings = new Map<string, string>();
   const seen = new Set<string>();
   for (const root of roots) {
     let tdir: string | undefined;
@@ -757,7 +768,7 @@ export function reviewLayers(repoRoot: string, ownRoot: string): ReviewLayer[] {
     if (tdir === undefined || !existsSync(tdir) || seen.has(name)) continue;
     seen.add(name);
     const home = criteriaAttestationsHome(root).root;
-    out.push(
+    const layer =
       reviewLayer({
         name,
         ...(decl?.repository ? { repository: decl.repository } : {}),
@@ -766,10 +777,11 @@ export function reviewLayers(repoRoot: string, ownRoot: string): ReviewLayer[] {
         attestationFor: (cat, locale) => join(home, "translation-qa", `${cat}.${locale}.attestations.json`),
         poHeader,
         count: countCatalogue,
-      }),
-    );
+      });
+    out.push(layer);
+    for (const [rel, proj] of layerStrings(layer, tdir)) strings.set(rel, `${JSON.stringify(proj, null, 1)}\n`);
   }
-  return out;
+  return { layers: out, strings };
 }
 
 /** The tag of {@link reviewProjection}. */
@@ -782,11 +794,12 @@ export const TRANSLATION_REVIEW_SCHEMA = "folio-translation-review/v1";
  * catalogues that translate it, show their state, and file the same
  * `translation-adjudication/v1` issue the review page files.
  */
-export function reviewProjection(layers: ReviewLayer[], statusPage: string): string {
+export function reviewProjection(layers: ReviewLayer[], statusPage: string | undefined): string {
   return `${JSON.stringify(
     {
       $schema: TRANSLATION_REVIEW_SCHEMA,
-      reviewPage: statusPage.replace(/index\.(html|md)$/, "review.html"),
+      // Absent on a site that publishes no review page (a folio's): the pane then links none.
+      ...(statusPage !== undefined ? { reviewPage: statusPage.replace(/index\.(html|md)$/, "review.html") } : {}),
       issue: {
         schema: ADJUDICATION_SCHEMA,
         label: ADJUDICATION_LABEL,
@@ -796,6 +809,9 @@ export function reviewProjection(layers: ReviewLayer[], statusPage: string): str
         candidatesSchema: CANDIDATES_SCHEMA,
         candidatesSuffix: CANDIDATES_SUFFIX,
       },
+      // Each row's `strings`, relative to `base` (owner, 2026-11-18). The
+      // vocabularies are the tools layer's, so the pane states neither.
+      strings: { schema: TRANSLATION_STRINGS_SCHEMA, base: STRINGS_BASE, statuses: STRING_STATUSES, pickTiers: PICK_TIERS },
       layers,
     },
     null,
@@ -911,7 +927,7 @@ function main(): void {
   // The review page, beside the status page: inside the same declared
   // directory, so it is built at publish with it and needs no route.
   const reviewPath = join(pageDir, "review.html");
-  const layers = reviewLayers(REPO_ROOT, ROOT);
+  const { layers, strings } = collectReview(REPO_ROOT, ROOT);
   // The review matrix as data, for the site chrome's per-block controls
   // (a block's translation status, and the same issue the review page files).
   const reviewJsonPath = join(assetDir, "review.json");
@@ -973,6 +989,7 @@ function main(): void {
     [pagePath, page],
     [reviewPath, () => withRenderedByFrontMatter(reviewPage(layers), VIEWER_TOOL)],
     [reviewJsonPath, () => reviewProjection(layers, sitePath.rel)],
+    ...[...strings].map(([rel, text]) => [join(site, STRINGS_BASE, rel), () => text] as const),
     ...sourceFiles,
   ] as const) {
     if (check && builtHere(p)) {

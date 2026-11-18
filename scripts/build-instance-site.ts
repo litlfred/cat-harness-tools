@@ -1266,6 +1266,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // before the rail, which links a row to its page only where the site holds one.
     run("harness pages", `bun run ${TOOLS}/${HARNESS_PAGES} --root . --out ${s} --title ${shellQuote(title)} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}/`)}${siteCommit ? ` --commit ${shellQuote(siteCommit)}` : ""}`, root);
     if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}${o.scope ? ` --scope ${shellQuote(scopeArg(o.scope))}` : ""}`, root);
+    // Every site whose checkout has translations: the projections a block's 🌐 pane reads
+    // (owner, 2026-11-18: "make the site build publish review.json wherever translations
+    // exist"). After the mounted docs, so a review page they bring is linked.
+    run("translation review", `bun run ${TOOLS}/publish-translation-review.ts --root . --site ${s}`, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");
     else if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow ${shellQuote(`https://cdn.jsdelivr.net/gh/${gh.owner}/`)} --allow ${shellQuote(`https://raw.githubusercontent.com/${gh.owner}/`)}`, root);

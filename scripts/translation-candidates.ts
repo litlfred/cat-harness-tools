@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Collect candidate translations from open, self-hosted engines, and fill each
- * EMPTY `msgstr` with the first good one, `#, fuzzy`.
+ * EMPTY `msgstr` with the default pick (ranked, `translation-strings.ts`), `#, fuzzy`.
  *
  * @module scripts/translation-candidates
  * @covers translation-sources
@@ -17,7 +17,7 @@
  * writer, `addCandidates` (`scripts/lib/translation-candidates.ts`), which
  * appends to `<locale>/<catalogue>.candidates.json`
  * (`translation-candidates/v1`), drops a candidate whose placeholders do not
- * round-trip, fills an empty `msgstr` with the first good candidate as
+ * round-trip, fills an empty `msgstr` with the ranked default pick as
  * `#, fuzzy`, never overwrites a non-empty one, and records the source on the
  * translation node without ever setting `official`.
  *

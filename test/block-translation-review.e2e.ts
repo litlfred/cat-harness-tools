@@ -283,17 +283,12 @@ test("past GitHub's URL limit the issue text is copied instead, and the link car
   expect(await page.evaluate(() => (window as unknown as { __opened: string[] }).__opened)).toEqual([]);
 });
 
-test("a site that publishes no review says so; a source-language page has no translation pane", async ({ page }) => {
+// (A source-language page now shows the pane too — owner, 2026-11-18, ruling 1 —
+// so the test that it shows none is gone; the pane's own e2e for it follows the pane.)
+test("a site that publishes no review says so", async ({ page }) => {
   await serve(page, { review: { code: 404 } });
   const pane = await openPanel(page, "b-guide");
   await expect(pane).toContainText("This site publishes no translation review.");
-});
-
-test("a source-language page shows no translation pane", async ({ page }) => {
-  await serve(page, { meta: { ...META, lang: "en", translationSource: "" } });
-  await openPanel(page, "b-guide");
-  await expect(page.locator(".fa-block-panel .fa-trf")).toHaveCount(0);
-  await expect(page.locator('.ba-ic[data-pane="translation"]')).toHaveCount(0);
 });
 
 test("fix translation offers each string's candidates by source; a picked one is filed with its source, an edited one without", async ({ page }) => {
@@ -303,11 +298,10 @@ test("fix translation offers each string's candidates by source; a picked one is
   const dlg = page.locator("dialog.fa-trf-dialog");
   const save = dlg.locator(".fa-trf-strings > li").nth(1);
   await expect(save).toContainText("(machine default, not reviewed)");
-  // The .po's own text is not offered again; the others name their source.
+  // Each candidate names its source (every candidate is offered — owner, 2026-11-18, ruling 2).
   const choices = save.locator(".fa-trf-cand");
-  await expect(choices).toHaveCount(2);
-  await expect(choices.nth(0)).toContainText("Enregistrer — open-mt opus-mt-en-fr");
-  await expect(choices.nth(1)).toContainText("Sauvegarder — web-service deepl");
+  await expect(choices.filter({ hasText: "Enregistrer" })).toContainText("Enregistrer — open-mt opus-mt-en-fr");
+  await expect(choices.filter({ hasText: "Sauvegarder" })).toContainText("Sauvegarder — web-service deepl");
   for (const c of await choices.all()) expect((await c.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   // A string with no candidates shows no choices, only the free-text field.
   await expect(dlg.locator(".fa-trf-strings > li").nth(0).locator(".fa-trf-cands")).toHaveCount(0);

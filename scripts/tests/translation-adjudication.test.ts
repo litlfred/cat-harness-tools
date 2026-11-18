@@ -11,9 +11,11 @@ import { join } from "node:path";
 
 import {
   ADJUDICATION_SCHEMA,
+  applyAdjudication,
   applySuggestion,
   candidatesProblems,
   issueBody,
+  msgidHash,
   newIssueUrl,
   parseIssueBody,
   payloadProblems,
@@ -117,6 +119,15 @@ describe("applying a suggestion", () => {
     expect("refused" in applySuggestion(PO, { msgid: "File", current: "Fichier", suggested: "Dossier" })).toBe(true);
     expect("text" in applySuggestion(PO, { msgid: "File", msgctxt: "menu", current: "Fichier", suggested: "Dossier" })).toBe(true);
   });
+  test("an adjudication writes msgstr, clears fuzzy and the previous-source lines, keeps other flags", () => {
+    const po = '#: a.md:1\n#, python-format, fuzzy\n#| msgid "Helo"\nmsgid "Hello"\nmsgstr "Bonjur"\n';
+    expect(poEntries(po)[0]).toMatchObject({ previousMsgid: "Helo", fuzzy: true });
+    const t = (applyAdjudication(po, { msgid: "Hello", current: "Bonjur", suggested: "Bonjour" }) as { text: string }).text;
+    expect(t).toBe('#: a.md:1\n#, python-format\nmsgid "Hello"\nmsgstr "Bonjour"\n');
+    const bare = (applyAdjudication('#, fuzzy\nmsgid "a"\nmsgstr "b"\n', { msgid: "a", current: "b", suggested: "c" }) as { text: string }).text;
+    expect(bare).toBe('msgid "a"\nmsgstr "c"\n');
+    expect(applyAdjudication(PO, { msgid: "Hello", current: "Allô", suggested: "Salut" })).toEqual({ refused: expect.stringContaining("no longer says") });
+  });
   test("refuses a string that changed since the reviewer saw it, and plural entries", () => {
     expect(applySuggestion(PO, { msgid: "Hello", current: "Salut", suggested: "Coucou" })).toEqual({ refused: expect.stringContaining("no longer says") });
     expect(applySuggestion(PO, { msgid: "One", current: "Un", suggested: "Une" })).toEqual({ refused: expect.stringContaining("plural") });
@@ -148,10 +159,11 @@ describe("the issue", () => {
 });
 
 describe("planning the record", () => {
-  test("nothing is recorded for an author who is not a collaborator", () => {
+  test("only a collaborator accepts a catalogue (owner, 2026-11-18)", () => {
     const r = plan(layer(), payload([{ catalogue: "docs/index", locale: "fr", verdict: "acceptable", poHash: poHash(PO) }]), "NONE");
     expect(r.writes.size).toBe(0);
-    expect(r.refused[0]).toContain("not an owner, member or collaborator");
+    expect(r.refused[0]).toContain("only an owner, member or collaborator");
+    expect(r.refused[0]).toContain("propose");
   });
   test("a catalogue that changed since the page showed it is refused", () => {
     const r = plan(layer(), payload([{ catalogue: "docs/index", locale: "fr", verdict: "acceptable", poHash: "0000000000000000" }]));
@@ -176,23 +188,90 @@ describe("planning the record", () => {
       { reviewer: { kind: "human", id: "github:reviewer" }, verdict: "acceptable", at: "2026-11-14T10:00:00Z", issue: "https://github.com/acme/layer/issues/7", po_hash: poHash(PO) },
     ]);
   });
-  test("mistranslation: the suggestion is applied fuzzy, the node is flagged, the record appends", () => {
+  test("a collaborator's suggestion adjudicates: msgstr is written, not fuzzy; the sidecar records who chose what and why", () => {
     const root = layer();
     mkdirSync(join(root, "test/attestations/translation-qa/translations/fr/docs"), { recursive: true });
     writeFileSync(join(root, att("translations/fr/docs/index", "fr")), JSON.stringify({ $schema: "qa-attestations/v1", family: "translation-qa", subject: { kind: "block", id: "s", path: "s" }, locale: "fr", criteria: { "human-adjudication": [{ reviewer: { kind: "human", id: "github:earlier" } }] } }));
     writeFileSync(join(root, "translations/fr/docs/index.json"), JSON.stringify({ label: "trans:fr/docs/index", locale: "fr", sourceFile: "docs/no-such-page.md", poFile: "x", status: { locale: "fr", official: true, signedOffBy: "earlier", signedOffAt: "2026-01-01T00:00:00Z" } }));
     const r = plan(root, payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(PO), note: "tone", suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut" }, { msgid: "Gone", current: "", suggested: "x" }] }]));
-    expect(r.applied).toEqual(["fr/docs/index: 1 suggestion(s) applied, marked fuzzy and flagged for review"]);
+    expect(r.applied).toEqual([expect.stringContaining("fr/docs/index: 1 string(s) adjudicated by @reviewer")]);
     expect(r.refused).toEqual([expect.stringContaining("no entry")]);
     const po = r.writes.get("translations/fr/docs/index.po")!;
-    expect(poEntries(po).find((e) => e.msgid === "Hello")).toMatchObject({ msgstr: "Salut", fuzzy: true });
+    expect(poEntries(po).find((e) => e.msgid === "Hello")).toMatchObject({ msgstr: "Salut", fuzzy: false });
+    const side = JSON.parse(r.writes.get("translations/fr/docs/index.candidates.json")!);
+    expect(candidatesProblems(side)).toEqual([]);
+    const hello = side.entries.find((e: { msgid: string }) => e.msgid === "Hello");
+    expect(hello.candidates).toEqual([
+      { text: "Salut", source: { kind: "human", id: "github:reviewer", at: "2026-11-14T10:00:00Z", issue: "https://github.com/acme/layer/issues/7" }, msgidHash: msgidHash({ msgid: "Hello" }) },
+    ]);
+    expect(hello.adjudications).toEqual([
+      { by: "github:reviewer", at: "2026-11-14T10:00:00Z", issue: "https://github.com/acme/layer/issues/7", text: "Salut", chose: "own-text", why: "tone", msgidHash: msgidHash({ msgid: "Hello" }), previous: "Bonjour" },
+    ]);
     const node = JSON.parse(r.writes.get("translations/fr/docs/index.json")!);
     expect(node.status.official).toBe(false);
     expect(node.status.signedOffBy).toBeUndefined();
-    expect(node.status.flaggedForReview).toBe(true);
+    expect(node.status.flaggedForReview).toBeUndefined();
     const list = JSON.parse(r.writes.get(att("translations/fr/docs/index", "fr"))!).criteria["human-adjudication"];
     expect(list).toHaveLength(2);
     expect(list[1]).toMatchObject({ verdict: "mistranslation", note: "tone", po_hash: poHash(PO), po_hash_after: poHash(po), suggestions: [{ msgid: "Hello" }] });
+  });
+  test("anyone else's suggestion is a proposal: appended, msgstr left alone, the catalogue flagged for a collaborator", () => {
+    const root = layer();
+    const r = plan(root, payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(PO), suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut", source: { kind: "agent", id: "claude-opus-5-5" } }] }]), "NONE");
+    expect(r.refused).toEqual([]);
+    expect(r.applied).toEqual(["fr/docs/index: 1 proposal(s) recorded beside the other candidates; msgstr is left as it was (@reviewer is not an owner, member or collaborator, NONE, so a collaborator adjudicates)"]);
+    expect(r.writes.has("translations/fr/docs/index.po")).toBe(false);
+    const side = JSON.parse(r.writes.get("translations/fr/docs/index.candidates.json")!);
+    expect(side.entries[0].candidates[0]).toMatchObject({ text: "Salut", source: { kind: "human", id: "github:reviewer", issue: "https://github.com/acme/layer/issues/7" }, basedOn: { kind: "agent", id: "claude-opus-5-5" } });
+    expect(side.entries[0].adjudications).toBeUndefined();
+    const node = JSON.parse(r.writes.get("translations/fr/docs/index.json")!);
+    expect(node.status).toMatchObject({ official: false, flaggedForReview: true, flagReason: expect.stringContaining("await a collaborator's adjudication") });
+    const a = JSON.parse(r.writes.get(att("translations/fr/docs/index", "fr"))!).criteria;
+    expect(a["human-adjudication"]).toBeUndefined();
+    expect(a["human-proposal"]).toHaveLength(1);
+  });
+  test("a proposal fills an EMPTY msgstr, fuzzy", () => {
+    const root = layer();
+    const empty = PO.replace('msgstr "Bonjour"', 'msgstr ""');
+    writeFileSync(join(root, "translations/fr/docs/index.po"), empty);
+    const r = plan(root, payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(empty), suggestions: [{ msgid: "Hello", current: "", suggested: "Salut" }] }]), "CONTRIBUTOR");
+    expect(r.applied.at(-1)).toContain("1 empty string(s) now show the proposal, fuzzy");
+    expect(poEntries(r.writes.get("translations/fr/docs/index.po")!).find((e) => e.msgid === "Hello")).toMatchObject({ msgstr: "Salut", fuzzy: true });
+  });
+  test("a second, different proposal is kept beside the first, never refused", () => {
+    const root = layer();
+    const first = plan(root, payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(PO), suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut" }] }]), "NONE");
+    for (const [rel, text] of first.writes) {
+      mkdirSync(join(root, rel, ".."), { recursive: true });
+      writeFileSync(join(root, rel), text);
+    }
+    // Another person, who saw an older page: the catalogue hash no longer matches; a proposal is still recorded.
+    const second = planAdjudication({
+      layerRoot: root, repository: "acme/layer", translations: "translations",
+      payload: payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: "0000000000000000", suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Coucou" }] }]),
+      author: { login: "other", association: "NONE" }, issueUrl: "https://github.com/acme/layer/issues/8", at: "2026-11-15T10:00:00Z", attestationPath: att, attestationSubject: (c) => c,
+    });
+    expect(second.refused).toEqual([]);
+    const side = JSON.parse(second.writes.get("translations/fr/docs/index.candidates.json")!);
+    expect(side.entries[0].candidates.map((c: { text: string; source: { id: string } }) => `${c.text} ${c.source.id}`)).toEqual(["Salut github:reviewer", "Coucou github:other"]);
+  });
+  test("a collaborator who saw an older text is recorded as proposing, not adjudicating; intent: propose does the same on purpose", () => {
+    const root = layer();
+    const stale = plan(root, payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(PO), suggestions: [{ msgid: "Hello", current: "Allô", suggested: "Salut" }] }]));
+    expect(stale.refused).toEqual([expect.stringContaining("recorded as @reviewer's proposal, not adjudicated")]);
+    expect(stale.applied).toEqual([expect.stringContaining("1 proposal(s) recorded")]);
+    expect(stale.writes.has("translations/fr/docs/index.po")).toBe(false);
+    const chosen = plan(root, payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(PO), intent: "propose", suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut" }] }]));
+    expect(chosen.writes.has("translations/fr/docs/index.po")).toBe(false);
+    expect(JSON.parse(chosen.writes.get("translations/fr/docs/index.candidates.json")!).entries[0].adjudications).toBeUndefined();
+    expect(payloadProblems(payload([{ catalogue: "a", locale: "fr", verdict: "mistranslation", poHash: poHash(""), intent: "decree" as never, suggestions: [{ msgid: "a", current: "", suggested: "b" }] }]))).toEqual([expect.stringContaining("intent")]);
+  });
+  test("a candidates file that will not validate is never overwritten", () => {
+    const root = layer();
+    writeFileSync(join(root, "translations/fr/docs/index.candidates.json"), JSON.stringify({ $schema: "nope" }));
+    const r = plan(root, payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(PO), suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut" }] }]));
+    expect(r.writes.size).toBe(0);
+    expect(r.refused[0]).toContain("never overwritten");
   });
   test("an attestation that will not parse is never overwritten", () => {
     const root = layer();
@@ -252,6 +331,9 @@ describe("candidate translations", () => {
     const r = plan(root, p);
     const list = JSON.parse(r.writes.get(att("translations/fr/docs/index", "fr"))!).criteria["human-adjudication"];
     expect(list[0].suggestions[0].source).toEqual({ kind: "web-service", id: "deepl" });
+    const side = JSON.parse(r.writes.get("translations/fr/docs/index.candidates.json")!);
+    expect(side.entries[0].adjudications[0].chose).toEqual({ kind: "web-service", id: "deepl" });
+    expect(side.entries[0].candidates[0].basedOn).toEqual({ kind: "web-service", id: "deepl" });
     const badSource = payload([{ ...p.items[0]!, suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut", source: { kind: "x", id: "y" } as never }] }]);
     expect(payloadProblems(badSource)).toEqual([expect.stringContaining("source kind")]);
   });

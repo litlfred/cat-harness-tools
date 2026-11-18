@@ -16,8 +16,12 @@
  *      `checkedCandidate`). A candidate that fails is not recorded, and is
  *      reported. `check: false` turns this off for a source a person wrote.
  *   3. **Candidates are never a barrier to having a translation** (owner,
- *      2026-11-14). An EMPTY `msgstr` gets the entry's first good candidate,
- *      marked `#, fuzzy`, so it is the default until a person adjudicates.
+ *      2026-11-14). An EMPTY `msgstr` gets the entry's default pick, marked
+ *      `#, fuzzy`, so it is the default until a collaborator adjudicates. The
+ *      pick is ranked (owner, 2026-11-18, `translation-strings.ts`
+ *      `rankCandidates`): official > human-adjudicated > human-proposed >
+ *      agent > MT, QA failures demoted, stale last; with one source it is the
+ *      first good candidate, as before.
  *      A non-empty `msgstr` is never overwritten. A plural entry's candidate
  *      carries every form (`forms`, one per the catalogue's plural count),
  *      each checked against the English it translates, and fills the entry
@@ -37,6 +41,7 @@ import { TranslationNodeSchema } from "../../schemas/content/translation.ts";
 import {
   applyForms,
   applySuggestion,
+  msgidHash,
   CANDIDATES_SCHEMA,
   CANDIDATES_SUFFIX,
   candidatesProblems,
@@ -44,7 +49,9 @@ import {
   type CandidateSource,
   type CandidateSourceKind,
   type CandidatesFile,
+  type CandidateQa,
 } from "./translation-adjudication.ts";
+import { rankCandidates } from "./translation-strings.ts";
 import { checkedCandidate, entryKey, forbidsMachineFill, nplurals, pluralSources, poFromPot, type Skipped } from "./machine-translation.ts";
 
 /** One candidate for one entry. */
@@ -56,6 +63,10 @@ export interface CandidateInput {
   /** For a plural entry: every `msgstr[n]`, in order, as many as the catalogue's plural count. */
   forms?: string[];
   source: CandidateSource;
+  /** Who wrote it, for a platform's translator. */
+  author?: string;
+  /** QA results, shown beside it and used to demote it from the default pick. */
+  qa?: CandidateQa;
 }
 
 /** What one {@link mergeCandidates} call did. */
@@ -146,11 +157,18 @@ export function mergeCandidates(po: string, sidecar: CandidatesFile, input: Cand
     const same = (x: { text: string; forms?: string[]; source: CandidateSource }) =>
       x.text === text && sameSource(x.source, c.source) && JSON.stringify(x.forms ?? null) === JSON.stringify(forms ?? null);
     if (entry.candidates.some(same)) continue;
-    entry.candidates.push({ text, ...(forms ? { forms } : {}), source: c.source });
+    entry.candidates.push({
+      text,
+      ...(forms ? { forms } : {}),
+      source: c.source,
+      ...(c.author ? { author: c.author } : {}),
+      msgidHash: msgidHash(target),
+      ...(c.qa ? { qa: c.qa } : {}),
+    });
     added++;
   }
 
-  // Fill each empty msgstr (every form, for a plural) from its entry's first good candidate.
+  // Fill each empty msgstr (every form, for a plural) from its entry's default pick.
   let text = po;
   const filled: MergeResult["filled"] = [];
   if (o.fill !== false) {
@@ -161,13 +179,12 @@ export function mergeCandidates(po: string, sidecar: CandidatesFile, input: Cand
       const ctx = e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {};
       let r: { text: string } | { refused: string } | undefined;
       let from: CandidateSource | undefined;
-      if (plural) {
-        const first = entry?.candidates.find((x) => !("refused" in checkedForms(sourcesOf(e), x.forms, check)));
-        if (first) [r, from] = [applyForms(text, { ...ctx, msgid: e.msgid, forms: first.forms! }), first.source];
-      } else {
-        const first = entry?.candidates.find((x) => !check || !("refused" in checkedCandidate(e.msgid, x.text)));
-        if (first) [r, from] = [applySuggestion(text, { ...ctx, msgid: e.msgid, current: "", suggested: first.text }), first.source];
-      }
+      const good = plural
+        ? (x: { forms?: string[] }) => !("refused" in checkedForms(sourcesOf(e), x.forms, check))
+        : (x: { text: string }) => !check || !("refused" in checkedCandidate(e.msgid, x.text));
+      const first = rankCandidates(entry, msgidHash(e), good)[0]?.candidate;
+      if (first && plural) [r, from] = [applyForms(text, { ...ctx, msgid: e.msgid, forms: first.forms! }), first.source];
+      else if (first) [r, from] = [applySuggestion(text, { ...ctx, msgid: e.msgid, current: "", suggested: first.text }), first.source];
       if (!r || "refused" in r) continue;
       text = r.text;
       filled.push({ ...ctx, msgid: e.msgid, source: from! });

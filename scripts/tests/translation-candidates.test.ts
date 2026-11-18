@@ -21,7 +21,7 @@ import {
   splitWhitespace,
   unmaskPlaceholders,
 } from "../lib/machine-translation.ts";
-import { candidatesProblems, poEntries, type CandidateSource } from "../lib/translation-adjudication.ts";
+import { candidatesProblems, msgidHash, poEntries, type CandidateSource } from "../lib/translation-adjudication.ts";
 import { addCandidates, emptySidecar, generatedByFor, mergeCandidates, type CandidateInput } from "../lib/translation-candidates.ts";
 import {
   libreTranslateSource,
@@ -204,7 +204,7 @@ describe("mergeCandidates: the never-overwrite rule and the first-candidate fill
   const all = (src: CandidateSource, f: (s: string) => string): CandidateInput[] =>
     entriesToTranslate(PO).wanted.filter((w) => w.msgidPlural === undefined).map((w) => ({ ...(w.msgctxt !== undefined ? { msgctxt: w.msgctxt } : {}), msgid: w.msgid, text: f(splitWhitespace(w.msgid).core), source: src }));
 
-  test("every non-empty msgstr is kept byte-for-byte; each empty one gets the first candidate, fuzzy", () => {
+  test("every non-empty msgstr is kept byte-for-byte; each empty one gets the default pick (one source: the first good candidate), fuzzy", () => {
     const r = mergeCandidates(PO, emptySidecar("es", "a"), [...all(OPUS, (s) => `ES:${s}`), ...all(ARGOS, (s) => `AR:${s}`)]);
     expect(r.added).toBe(10);
     expect(r.filled.map((f) => f.source)).toEqual([OPUS, OPUS, OPUS, OPUS]);
@@ -227,8 +227,8 @@ describe("mergeCandidates: the never-overwrite rule and the first-candidate fill
     expect(candidatesProblems(r.sidecar)).toEqual([]);
     const fuzzy = r.sidecar.entries.find((e) => e.msgid === "Already a machine guess")!;
     expect(fuzzy.candidates).toEqual([
-      { text: "ES:Already a machine guess", source: OPUS },
-      { text: "AR:Already a machine guess", source: ARGOS },
+      { text: "ES:Already a machine guess", source: OPUS, msgidHash: msgidHash({ msgid: "Already a machine guess" }) },
+      { text: "AR:Already a machine guess", source: ARGOS, msgidHash: msgidHash({ msgid: "Already a machine guess" }) },
     ]);
   });
 
@@ -350,8 +350,8 @@ describe("collectCandidates over a layer", () => {
     const side = JSON.parse(read(root, "es/start/a.candidates.json"));
     expect(candidatesProblems(side)).toEqual([]);
     expect(side.entries.find((e: { msgid: string }) => e.msgid === "Open {name} now").candidates).toEqual([
-      { text: "O:Open {name} now", source: { kind: "open-mt", id: "opus-en-es", at: "2026-11-14T12:00:00.000Z" } },
-      { text: "A:Open {name} now", source: { kind: "open-mt", id: "argos-en-es", at: "2026-11-14T12:00:00.000Z" } },
+      { text: "O:Open {name} now", source: { kind: "open-mt", id: "opus-en-es", at: "2026-11-14T12:00:00.000Z" }, msgidHash: msgidHash({ msgid: "Open {name} now" }) },
+      { text: "A:Open {name} now", source: { kind: "open-mt", id: "argos-en-es", at: "2026-11-14T12:00:00.000Z" }, msgidHash: msgidHash({ msgid: "Open {name} now" }) },
     ]);
     expect(read(root, "es/start/a.po")).toContain('#, fuzzy\nmsgid "Open {name} now"\nmsgstr "O:Open {name} now"');
     const node = JSON.parse(read(root, "es/start/a.json"));

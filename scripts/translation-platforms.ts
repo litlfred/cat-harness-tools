@@ -203,7 +203,7 @@ async function runImport(): Promise<number> {
     : [
         `Translations from **${platform}** rewritten as candidates (\`translation-candidates/v1\`).`,
         "",
-        `${platform} is a source, never an adjudicator: its strings — approved there or not — are candidates in each catalogue's \`.candidates.json\`, with ${platform}'s own state as metadata. The \`.po\` keeps the base branch's text; an empty string takes the first candidate, marked fuzzy. A person adjudicates on the translation review page.`,
+        `${platform} is a source, never an adjudicator: its strings — approved there or not — are candidates in each catalogue's \`.candidates.json\`, with ${platform}'s own state as metadata. The \`.po\` keeps the base branch's text; an empty string takes the ranked default pick, marked fuzzy. A collaborator adjudicates on the translation review page or from a block's 🌐 pane.`,
         "",
         ...lines,
       ].join("\n");

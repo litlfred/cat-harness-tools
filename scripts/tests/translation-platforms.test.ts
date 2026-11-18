@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { candidatesProblems, poEntries, type CandidatesFile } from "../lib/translation-adjudication.ts";
+import { candidatesProblems, msgidHash, poEntries, type CandidatesFile } from "../lib/translation-adjudication.ts";
 import {
   blankTranslations,
   BRANCH_PREFIX,
@@ -178,7 +178,7 @@ describe("pull: a platform's strings become candidates, never verdicts", () => {
     expect(find(r.po, "Hello").fuzzy).toBe(false);
     const e = r.candidates.entries.find((x) => x.msgid === "Hello")!;
     expect(e.candidates).toEqual([
-      { text: "Salut", source: { kind: "web-service", id: "crowdin", at: AT }, metadata: { platformState: "translated" } } as never,
+      { text: "Salut", source: { kind: "web-service", id: "crowdin", at: AT }, msgidHash: msgidHash({ msgid: "Hello" }), metadata: { platformState: "translated" } } as never,
     ]);
     expect(candidatesProblems(r.candidates)).toEqual([]);
   });
@@ -203,7 +203,7 @@ describe("pull: a platform's strings become candidates, never verdicts", () => {
     expect(st("World")).toBe("fuzzy");
   });
 
-  test("an existing first candidate fills the empty msgstr, not the platform's", () => {
+  test("the default pick ranks a platform's text (people translate there) above an earlier agent candidate (owner, 2026-11-18)", () => {
     const existing: CandidatesFile = {
       $schema: "translation-candidates/v1",
       locale: "fr",
@@ -211,7 +211,7 @@ describe("pull: a platform's strings become candidates, never verdicts", () => {
       entries: [{ msgid: "World", candidates: [{ text: "Univers", source: { kind: "agent", id: "claude" } }] }],
     };
     const r = run({ candidates: existing });
-    expect(find(r.po, "World").msgstr).toBe("Univers");
+    expect(find(r.po, "World")).toMatchObject({ msgstr: "Monde", fuzzy: true });
     expect(r.candidates.entries.find((x) => x.msgid === "World")!.candidates.map((c) => c.text)).toEqual(["Univers", "Monde"]);
     expect(existing.entries[0]!.candidates).toHaveLength(1); // input untouched
   });
