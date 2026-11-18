@@ -101,6 +101,7 @@
     "test/sticky-todo-graph.e2e.ts",
     "test/suggest-editor.e2e.ts",
     "test/support/themed-page.ts",
+    "test/task-panel-phone-width.e2e.ts",
     "test/themed-viewers.e2e.ts",
     "test/todo-page.e2e.ts",
     "test/todos-page-board.e2e.ts",

@@ -484,7 +484,15 @@ export const PANEL_SCRIPT = `(function () {
 
 /** Styles, scoped under `.pt-diagram`. Colours follow the page's own text colour where they can. */
 export const PANEL_CSS = [
-  ".pt-diagram{position:relative;width:100%}",
+  // `overflow-x:clip`: the layer is laid over the WHOLE drawing, which is
+  // wider than the column once the viewer scrolls it, and its clip-path hides
+  // the overhang from sight but not from layout. Unclipped, it made the page
+  // wider than a phone, so the browser zoomed the page out, and every pan
+  // moved the layer and resized the page (owner, 2026-11-18: "if you move or
+  // scroll on the bpmn diagram then the screen starts to resize"). `clip`, not
+  // `hidden`: the y axis stays visible, so a panel opened low on the drawing
+  // still shows below it, and the block does not become a scroll container.
+  ".pt-diagram{position:relative;width:100%;overflow-x:clip}",
   ".pt-diagram>img{display:block;width:100%;height:auto}",
   ".pt-mark{position:absolute;transform:translate(-50%,-50%);width:1.35em;height:1.35em;padding:0;border-radius:50%;" +
     "border:1px solid #1f6feb;background:#fff;color:#1f6feb;font:bold 0.8em/1 sans-serif;cursor:pointer;" +
