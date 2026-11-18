@@ -42,6 +42,8 @@ import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { linkInlineCode, type CodeRefFinding, type CodeRefResolver, type CodeRefTarget } from "./lib/code-ref-links.ts";
 import { beanRegistry, commandRegistry, type ToolInvocation } from "./lib/code-ref-registries.ts";
 import { toolPageRelPath, toolSubjects } from "./gen-tools-viz.ts";
+import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
+import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 
 /** The repository the edit links name: this checkout's origin, else folio-assistant (bean v433). */
 const SKILL_DOCS_REPO = repoOf(detectRepoUrl(process.cwd()));
@@ -1078,8 +1080,60 @@ function publishedLocation(
   // `blob/` as a 404, so getting this wrong would trade one broken link for
   // another — and the directory case only started arriving here when the
   // matcher below learned to see it.
-  const kind = statSync(abs).isDirectory() ? "tree" : "blob";
-  return `https://github.com/litlfred/folio-assistant/${kind}/main/${rel}`;
+  return repositoryFileHref(abs, statSync(abs).isDirectory(), { repoRoot: REPO_ROOT, location: skillDocsQaLocation(), key: SKILL_DOCS_QA_KEY });
+}
+
+/** The `qa-reports` entry this build's evidence came from (gen-docs-pages names the same one); `undefined` addresses the tip. */
+const SKILL_DOCS_QA_KEY = siteLinkKey();
+
+/** The forge the repository-file links name. */
+const SKILL_DOCS_FORGE = "https://github.com/litlfred/folio-assistant";
+
+/**
+ * The forge address of a repository file that publishes no page.
+ *
+ * A file inside a `qa` directory that declares `storage` is NOT on `main`:
+ * its record is the `qa-reports` branch, and its address comes from
+ * `qa-result-link.ts`, like every other QA link (`check:qa-result-links`
+ * refused six `blob/main/cat-harness/test/results/…` links on
+ * folio-assistant#3186's stage job). Everything else is `main`. Exported for
+ * the test, which passes the location a checkout would resolve.
+ */
+export function repositoryFileHref(
+  abs: string,
+  isDirectory: boolean,
+  ctx: { repoRoot: string; location: QaLocation | undefined; key?: string },
+): string {
+  const rel = relative(ctx.repoRoot, abs).split(sep).join("/");
+  if (ctx.location !== undefined) {
+    const link = qaResultLinkFor(abs, { repoRoot: ctx.repoRoot, repoWeb: SKILL_DOCS_FORGE, key: ctx.key, location: ctx.location });
+    if (link.addressedBy !== "main" && link.href !== undefined) {
+      // An entry's directory is a tree on the forge too; the tip is `index.json`, a file.
+      return isDirectory && link.addressedBy === "entry" ? link.href.replace(`${SKILL_DOCS_FORGE}/blob/`, `${SKILL_DOCS_FORGE}/tree/`) : link.href;
+    }
+  }
+  // `tree` for a directory, `blob` for a file. GitHub serves a directory under
+  // `blob/` as a 404.
+  return `${SKILL_DOCS_FORGE}/${isDirectory ? "tree" : "blob"}/main/${rel}`;
+}
+
+/**
+ * Where QA results live in this checkout, resolved once. `undefined` when the
+ * declarations do not resolve: the links then keep their `main` address, and
+ * `check:qa-result-links` is what judges them.
+ */
+let qaLocationMemo: { at: QaLocation | undefined } | undefined;
+function skillDocsQaLocation(): QaLocation | undefined {
+  if (qaLocationMemo === undefined) {
+    let at: QaLocation | undefined;
+    try {
+      at = resolveQaLocation(REPO_ROOT);
+    } catch {
+      at = undefined;
+    }
+    qaLocationMemo = { at };
+  }
+  return qaLocationMemo.at;
 }
 
 /** Where the skill pages publish, relative to the site root: what their links are written from. */
