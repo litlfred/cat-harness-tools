@@ -39,6 +39,9 @@ import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { writeProvenanceListing } from "./provenance-footer.ts";
 import { readPathAt, writePathAt } from "./lib/layer-output.ts";
+import { linkInlineCode, type CodeRefFinding, type CodeRefResolver, type CodeRefTarget } from "./lib/code-ref-links.ts";
+import { beanRegistry, commandRegistry, type ToolInvocation } from "./lib/code-ref-registries.ts";
+import { toolPageRelPath, toolSubjects } from "./gen-tools-viz.ts";
 
 /** The repository the edit links name: this checkout's origin, else folio-assistant (bean v433). */
 const SKILL_DOCS_REPO = repoOf(detectRepoUrl(process.cwd()));
@@ -1024,6 +1027,145 @@ function publishedLocation(
   return `https://github.com/litlfred/folio-assistant/${kind}/main/${rel}`;
 }
 
+/** Where the skill pages publish, relative to the site root: what their links are written from. */
+const SKILL_PAGES_REL = relative(SITE_ROOT, OUT_DIR).split(sep).join("/");
+
+/** The QA page listing the code spans that looked like a kind and were not linked. */
+export const CODE_REFS_REPORT = "unresolved-code-references";
+
+/**
+ * The resolver a skill page's code spans are linked by (owner card "Auto-link
+ * + Skills hub", 2026-11-17; `lib/code-ref-links.ts`).
+ *
+ * Every lookup is a REGISTRY read from the checkout — the published skill
+ * set, the process rows, the skill schemas, the bean store, the cat script
+ * tables and the Tools — and a path is resolved against disk and published by
+ * {@link publishedLocation}, the rule the page's own links already follow, so
+ * a code span and a link to the same file cannot land in two places.
+ */
+export function codeRefResolverFactory(
+  flat: ReadonlyMap<string, string>,
+  processPages: ReadonlyMap<string, string>,
+  procRows: readonly ProcessRow[],
+  layerRoots: readonly string[],
+): { resolverFor: (baseDir: string) => CodeRefResolver; notes: string[] } {
+  const notes: string[] = [];
+
+  // skill id → its page. Where two groups publish one basename (a stub and
+  // the skill, `SAME_BASENAME_DIFFERENT_DOCUMENT`), the unprefixed page is the
+  // skill `skill_fetch` serves, so the id names that one.
+  const skills = new Map<string, string>();
+  for (const [abs, published] of flat) {
+    const name = basename(abs, ".md");
+    if (!skills.has(name) || published === name) skills.set(name, `${published}.html`);
+  }
+
+  // A process diagram written by its bare filename: unambiguous only if one
+  // row of the checkout has that basename.
+  const byBasename = new Map<string, string[]>();
+  for (const r of procRows) {
+    const b = basename(r.file);
+    byBasename.set(b, [...(byBasename.get(b) ?? []), join(REPO_ROOT, r.file)]);
+  }
+
+  const fileHref = (abs: string): string | undefined =>
+    publishedLocation(dirname(abs), basename(abs), flat, processPages);
+
+  const targetFor = (abs: string, written: string): CodeRefTarget | undefined => {
+    const rel = repoRelative(abs);
+    // A skill's typed contract: its schema reference page, where one is published.
+    const schema = /(?:^|\/)schemas\/skills\/([\w.-]+?)\.(?:schema\.)?(?:json|md|ts)$/.exec(rel ?? "");
+    if (schema && existsSync(join(SCHEMA_DIR, `${schema[1]}.md`))) {
+      return { kind: "schema", href: `../skills/${schema[1]}.html` };
+    }
+    const href = fileHref(abs);
+    if (href === undefined) return undefined;
+    const kind = /\.(?:bpmn|dmn)$/.test(abs) ? "process" : /^(?:\.\/)?schemas\//.test(written) ? "schema" : "file";
+    return { kind, href };
+  };
+
+  const beans = beanRegistry(REPO_ROOT, SKILL_DOCS_REPO);
+  if (beans.note) notes.push(beans.note);
+
+  let tools: ToolInvocation[] = [];
+  try {
+    tools = toolSubjects(REPO_ROOT).subjects.flatMap((x) =>
+      (x.defs ?? []).flatMap((d) => {
+        const page = d.invoke.shell ? toolPageRelPath(REPO_ROOT, x.name, d.id) : undefined;
+        return page && d.invoke.shell ? [{ shell: d.invoke.shell, page }] : [];
+      }),
+    );
+  } catch (err) {
+    notes.push(`commands linked to their scripts, not their Tool pages: ${(err as Error).message}`);
+  }
+  const commands = commandRegistry([REPO_ROOT, ...layerRoots], `${SKILL_PAGES_REL}/index.md`, tools, fileHref);
+  if (commands.note) notes.push(commands.note);
+
+  const resolverFor = (baseDir: string): CodeRefResolver => ({
+    skill: (n) => skills.get(n),
+    bean: (id) => beans.hrefs.get(id),
+    command: (k) => commands.hrefs.get(k),
+    path: (p) => {
+      const clean = p.replace(/^\.\//, "").replace(/\/$/, "");
+      if (clean === "" || isAbsolute(clean) || clean.split("/").includes("..")) return [];
+      const abs = new Set<string>();
+      for (const base of [baseDir, REPO_ROOT, ...layerRoots]) {
+        const at = resolve(base, clean);
+        if (existsSync(at)) abs.add(at);
+      }
+      if (abs.size === 0 && !clean.includes("/")) {
+        const rows = byBasename.get(clean) ?? [];
+        if (rows.length === 1) abs.add(rows[0]!);
+      }
+      return [...abs].map((a) => targetFor(a, clean)).filter((t): t is CodeRefTarget => t !== undefined);
+    },
+  });
+  return { resolverFor, notes };
+}
+
+/** The QA page: every span that looked like a kind and was not linked, by page. */
+export function codeRefsReportPage(findings: ReadonlyMap<string, readonly CodeRefFinding[]>, notes: readonly string[]): string {
+  const cell = (s: string): string => s.replace(/[\\|]/g, "\\$&").replace(/`/g, "&#96;");
+  const all = [...findings].sort(([a], [b]) => a.localeCompare(b));
+  const total = all.reduce((n, [, fs]) => n + fs.length, 0);
+  const out: string[] = [
+    "---",
+    "layout: default",
+    "generated: scripts/gen-skill-docs.ts — do not hand-edit; edit the skill",
+    "title: Unresolved code references",
+    "parent: Skill instructions",
+    "nav_exclude: true",
+    "---",
+    "",
+    "# Unresolved code references",
+    "",
+    "Each skill page links an inline `code` span to the page of the thing it names —",
+    "a skill, a bean, a `bun run cat` command or the Tool that runs it, a process",
+    "diagram, a schema, a repository file — when the knowledge graph places it",
+    "exactly once. These spans were SHAPED like one of those kinds and were left as",
+    "code: **unresolved** (nothing of that kind has the name) or **ambiguous** (two",
+    "different things do). Fix the name in the skill's source, or leave it if the",
+    "span names something outside the graph.",
+    "",
+    `${total} span(s) on ${all.length} page(s).`,
+    "",
+  ];
+  if (notes.length > 0) {
+    out.push("Registries this build could not read whole:", "");
+    for (const n of notes) out.push(`- ${cell(n)}`);
+    out.push("");
+  }
+  if (total === 0) return [...out, "_None._", ""].join("\n");
+  out.push("| page | line | span | state | kind(s) |", "|---|---|---|---|---|");
+  for (const [page, fs] of all) {
+    for (const f of fs) {
+      out.push(`| [${page}](${page}.html) | ${f.line} | <code>${cell(f.code)}</code> | ${f.state} | ${f.kinds.join(", ")} |`);
+    }
+  }
+  out.push("");
+  return out.join("\n");
+}
+
 function rebaseLinks(
   baseDir: string,
   text: string,
@@ -1127,6 +1269,11 @@ async function main(): Promise<void> {
   // Same one-pass hazard as `flat` above: computed before any body is written,
   // so a link never rebases or not depending on which group was reached first.
   const processPages = processPageStems(procRows);
+  // Code spans resolved against the graph's registries (owner card,
+  // 2026-11-17), built once like `flat`, and every miss collected for the
+  // QA page.
+  const codeRefs = codeRefResolverFactory(flat, processPages, procRows, contractRoots);
+  const codeRefFindings = new Map<string, CodeRefFinding[]>();
 
   for (const group of GROUPS) {
     indexRows[group.category] = [];
@@ -1181,6 +1328,14 @@ async function main(): Promise<void> {
       // based one level deeper. Two different bases, so two calls.
       let body = rebaseLinks(group.dir, stripFrontMatter(raw).replace(/^\n+/, ""), flat, processPages);
       body = withParts(group.dir, name, body, flat, processPages);
+      {
+        const found: CodeRefFinding[] = [];
+        body = linkInlineCode(body, codeRefs.resolverFor(group.dir), {
+          self: new Set([`${published}.html`]),
+          onFinding: (f) => found.push(f),
+        });
+        if (found.length > 0) codeRefFindings.set(published, found);
+      }
       if (twin) {
         const other = twin.find((t) => t.published !== published);
         const self = twin.find((t) => t.published === published);
@@ -1327,11 +1482,19 @@ async function main(): Promise<void> {
     idx.push(...rows);
     idx.push("");
   }
+  idx.push(`Inline code on these pages links to what it names; the spans that could not be placed are listed in [Unresolved code references](${CODE_REFS_REPORT}.html).`);
+  idx.push("");
   idx.push("> The `authoring-math` and `authoring-who-smart-guidelines` packages ship");
   idx.push("> skill *definitions* + typed schemas today; their prose instruction bodies");
   idx.push("> will appear here as they are authored.");
   idx.push("");
   emit(join(OUT_DIR, "index.md"), idx.join("\n"));
+  emit(join(OUT_DIR, `${CODE_REFS_REPORT}.md`), codeRefsReportPage(codeRefFindings, codeRefs.notes));
+  {
+    const spans = [...codeRefFindings.values()].reduce((n, fs) => n + fs.length, 0);
+    console.log(`  ✓ ${CODE_REFS_REPORT}.md (${spans} unresolved or ambiguous span(s))`);
+    for (const n of codeRefs.notes) console.log(`    · ${n}`);
+  }
   const total = Object.values(indexRows).reduce((n, r) => n + r.length, 0);
   console.log(`  ✓ index.md (${total} instruction bodies)`);
   // THE PROVENANCE FOOTER (owner, 2026-11-05, "2B"): one site-data slice for
@@ -1355,7 +1518,7 @@ async function main(): Promise<void> {
   // BEFORE `reportDrift`, which `process.exit(0)`s on a clean tree — anything
   // after it is unreachable in exactly the run that matters, `--check` on a
   // tree whose only defect is an orphan.
-  reportOrphans(written.keys());
+  reportOrphans([...written.keys(), CODE_REFS_REPORT]);
   reportUnpublishedTwins(written.keys());
   reportDrift();
   console.log(`\nWrote skill instruction docs to ${TARGETS().dir}`);
