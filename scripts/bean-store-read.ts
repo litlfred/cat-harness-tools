@@ -305,6 +305,27 @@ export function storeDeterminedEmpty(store: BeanStore, examined: (b: BeanFile) =
   return !store.beans.some(examined);
 }
 
+/**
+ * The directory of a bean store that is DECLARED, mounted and holds no bean
+ * at all, or `undefined`. For the gates whose zero-bean result was a vacuity
+ * refusal (`check:bean-front-matter`, `beans:retag --check`): a state branch
+ * seeded empty on purpose (`state:seed --init`, or by an owner's decision as
+ * `cat/dth-sfp/beans` was, 2026-11-17) holds `defs/.gitkeep` and the
+ * generated README, and nothing there is unread.
+ *
+ * Narrower than {@link storeDeterminedEmpty} on one point: the graph must be
+ * DECLARED (`beans/beans.json` present where the graph resolves). The
+ * fallback hands back a plausible `beans/defs` for a repository that never
+ * mentioned one, and an empty directory nobody declared stays a vacuity
+ * finding. Unreachable, declared-but-absent, absent, a skipped file and an
+ * unreconciled count all answer `undefined`, so the refusal still stands.
+ */
+export function declaredStoreDeterminedEmpty(root: string): string | undefined {
+  if (!resolveBeanDefs(root).declared) return undefined;
+  const store = readBeanStore(root);
+  return store.state === "read" && storeDeterminedEmpty(store, () => true) ? store.dir : undefined;
+}
+
 /** The line a bean gate prints when it passes over a {@link storeDeterminedEmpty} store. */
 export function emptyStoreNote(gate: string, dir: string): string {
   return `  ✓ ${gate}: the bean store at ${dir} is mounted and holds no open bean — nothing to examine, so nothing failed (a determined-empty store, not an unread one)`;
