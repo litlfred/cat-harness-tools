@@ -16,8 +16,12 @@
  *      `checkedCandidate`). A candidate that fails is not recorded, and is
  *      reported. `check: false` turns this off for a source a person wrote.
  *   3. **Candidates are never a barrier to having a translation** (owner,
- *      2026-11-14). An EMPTY `msgstr` gets the entry's first good candidate,
- *      marked `#, fuzzy`, so it is the default until a person adjudicates.
+ *      2026-11-14). An EMPTY `msgstr` gets the entry's default pick, marked
+ *      `#, fuzzy`, so it is the default until a collaborator adjudicates. The
+ *      pick is ranked (owner, 2026-11-18, `translation-strings.ts`
+ *      `rankCandidates`): official > human-adjudicated > human-proposed >
+ *      agent > MT, QA failures demoted, stale last; with one source it is the
+ *      first good candidate, as before.
  *      A non-empty `msgstr` is never overwritten. A plural entry's candidate
  *      carries every form (`forms`, one per the catalogue's plural count),
  *      each checked against the English it translates, and fills the entry
@@ -36,7 +40,7 @@ import { join, relative, sep } from "node:path";
 import { TranslationNodeSchema } from "../../schemas/content/translation.ts";
 import {
   applyForms,
-  applySuggestion,
+  msgidHash,
   CANDIDATES_SCHEMA,
   CANDIDATES_SUFFIX,
   candidatesProblems,
@@ -44,7 +48,9 @@ import {
   type CandidateSource,
   type CandidateSourceKind,
   type CandidatesFile,
+  type CandidateQa,
 } from "./translation-adjudication.ts";
+import { applyAutoPick, autoPickOf } from "./translation-strings.ts";
 import { checkedCandidate, entryKey, forbidsMachineFill, nplurals, pluralSources, poFromPot, type Skipped } from "./machine-translation.ts";
 
 /** One candidate for one entry. */
@@ -56,6 +62,10 @@ export interface CandidateInput {
   /** For a plural entry: every `msgstr[n]`, in order, as many as the catalogue's plural count. */
   forms?: string[];
   source: CandidateSource;
+  /** For an `official` candidate: the English exactly as its source prints it. */
+  sourceText?: string;
+  /** QA results beyond the placeholder check this writer runs, shown beside it and used to demote it. */
+  qa?: CandidateQa;
 }
 
 /** What one {@link mergeCandidates} call did. */
@@ -73,8 +83,10 @@ export interface MergeResult {
 export interface MergeOptions {
   /** Check placeholders (default true). */
   check?: boolean;
-  /** Fill an empty `msgstr` with the first good candidate (default true). */
+  /** Apply the auto-pick to an empty `msgstr`, or an earlier auto-pick (default true). */
   fill?: boolean;
+  /** When the auto-pick is recorded (`chosen.at`); now by default. */
+  at?: string;
 }
 
 const sameSource = (a: CandidateSource, b: CandidateSource) => a.kind === b.kind && a.id === b.id;
@@ -146,31 +158,45 @@ export function mergeCandidates(po: string, sidecar: CandidatesFile, input: Cand
     const same = (x: { text: string; forms?: string[]; source: CandidateSource }) =>
       x.text === text && sameSource(x.source, c.source) && JSON.stringify(x.forms ?? null) === JSON.stringify(forms ?? null);
     if (entry.candidates.some(same)) continue;
-    entry.candidates.push({ text, ...(forms ? { forms } : {}), source: c.source });
+    entry.candidates.push({
+      text,
+      ...(forms ? { forms } : {}),
+      source: c.source,
+      msgidHash: msgidHash(target),
+      ...(c.sourceText !== undefined ? { sourceText: c.sourceText } : {}),
+      // Placeholders always (owner, 2026-11-18); a candidate that failed them was refused above unless `check: false`.
+      qa: { ...(c.qa ?? {}), placeholders: { pass: forms ? true : !("refused" in checkedCandidate(c.msgid, text)) } },
+    });
     added++;
   }
 
-  // Fill each empty msgstr (every form, for a plural) from its entry's first good candidate.
+  // Re-rank every entry (owner, 2026-11-18): an empty msgstr, or one that is
+  // itself an earlier auto-pick, takes the auto-pick; a collaborator's choice
+  // and any msgstr of other provenance are never touched.
   let text = po;
   const filled: MergeResult["filled"] = [];
+  const at = o.at ?? new Date().toISOString();
   if (o.fill !== false) {
-    for (const e of poEntries(po)) {
-      const plural = e.msgidPlural !== undefined;
-      if (e.forms.some((f) => f !== "")) continue;
+    for (const e0 of poEntries(po)) {
+      const e = poEntries(text).find((x) => entryKey(x.msgctxt, x.msgid) === entryKey(e0.msgctxt, e0.msgid))!;
       const entry = byKey.get(entryKey(e.msgctxt, e.msgid));
       const ctx = e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {};
-      let r: { text: string } | { refused: string } | undefined;
-      let from: CandidateSource | undefined;
-      if (plural) {
-        const first = entry?.candidates.find((x) => !("refused" in checkedForms(sourcesOf(e), x.forms, check)));
-        if (first) [r, from] = [applyForms(text, { ...ctx, msgid: e.msgid, forms: first.forms! }), first.source];
-      } else {
-        const first = entry?.candidates.find((x) => !check || !("refused" in checkedCandidate(e.msgid, x.text)));
-        if (first) [r, from] = [applySuggestion(text, { ...ctx, msgid: e.msgid, current: "", suggested: first.text }), first.source];
+      if (e.msgidPlural !== undefined) {
+        if (e.forms.some((f) => f !== "")) continue;
+        const first = autoPickOf(entry, msgidHash(e), (x) => !("refused" in checkedForms(sourcesOf(e), x.forms, check)))?.candidate;
+        if (!first) continue;
+        const r = applyForms(text, { ...ctx, msgid: e.msgid, forms: first.forms! });
+        if ("refused" in r) continue;
+        text = r.text;
+        entry!.chosen = { text: first.text, how: "auto", at, candidate: { kind: first.source.kind, id: first.source.id } };
+        filled.push({ ...ctx, msgid: e.msgid, source: first.source });
+        continue;
       }
-      if (!r || "refused" in r) continue;
-      text = r.text;
-      filled.push({ ...ctx, msgid: e.msgid, source: from! });
+      const picked = applyAutoPick(text, entry, e, at, (x) => !check || !("refused" in checkedCandidate(e.msgid, x.text)));
+      if (!picked) continue;
+      text = picked.po;
+      entry!.chosen = picked.chosen;
+      filled.push({ ...ctx, msgid: e.msgid, source: picked.source });
     }
   }
   return { sidecar: out, po: text, added, filled, rejected };

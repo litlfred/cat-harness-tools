@@ -44,10 +44,13 @@ import {
   ADJUDICATION_TITLE_PREFIX,
   CANDIDATES_SCHEMA,
   CANDIDATES_SUFFIX,
+  candidatesProblems,
   MAX_ISSUE_URL,
   poHash,
   sourceFilesOf,
+  type CandidatesFile,
 } from "./translation-adjudication.ts";
+import { stringsProjection, type LocaleInput, type StringsProjection } from "./translation-strings.ts";
 
 export type CellState = "none" | "empty" | "machine" | "flagged" | "reviewed" | "stale" | "official";
 
@@ -74,6 +77,12 @@ export interface ReviewRow {
   /** Source files the strings come from. */
   sources: string[];
   cells: Record<string, ReviewCell>;
+  /**
+   * The row's strings projection (`folio-translation-strings/v1`), relative
+   * to the review projection's `strings.base`: every string in every locale,
+   * with its status and candidates (owner, 2026-11-18).
+   */
+  strings?: string;
 }
 
 export interface ReviewLayer {
@@ -217,9 +226,47 @@ export function reviewLayer(opts: {
         }
       }
     }
-    rows.push({ catalogue: cat, sources, cells });
+    rows.push({ catalogue: cat, sources, cells, strings: stringsPath(opts.name, cat) });
   }
   return { name: opts.name, ...(opts.repository ? { repository: opts.repository } : {}), translations, locales, rows, templatesOnly };
+}
+
+/** Where the strings projections are published, under the site root. */
+export const STRINGS_BASE = "assets/translation-status/strings/" as const;
+
+/** A row's strings projection, relative to {@link STRINGS_BASE}. */
+export function stringsPath(layer: string, catalogue: string): string {
+  return `${layer.replace(/[^A-Za-z0-9._-]/g, "_")}/${catalogue}.json`;
+}
+
+/**
+ * Every row's strings projection for one layer: relative path (under
+ * {@link STRINGS_BASE}) → projection. Reads each locale's `.po`, its
+ * candidates sidecar (an unreadable one is left out, never guessed at) and
+ * the cell already computed for it.
+ */
+export function layerStrings(layer: ReviewLayer, translationsDir: string): Map<string, StringsProjection> {
+  const out = new Map<string, StringsProjection>();
+  for (const row of layer.rows) {
+    const locales: Record<string, LocaleInput> = {};
+    for (const l of layer.locales) {
+      const cell = row.cells[l];
+      if (!cell || cell.state === "none" || cell.hash === undefined) continue;
+      const base = join(translationsDir, l, row.catalogue);
+      let po: string;
+      try {
+        po = readFileSync(`${base}.po`, "utf-8");
+      } catch {
+        continue;
+      }
+      const raw = readJson(`${base}${CANDIDATES_SUFFIX}`);
+      const sidecar = raw !== undefined && candidatesProblems(raw).length === 0 ? (raw as unknown as CandidatesFile) : undefined;
+      locales[l] = { po, ...(sidecar ? { sidecar } : {}), officialCatalogue: cell.state === "official", ...(cell.generatedBy ? { generatedBy: cell.generatedBy } : {}), poHash: cell.hash };
+    }
+    if (Object.keys(locales).length === 0) continue;
+    out.set(row.strings ?? stringsPath(layer.name, row.catalogue), stringsProjection({ layer: layer.name, ...(layer.repository ? { repository: layer.repository } : {}), translations: layer.translations, catalogue: row.catalogue }, locales));
+  }
+  return out;
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────

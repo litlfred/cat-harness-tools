@@ -15,7 +15,7 @@
  * ({@link PlatformCandidate.metadata}). Only a person's GitHub issue records an
  * adjudication (`translation-adjudication/v1`). The one thing an import may
  * do to a `.po` is what any candidate source may do: an EMPTY `msgstr` takes
- * the first candidate, marked `#, fuzzy`, so candidates are never a barrier
+ * the ranked default pick, marked `#, fuzzy`, so candidates are never a barrier
  * to having a translation.
  *
  * ## Push: the layout each platform reads
@@ -421,14 +421,14 @@ export interface ImportInput {
 }
 
 export interface ImportResult {
-  /** The `.po` to keep: the base, with empty msgstrs filled fuzzy from the first candidate. */
+  /** The `.po` to keep: the base, with empty msgstrs filled fuzzy from the ranked default pick. */
   po: string;
   candidates: CandidatesFile;
   /** One line per string imported. */
   imported: string[];
   /** One line per string NOT imported, with the reason. */
   skipped: string[];
-  /** msgids whose empty msgstr took the first candidate, fuzzy. */
+  /** msgids whose empty msgstr took the ranked default pick, fuzzy. */
   filled: string[];
   /** Candidates newly recorded (an identical one already there is not). */
   added: number;

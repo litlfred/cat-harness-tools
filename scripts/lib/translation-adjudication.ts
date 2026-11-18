@@ -24,17 +24,21 @@
  *
  * ## What is recorded, and where
  *
- * - **acceptable**: the catalogue's translation node (`<locale>/<cat>.json`,
- *   `translation-node/v1`) gets `status.official: true` with `signedOffBy` /
- *   `signedOffAt` — what a layer's per-catalogue review reader and the status page
- *   read as "reviewed by a person" — and an entry is appended to the audited
- *   `translation-qa` attestation (`qa-attestations/v1`, criterion
- *   {@link ADJUDICATION_CRITERION}) naming the issue and the hash of the
- *   catalogue the person saw.
- * - **mistranslation**: each suggestion replaces its `msgstr` in the `.po`
- *   and is marked `#, fuzzy`: a suggestion is a person's text that nobody
- *   else has reviewed yet, so the catalogue is flagged for review, never
- *   accepted. The attestation records the suggestion, old and new text both.
+ * - **acceptable** (collaborators only): the catalogue's translation node
+ *   (`<locale>/<cat>.json`, `translation-node/v1`) gets `status.official:
+ *   true` with `signedOffBy` / `signedOffAt` — what a layer's per-catalogue
+ *   review reader and the status page read as "reviewed by a person" — and an
+ *   entry is appended to the audited `translation-qa` attestation
+ *   (`qa-attestations/v1`, criterion {@link ADJUDICATION_CRITERION}) naming
+ *   the issue and the hash of the catalogue the person saw.
+ * - **mistranslation** (owner, 2026-11-18): every suggestion, from anyone, is
+ *   appended to the candidates sidecar as a `human` candidate, and the string
+ *   is re-ranked: an empty `msgstr`, or an earlier auto-pick, takes the
+ *   auto-pick. A suggestion with `choose: true` from an owner, member or
+ *   collaborator becomes `msgstr`, not fuzzy, and the entry's `chosen`
+ *   records who chose which candidate (or their own text), when and why.
+ *   A proposal is filed under {@link PROPOSAL_CRITERION}, a choice under
+ *   {@link ADJUDICATION_CRITERION}.
  *
  * The PO header `X-Folio-Official` and the locale's `status.json` are never
  * touched: locale sign-off stays a separate, deliberate act
@@ -42,12 +46,14 @@
  *
  * ## Refusals
  *
- * Nothing is recorded for an author who is not an owner, member or
- * collaborator of the repository. An item is refused when its catalogue
- * changed since the page showed it (`poHash`), when its path leaves the
- * translations directory, or when a suggestion's `current` text is no longer
- * what the catalogue says. A refusal is reported on the issue; it is never a
- * partial record dressed as a whole one.
+ * An `acceptable` verdict from an author who is not an owner, member or
+ * collaborator of the repository is refused, as is one whose catalogue
+ * changed since the page showed it (`poHash`). An item is refused when its
+ * path leaves the translations directory or its sidecar will not parse. A
+ * choice against a catalogue that moved, or a string that no longer says what
+ * the chooser saw, is not applied; the suggestion is kept as their proposal.
+ * A proposal itself is never refused for a moved catalogue. A refusal is reported
+ * on the issue; it is never a partial record dressed as a whole one.
  *
  * Node-only imports: this module is the part both the page's generator and
  * the workflow's script share, and it is tested without a mounted harness.
@@ -55,6 +61,9 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, normalize, sep } from "node:path";
+
+import { checkedCandidate } from "./machine-translation.ts";
+import { applyAutoPick } from "./translation-strings.ts";
 
 /** The issue body's JSON block declares this. */
 export const ADJUDICATION_SCHEMA = "translation-adjudication/v1" as const;
@@ -76,57 +85,152 @@ export const MAX_ISSUE_URL = 7500;
 
 export type Verdict = "acceptable" | "mistranslation";
 
-/** One string's suggested fix. `current` is what the reviewer saw, so a changed catalogue is caught. */
 /**
  * Where a candidate translation came from. A reviewer may pick one of several
- * candidates for a string (an agent model, an open machine-translation model,
- * a web service, a person); the source of the one they picked is recorded
- * with their verdict.
+ * candidates for a string (an official text, an agent model, an open
+ * machine-translation model, a web service or translation platform, a
+ * person); the source of the one they picked is recorded with their verdict.
+ *
+ * `official` (owner, 2026-11-18) is a text a responsible body published (a
+ * WHO glossary's, a ministry's), recorded as a candidate so it ranks first.
  */
-export const CANDIDATE_SOURCE_KINDS = ["agent", "open-mt", "web-service", "human"] as const;
+export const CANDIDATE_SOURCE_KINDS = ["official", "agent", "open-mt", "web-service", "human"] as const;
 export type CandidateSourceKind = (typeof CANDIDATE_SOURCE_KINDS)[number];
 
 export interface CandidateSource {
   kind: CandidateSourceKind;
-  /** The model or service: `claude-opus-5-5`, `opus-mt-en-fr`, `deepl`, a GitHub login. */
+  /** The model, service or publication: `claude-opus-5-5`, `opus-mt-en-fr`, `deepl`, `weblate`, `who-ehealth-glossary`; a person as `github:<login>`. */
   id: string;
   version?: string;
   /** ISO 8601, when the candidate was produced. */
   at?: string;
+  /** Who: `github:<login>` for a person, or the agent that produced it. */
+  by?: string;
+  /** The issue a person's proposal came from (owner, 2026-11-18). */
+  issue?: number;
+}
+
+/**
+ * QA results carried with a candidate, so a reviewer sees them beside it and
+ * the auto-pick demotes a candidate that fails (owner, 2026-11-18). A check
+ * that was not run is absent, and absent is not a failure.
+ *
+ * - `glossary`: the glossary check (`pipeline/translation-glossary.ts`, the
+ *   port of `glossary_qa.py`), with the fixed terms the candidate lacks.
+ * - `placeholders`: placeholders and markup round-trip (always run on append).
+ * - `roundtrip`: the candidate translated back and scored against the source,
+ *   run only where an engine is configured.
+ */
+export interface CandidateQa {
+  glossary?: { pass: boolean; missing?: string[] };
+  placeholders?: { pass: boolean };
+  roundtrip?: { score: number; threshold: number; pass: boolean; engine?: string };
+  at?: string;
+}
+
+/** One proposed translation of one string. */
+export interface Candidate {
+  /** The translation; for a plural entry, form 0. */
+  text: string;
+  /** For a plural entry, every `msgstr[n]`, in order. */
+  forms?: string[];
+  source: CandidateSource;
+  /** {@link msgidHash} of the string the candidate translates, when it was made: a mismatch is a stale candidate. */
+  msgidHash?: string;
+  /**
+   * For an `official` candidate: the English exactly as the official source
+   * prints it. Only an exact match with the entry's msgid makes its auto-pick
+   * official (owner amendment, 2026-11-18).
+   */
+  sourceText?: string;
+  qa?: CandidateQa;
+  /** A person's proposal that repeats another source's candidate names that source. */
+  basedOn?: { kind: CandidateSourceKind; id: string };
+  note?: string;
+}
+
+/** How an entry's `msgstr` came to be what it is. */
+export const CHOSEN_HOW = ["adjudicated", "auto-official", "auto"] as const;
+export type ChosenHow = (typeof CHOSEN_HOW)[number];
+
+/**
+ * What an entry's `msgstr` is, and how it got there (owner, 2026-11-18):
+ * `adjudicated` by a collaborator's choice (who, when, why), `auto-official`
+ * an official candidate whose source English matches exactly (not fuzzy), or
+ * `auto` the top-ranked candidate, fuzzy and unofficial, which a better
+ * candidate replaces on a later merge.
+ */
+export interface Chosen {
+  text: string;
+  how: ChosenHow;
+  /** `github:<login>`, for `adjudicated`. */
+  by?: string;
+  at: string;
+  issue?: number;
+  reason?: string;
+  /** The candidate chosen, by its source; absent when a collaborator typed their own text. */
+  candidate?: { kind: CandidateSourceKind; id: string };
 }
 
 /**
  * The candidates sidecar, `translations/<locale>/<catalogue>.candidates.json`:
  * alternative translations per string, from any number of sources, for a
  * reviewer to choose among. The `.po` keeps one `msgstr`; this file keeps the
- * rest. Writers append; a candidate is never a verdict.
+ * rest. Writers append (deduplicated on text, kind and id); a candidate is
+ * never a verdict.
  *
  * **Candidates are never a barrier to having a translation** (owner,
- * 2026-11-14). A writer that adds candidates for a string whose `msgstr` is
- * empty also puts the first candidate in the `.po` as its `msgstr`, marked
- * `#, fuzzy`: the page then shows that translation, the status page counts it
- * as needing review, and it stays the default until a person adjudicates the
- * catalogue — accepting it, or choosing another candidate or their own text.
+ * 2026-11-14). `msgstr` changes only when it is empty, by auto-pick
+ * (`translation-strings.ts` `rankCandidates`), or by a collaborator's choice
+ * (owner, 2026-11-18). Every issue suggestion, from any author, is appended
+ * as a `human` candidate.
  */
 export const CANDIDATES_SCHEMA = "translation-candidates/v1" as const;
 export const CANDIDATES_SUFFIX = ".candidates.json" as const;
+
+export interface CandidatesEntry {
+  msgctxt?: string;
+  msgid: string;
+  /**
+   * `text` is the translation; for a plural entry it is form 0, and `forms`
+   * holds every `msgstr[n]`, in order (owner, 2026-11-14: plurals are
+   * machine-filled, fuzzy).
+   */
+  candidates: Candidate[];
+  chosen?: Chosen;
+}
 
 export interface CandidatesFile {
   $schema: typeof CANDIDATES_SCHEMA;
   locale: string;
   /** Path inside the locale directory, without extension. */
   catalogue: string;
-  entries: Array<{
-    msgctxt?: string;
-    msgid: string;
-    /**
-     * `text` is the translation; for a plural entry it is form 0, and `forms`
-     * holds every `msgstr[n]`, in order (owner, 2026-11-14: plurals are
-     * machine-filled, fuzzy).
-     */
-    candidates: Array<{ text: string; forms?: string[]; source: CandidateSource }>;
-  }>;
+  entries: CandidatesEntry[];
 }
+
+const HEX16 = /^[0-9a-f]{16}$/;
+const PASS = (v: unknown) => v !== null && typeof v === "object" && typeof (v as { pass?: unknown }).pass === "boolean";
+
+/** `undefined` when `v` is a {@link CandidateQa}, else what is wrong. */
+function qaProblem(v: unknown): string | undefined {
+  const q = v as Record<string, unknown> | null;
+  if (q === null || typeof q !== "object" || Array.isArray(q)) return "must be an object";
+  const strs = (x: unknown) => Array.isArray(x) && x.every((y) => typeof y === "string" && y.length <= 500);
+  if (q.glossary !== undefined && (!PASS(q.glossary) || ((q.glossary as { missing?: unknown }).missing !== undefined && !strs((q.glossary as { missing?: unknown }).missing)))) return "glossary must say pass (and list missing terms)";
+  if (q.placeholders !== undefined && !PASS(q.placeholders)) return "placeholders must say pass";
+  if (q.roundtrip !== undefined) {
+    const r = q.roundtrip as Record<string, unknown> | null;
+    if (!PASS(r) || typeof r!.score !== "number" || typeof r!.threshold !== "number" || !(r!.score >= 0 && r!.score <= 1)) return "roundtrip must give score (0 to 1), threshold and pass";
+    if (r!.engine !== undefined && typeof r!.engine !== "string") return "roundtrip.engine must be text";
+  }
+  if (q.at !== undefined && (typeof q.at !== "string" || q.at.length > 40)) return "at must be a timestamp";
+  return undefined;
+}
+
+const kindId = (v: unknown) => {
+  const o = v as Record<string, unknown> | null;
+  return o !== null && typeof o === "object" && (CANDIDATE_SOURCE_KINDS as readonly unknown[]).includes(o.kind) && typeof o.id === "string" && o.id.length > 0;
+};
 
 /** Problems with a candidates file; empty means it is a {@link CandidatesFile}. */
 export function candidatesProblems(c: unknown): string[] {
@@ -142,14 +246,35 @@ export function candidatesProblems(c: unknown): string[] {
     if (e === null || typeof e !== "object" || typeof e.msgid !== "string") return void out.push(`entries[${i}].msgid is required`);
     if (!Array.isArray(e.candidates)) return void out.push(`entries[${i}].candidates must be a list`);
     e.candidates.forEach((c1, j) => {
+      const at = `entries[${i}].candidates[${j}]`;
       const cc = c1 as Record<string, unknown> | null;
-      if (cc === null || typeof cc.text !== "string") out.push(`entries[${i}].candidates[${j}].text is required`);
+      if (cc === null || typeof cc.text !== "string") out.push(`${at}.text is required`);
       if (cc?.forms !== undefined && (!Array.isArray(cc.forms) || cc.forms.length === 0 || !cc.forms.every((x) => typeof x === "string") || cc.forms[0] !== cc.text)) {
-        out.push(`entries[${i}].candidates[${j}].forms must be a non-empty list of strings whose first is text`);
+        out.push(`${at}.forms must be a non-empty list of strings whose first is text`);
       }
       const p = sourceProblem(cc?.source);
-      if (p) out.push(`entries[${i}].candidates[${j}].source ${p}`);
+      if (p) out.push(`${at}.source ${p}`);
+      if (cc?.basedOn !== undefined && !kindId(cc.basedOn)) out.push(`${at}.basedOn must name a source kind and id`);
+      if (cc?.msgidHash !== undefined && (typeof cc.msgidHash !== "string" || !HEX16.test(cc.msgidHash))) out.push(`${at}.msgidHash must be 16 hex characters`);
+      if (cc?.sourceText !== undefined && !str(cc.sourceText)) out.push(`${at}.sourceText must be text`);
+      if (cc?.note !== undefined && !str(cc.note, 2000)) out.push(`${at}.note is too long`);
+      if (cc?.qa !== undefined) {
+        const q = qaProblem(cc.qa);
+        if (q) out.push(`${at}.qa ${q}`);
+      }
     });
+    if (e.chosen !== undefined) {
+      const at = `entries[${i}].chosen`;
+      const ch = e.chosen as Record<string, unknown> | null;
+      if (ch === null || typeof ch !== "object") return void out.push(`${at} is not an object`);
+      if (typeof ch.text !== "string") out.push(`${at}.text is required`);
+      if (!(CHOSEN_HOW as readonly unknown[]).includes(ch.how)) out.push(`${at}.how must be one of ${CHOSEN_HOW.join(", ")}`);
+      if (ch.how === "adjudicated" && (typeof ch.by !== "string" || !/^github:[A-Za-z0-9-]+(\[bot\])?$/.test(ch.by))) out.push(`${at}.by must be github:<login> for an adjudication`);
+      if (typeof ch.at !== "string" || ch.at.length > 40) out.push(`${at}.at must be a timestamp`);
+      if (ch.issue !== undefined && (!Number.isInteger(ch.issue) || (ch.issue as number) <= 0)) out.push(`${at}.issue must be an issue number`);
+      if (ch.reason !== undefined && !str(ch.reason, 2000)) out.push(`${at}.reason is too long`);
+      if (ch.candidate !== undefined && !kindId(ch.candidate)) out.push(`${at}.candidate must name a source kind and id`);
+    }
   });
   return out;
 }
@@ -162,9 +287,12 @@ export function sourceProblem(v: unknown): string | undefined {
   if (typeof s.id !== "string" || s.id.length === 0 || s.id.length > 200) return "id must name the model or service";
   if (s.version !== undefined && (typeof s.version !== "string" || s.version.length > 200)) return "version must be text";
   if (s.at !== undefined && (typeof s.at !== "string" || s.at.length > 40)) return "at must be a timestamp";
+  if (s.by !== undefined && (typeof s.by !== "string" || s.by.length === 0 || s.by.length > 200)) return "by must name who";
+  if (s.issue !== undefined && (!Number.isInteger(s.issue) || (s.issue as number) <= 0)) return "issue must be an issue number";
   return undefined;
 }
 
+/** One string's suggested fix. `current` is what the reviewer saw, so a changed string is caught. */
 export interface Suggestion {
   msgctxt?: string;
   msgid: string;
@@ -173,6 +301,14 @@ export interface Suggestion {
   /** The candidate's source when the reviewer picked one rather than typing their own. */
   source?: CandidateSource;
   note?: string;
+  /**
+   * "Choose as the translation": honoured for an owner, member or
+   * collaborator only, whose choice then becomes the string's `msgstr`.
+   * Without it, or from anyone else, the suggestion is a proposal.
+   */
+  choose?: boolean;
+  /** Why the reviewer chose it, recorded with the choice. */
+  reason?: string;
 }
 
 /** One (catalogue, locale) verdict. */
@@ -204,6 +340,15 @@ export interface AdjudicationPayload {
 /** The hash a reviewer's verdict is pinned to: SHA-256 of the catalogue's bytes, 16 hex. */
 export function poHash(text: string): string {
   return createHash("sha256").update(text, "utf-8").digest("hex").slice(0, 16);
+}
+
+/**
+ * The hash of one source string — context, msgid and plural msgid — that a
+ * candidate or an adjudication is pinned to (owner, 2026-11-18: "the source
+ * msgid hash so stale entries show"). 16 hex characters.
+ */
+export function msgidHash(e: { msgctxt?: string; msgid: string; msgidPlural?: string }): string {
+  return poHash(`${e.msgctxt ?? ""}\u0004${e.msgid}\u0000${e.msgidPlural ?? ""}`);
 }
 
 // ── Validation ───────────────────────────────────────────────────────────
@@ -264,6 +409,8 @@ export function payloadProblems(p: unknown): string[] {
           if (!str(s.current)) out.push(`${sat}.current is required (the text you saw)`);
           if (!str(s.suggested) || s.suggested.trim().length === 0) out.push(`${sat}.suggested is required`);
           if (s.note !== undefined && !str(s.note, 2000)) out.push(`${sat}.note is too long`);
+          if (s.choose !== undefined && typeof s.choose !== "boolean") out.push(`${sat}.choose must be true or false`);
+          if (s.reason !== undefined && !str(s.reason, 2000)) out.push(`${sat}.reason is too long`);
           if (s.source !== undefined) {
             const sp = sourceProblem(s.source);
             if (sp) out.push(`${sat}.source ${sp}`);
@@ -304,7 +451,7 @@ export function issueBody(p: AdjudicationPayload): string {
   const lines: string[] = [
     `Translation review of **${p.layer}** (\`${p.translations}\`), filed from the translation status page.`,
     "",
-    "By filing this issue, I (its author) adjudicate the machine translations below. The workflow records my GitHub login as the reviewer and opens a pull request; nothing is recorded in anyone else's name.",
+    "By filing this issue, I (its author) review the translations below. The workflow records my GitHub login as the reviewer and opens a pull request; nothing is recorded in anyone else's name. Each suggestion is recorded as a proposal beside the others; one marked \"chooses\" becomes the translation only if I am a collaborator of the repository.",
     "",
   ];
   const acc = p.items.filter((i) => i.verdict === "acceptable");
@@ -319,7 +466,7 @@ export function issueBody(p: AdjudicationPayload): string {
     for (const i of mis) {
       lines.push(`- \`${i.locale}\` ${code(i.catalogue)}${i.note ? ` — ${i.note}` : ""}`);
       for (const s of i.suggestions ?? []) {
-        lines.push(`  - ${code(s.msgid)}${s.msgctxt ? ` (context ${code(s.msgctxt)})` : ""}: ${code(s.current)} → ${code(s.suggested)}${s.source ? ` (candidate from ${s.source.kind} ${code(s.source.id)})` : ""}${s.note ? ` — ${s.note}` : ""}`);
+        lines.push(`  - ${s.choose ? "chooses" : "proposes"} ${code(s.msgid)}${s.msgctxt ? ` (context ${code(s.msgctxt)})` : ""}: ${code(s.current)} → ${code(s.suggested)}${s.source ? ` (candidate from ${s.source.kind} ${code(s.source.id)})` : ""}${s.reason ? ` because ${s.reason}` : ""}${s.note ? ` — ${s.note}` : ""}`);
       }
     }
     lines.push("");
@@ -371,6 +518,10 @@ export interface PoEntry {
   fuzzy: boolean;
   /** `#:` source references: where the string comes from. */
   references: string[];
+  /** `#| msgid`: the source text this entry translated before the source changed (msgmerge's previous msgid). */
+  previousMsgid?: string;
+  /** `#| msgctxt`, with {@link previousMsgid}. */
+  previousMsgctxt?: string;
   /** Line range `[start, end)` of the whole entry, comments included. */
   start: number;
   end: number;
@@ -410,9 +561,18 @@ export function poEntries(text: string): PoEntry[] {
     const forms: string[] = [];
     let formsEnd: number | undefined;
     let obsolete = false;
+    const prev: Record<string, string> = {};
+    let prevField: string | undefined;
     for (let k = start; k < end; k++) {
       const l = lines[k]!;
       if (l.startsWith("#~")) { obsolete = true; continue; }
+      if (l.startsWith("#|")) {
+        const body = l.slice(2).trimStart();
+        const pk = /^(msgctxt|msgid_plural|msgid)\s/.exec(body);
+        if (pk) { prevField = pk[1]; prev[prevField!] = unquote(body); }
+        else if (prevField && body.startsWith('"')) prev[prevField] = (prev[prevField] ?? "") + unquote(body);
+        continue;
+      }
       if (l.startsWith("#:")) { e.references.push(...l.slice(2).trim().split(/\s+/).filter(Boolean)); continue; }
       if (l.startsWith("#,")) { e.flagsLine = k; e.fuzzy = /\bfuzzy\b/.test(l); continue; }
       if (l.startsWith("#")) continue;
@@ -448,6 +608,8 @@ export function poEntries(text: string): PoEntry[] {
       forms,
       fuzzy: e.fuzzy!,
       references: e.references,
+      ...(prev.msgid !== undefined ? { previousMsgid: prev.msgid } : {}),
+      ...(prev.msgctxt !== undefined ? { previousMsgctxt: prev.msgctxt } : {}),
       start,
       end,
       msgstrStart: e.msgstrStart,
@@ -558,20 +720,69 @@ function readJson(path: string): Record<string, unknown> | null | undefined {
 const json = (v: unknown) => `${JSON.stringify(v, null, 2)}\n`;
 
 /**
+ * A collaborator's choice for one string: replace its `msgstr`, and clear
+ * `fuzzy` and the `#|` previous-source lines, since a person with the
+ * authority to decide has decided. Refused for a plural entry, an entry that
+ * is not there, or one that no longer says `current` (unless it already says
+ * the chosen text).
+ */
+export function applyAdjudication(text: string, s: Pick<Suggestion, "msgctxt" | "msgid" | "current" | "suggested">): { text: string } | { refused: string } {
+  const e = poEntries(text).find((x) => x.msgid === s.msgid && (x.msgctxt ?? undefined) === (s.msgctxt || undefined));
+  const what = `msgid ${JSON.stringify(s.msgid.slice(0, 80))}`;
+  if (!e) return { refused: `no entry for ${what}` };
+  if (e.msgidPlural !== undefined) return { refused: `${what} is a plural entry; adjudicate plural forms by hand` };
+  if (e.msgstr !== s.current && e.msgstr !== s.suggested) return { refused: `${what} no longer says what the reviewer saw` };
+  const lines = text.split("\n");
+  const head: string[] = [];
+  for (let k = e.start; k < e.msgstrStart; k++) {
+    const l = lines[k]!;
+    if (l.startsWith("#|")) continue;
+    if (k === e.flagsLine) {
+      const flags = l.slice(2).split(",").map((f) => f.trim()).filter((f) => f && f !== "fuzzy");
+      if (flags.length > 0) head.push(`#, ${flags.join(", ")}`);
+      continue;
+    }
+    head.push(l);
+  }
+  return { text: [...lines.slice(0, e.start), ...head, `msgstr ${quote(s.suggested)}`, ...lines.slice(e.msgstrEnd)].join("\n") };
+}
+
+/** The attestation criterion a proposal (not an adjudication) is filed under. */
+export const PROPOSAL_CRITERION = "human-proposal" as const;
+
+/** The issue number in an issue's URL; `undefined` when the URL names none. */
+export function issueNumber(url: string): number | undefined {
+  const m = /\/issues\/(\d+)(?:[#?].*)?$/.exec(url);
+  return m ? Number(m[1]) : undefined;
+}
+
+/**
  * Decide every write an issue makes. Pure apart from reading the layer's
  * files: the caller writes {@link Plan.writes}, so a test can inspect the
  * plan without a checkout.
+ *
+ * The owner's rulings of 2026-11-18:
+ *
+ * - **PROPOSE (anyone).** Every suggestion, from any author, is appended to
+ *   the catalogue's candidates sidecar as `{kind: "human", id:
+ *   "github:<login>", by, issue}`, with its `msgidHash` and placeholder QA.
+ *   A proposal is never refused for a changed catalogue and never conflicts
+ *   with another: the sidecar keeps them all. Then the string is re-ranked:
+ *   an empty `msgstr`, or one that is itself an earlier auto-pick, takes the
+ *   auto-pick (`translation-strings.ts` `applyAutoPick`).
+ * - **ADJUDICATE (owners, members, collaborators, with `choose: true`).** The
+ *   suggestion becomes the string's `msgstr`, not fuzzy, and the entry's
+ *   `chosen` says `adjudicated`, by whom, when, in which issue, why, and
+ *   which candidate. The catalogue-hash and current-text checks apply here
+ *   only: a choice against a catalogue that moved is refused, and the
+ *   proposal is kept.
+ * - **ACCEPT (owners, members, collaborators).** `acceptable` signs off the
+ *   catalogue, and each fuzzy entry in it is adjudicated as it stands.
  */
 export function planAdjudication(input: PlanInput): Plan {
   const plan: Plan = { writes: new Map(), applied: [], refused: [] };
   const { payload: p, author } = input;
-  if (!(ADJUDICATOR_ASSOCIATIONS as readonly string[]).includes(author.association)) {
-    plan.refused.push(
-      `@${author.login} is not an owner, member or collaborator of ${input.repository} (association ${author.association}); ` +
-        "nothing is recorded. A maintainer can file the same review under their own name.",
-    );
-    return plan;
-  }
+  const collaborator = (ADJUDICATOR_ASSOCIATIONS as readonly string[]).includes(author.association);
   const problems = payloadProblems(p);
   if (problems.length > 0) {
     plan.refused.push(...problems.map((x) => `invalid record: ${x}`));
@@ -585,6 +796,8 @@ export function planAdjudication(input: PlanInput): Plan {
     plan.refused.push(`the record names translations directory ${p.translations}, but this layer declares ${input.translations}`);
     return plan;
   }
+  const person = `github:${author.login}`;
+  const issue = issueNumber(input.issueUrl);
   const seen = new Set<string>();
   for (const item of p.items) {
     const key = `${item.locale}/${item.catalogue}`;
@@ -596,38 +809,136 @@ export function planAdjudication(input: PlanInput): Plan {
     const catFromRoot = join(input.translations, item.locale, item.catalogue).split(sep).join("/");
     const poRel = `${catFromRoot}.po`;
     const nodeRel = `${catFromRoot}.json`;
+    const sidecarRel = `${catFromRoot}${CANDIDATES_SUFFIX}`;
     const poAbs = join(input.layerRoot, poRel);
     const current = plan.writes.get(poRel) ?? (existsSync(poAbs) ? readFileSync(poAbs, "utf-8") : undefined);
     if (current === undefined) {
       plan.refused.push(`${key}: there is no catalogue ${poRel}`);
       continue;
     }
-    if (poHash(current) !== item.poHash) {
-      plan.refused.push(`${key}: the catalogue changed since the page showed it (hash ${item.poHash}, now ${poHash(current)}); reload the page and review it again`);
+    const moved = poHash(current) !== item.poHash;
+    if (item.verdict === "acceptable") {
+      if (!collaborator) {
+        plan.refused.push(
+          `${key}: only an owner, member or collaborator of ${input.repository} can accept a translation, and @${author.login} is ${author.association}; ` +
+            "suggest text with ✎ Fix translation to propose it instead.",
+        );
+        continue;
+      }
+      if (moved) {
+        plan.refused.push(`${key}: the catalogue changed since the page showed it (hash ${item.poHash}, now ${poHash(current)}); reload the page and review it again`);
+        continue;
+      }
+    }
+
+    const sidecarAbs = join(input.layerRoot, sidecarRel);
+    const raw = plan.writes.has(sidecarRel) ? (JSON.parse(plan.writes.get(sidecarRel)!) as unknown) : readJson(sidecarAbs);
+    if (raw === null || (raw !== undefined && candidatesProblems(raw).length > 0)) {
+      plan.refused.push(`${key}: its candidates file ${sidecarRel} is not ${CANDIDATES_SCHEMA}; it is never overwritten, so nothing is recorded for this catalogue`);
+      continue;
+    }
+    const sidecar: CandidatesFile = (raw as CandidatesFile | undefined) ?? { $schema: CANDIDATES_SCHEMA, locale: item.locale, catalogue: item.catalogue, entries: [] };
+    const entryOf = (e: PoEntry): CandidatesEntry => {
+      let x = sidecar.entries.find((y) => y.msgid === e.msgid && (y.msgctxt ?? undefined) === (e.msgctxt ?? undefined));
+      if (!x) {
+        x = { ...(e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {}), msgid: e.msgid, candidates: [] };
+        sidecar.entries.push(x);
+      }
+      return x;
+    };
+
+    let poText = current;
+    const recorded: Suggestion[] = [];
+    let chosenCount = 0;
+    let proposed = 0;
+    let autoPicked = 0;
+    if (item.verdict === "acceptable") {
+      // Each fuzzy entry is adjudicated as it stands.
+      for (const e of poEntries(current)) {
+        if (!e.fuzzy || e.msgidPlural !== undefined || e.msgstr === "") continue;
+        const r = applyAdjudication(poText, { ...(e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {}), msgid: e.msgid, current: e.msgstr, suggested: e.msgstr });
+        if ("refused" in r) continue;
+        poText = r.text;
+        entryOf(e).chosen = { text: e.msgstr, how: "adjudicated", by: person, at: input.at, ...(issue ? { issue } : {}), ...(item.note ? { reason: item.note } : {}) };
+        chosenCount++;
+      }
+    } else {
+      for (const s of item.suggestions ?? []) {
+        const what = `msgid ${JSON.stringify(s.msgid.slice(0, 80))}`;
+        const e = poEntries(poText).find((x) => x.msgid === s.msgid && (x.msgctxt ?? undefined) === (s.msgctxt || undefined));
+        if (!e) {
+          plan.refused.push(`${key}: no entry for ${what}`);
+          continue;
+        }
+        if (e.msgidPlural !== undefined) {
+          plan.refused.push(`${key}: ${what} is a plural entry; suggest plural forms by hand`);
+          continue;
+        }
+        const hash = msgidHash(e);
+        const entry = entryOf(e);
+        // PROPOSE: always recorded, beside the others (deduplicated on text, kind and id).
+        if (!entry.candidates.some((c) => c.text === s.suggested && c.source.kind === "human" && c.source.id === person)) {
+          const ph = placeholderCheck(s.msgid, s.suggested);
+          entry.candidates.push({
+            text: s.suggested,
+            source: { kind: "human", id: person, by: person, at: input.at, ...(issue ? { issue } : {}) },
+            msgidHash: hash,
+            ...(s.source ? { basedOn: { kind: s.source.kind, id: s.source.id } } : {}),
+            qa: { placeholders: { pass: ph }, at: input.at },
+            ...(s.note ? { note: s.note } : {}),
+          });
+        }
+        proposed++;
+        recorded.push(s);
+        // ADJUDICATE: a collaborator's explicit choice.
+        if (s.choose === true && collaborator) {
+          if (moved) {
+            plan.refused.push(`${key}: the catalogue changed since the page showed it, so @${author.login}'s choice for ${what} is not applied; it is kept as their proposal`);
+            continue;
+          }
+          const r = applyAdjudication(poText, s);
+          if ("refused" in r) {
+            plan.refused.push(`${key}: ${r.refused}; @${author.login}'s choice is not applied, and is kept as their proposal`);
+            continue;
+          }
+          poText = r.text;
+          const why = s.reason ?? s.note ?? item.note;
+          entry.chosen = {
+            text: s.suggested,
+            how: "adjudicated",
+            by: person,
+            at: input.at,
+            ...(issue ? { issue } : {}),
+            ...(why ? { reason: why } : {}),
+            ...(s.source ? { candidate: { kind: s.source.kind, id: s.source.id } } : {}),
+          };
+          chosenCount++;
+          continue;
+        }
+        if (s.choose === true && !collaborator) {
+          plan.refused.push(`${key}: only an owner, member or collaborator can choose the translation of ${what}, and @${author.login} is ${author.association}; it is recorded as their proposal`);
+        }
+        // Re-rank: an empty msgstr, or an earlier auto-pick, takes the auto-pick.
+        const picked = applyAutoPick(poText, entry, poEntries(poText).find((x) => x.msgid === e.msgid && (x.msgctxt ?? undefined) === (e.msgctxt ?? undefined))!, input.at);
+        if (picked) {
+          poText = picked.po;
+          entry.chosen = picked.chosen;
+          autoPicked++;
+        }
+      }
+      if (proposed === 0) continue;
+    }
+    const issues = candidatesProblems(sidecar);
+    if (issues.length > 0) {
+      plan.refused.push(`${key}: the candidates file would not validate (${issues[0]}); nothing is recorded for this catalogue`);
       continue;
     }
 
-    let poText = current;
-    const appliedSuggestions: Suggestion[] = [];
-    if (item.verdict === "mistranslation") {
-      for (const s of item.suggestions ?? []) {
-        const r = applySuggestion(poText, s);
-        if ("refused" in r) plan.refused.push(`${key}: ${r.refused}`);
-        else {
-          poText = r.text;
-          appliedSuggestions.push(s);
-        }
-      }
-      if (appliedSuggestions.length === 0) continue;
-      plan.writes.set(poRel, poText);
-    }
-
-    // The translation node: what pageReview and the status page read.
+    // The translation node: what the review cells and the status page read.
     const nodeAbs = join(input.layerRoot, nodeRel);
     const node0 = plan.writes.has(nodeRel) ? (JSON.parse(plan.writes.get(nodeRel)!) as Record<string, unknown>) : readJson(nodeAbs);
     if (node0 === null) {
       plan.refused.push(`${key}: ${nodeRel} will not parse; recorded nothing for this catalogue`);
-      plan.writes.delete(poRel);
       continue;
     }
     const node: Record<string, unknown> = node0 ?? {
@@ -646,24 +957,23 @@ export function planAdjudication(input: PlanInput): Plan {
       status.level = "block";
       delete status.flaggedForReview;
       delete status.flagReason;
-    } else {
+    } else if (chosenCount > 0) {
+      // A sign-off covered the old text; the entries' `chosen` say who chose the new.
       status.official = false;
       delete status.signedOffBy;
       delete status.signedOffAt;
       delete status.level;
+    } else {
       status.flaggedForReview = true;
-      status.flagReason = `mistranslation reported by ${author.login} in ${input.issueUrl}; the suggested text awaits review`;
+      status.flagReason = `${proposed} proposal(s) by ${author.login} in ${input.issueUrl} await a collaborator's choice`;
     }
     node.status = status;
-    plan.writes.set(nodeRel, json(node));
 
     // The audited record: append-only.
     const attRel = input.attestationPath(catFromRoot, item.locale);
     const att0 = plan.writes.has(attRel) ? JSON.parse(plan.writes.get(attRel)!) : readJson(join(input.layerRoot, attRel));
     if (att0 === null) {
       plan.refused.push(`${key}: the attestation ${attRel} will not parse; it is never overwritten, so nothing is recorded for this catalogue`);
-      plan.writes.delete(poRel);
-      plan.writes.delete(nodeRel);
       continue;
     }
     const att = (att0 as Record<string, unknown> | undefined) ?? {
@@ -674,24 +984,38 @@ export function planAdjudication(input: PlanInput): Plan {
       criteria: {},
     };
     const criteria = (att.criteria as Record<string, unknown[]>) ?? {};
+    const criterion = item.verdict === "acceptable" || chosenCount > 0 ? ADJUDICATION_CRITERION : PROPOSAL_CRITERION;
     const entry: Record<string, unknown> = {
-      reviewer: { kind: "human", id: `github:${author.login}` },
+      reviewer: { kind: "human", id: person },
       verdict: item.verdict,
       at: input.at,
       issue: input.issueUrl,
       po_hash: item.poHash,
-      ...(item.verdict === "mistranslation" ? { po_hash_after: poHash(poText) } : {}),
+      ...(poText !== current ? { po_hash_after: poHash(poText) } : {}),
       ...(item.note ? { note: item.note } : {}),
-      ...(appliedSuggestions.length > 0 ? { suggestions: appliedSuggestions } : {}),
+      ...(recorded.length > 0 ? { suggestions: recorded } : {}),
     };
-    criteria[ADJUDICATION_CRITERION] = [...(criteria[ADJUDICATION_CRITERION] ?? []), entry];
+    criteria[criterion] = [...(criteria[criterion] ?? []), entry];
     att.criteria = criteria;
+
+    // Every write of this item, or none.
+    if (poText !== current) plan.writes.set(poRel, poText);
+    if (item.verdict !== "acceptable" || chosenCount > 0) plan.writes.set(sidecarRel, json(sidecar));
+    plan.writes.set(nodeRel, json(node));
     plan.writes.set(attRel, json(att));
-    plan.applied.push(
-      item.verdict === "acceptable"
-        ? `${key}: accepted`
-        : `${key}: ${appliedSuggestions.length} suggestion(s) applied, marked fuzzy and flagged for review`,
-    );
+    if (item.verdict === "acceptable") plan.applied.push(`${key}: accepted${chosenCount > 0 ? `; ${chosenCount} fuzzy string(s) adjudicated as they stand` : ""}`);
+    else {
+      const parts = [`${proposed} proposal(s) recorded beside the other candidates`];
+      if (chosenCount > 0) parts.push(`${chosenCount} chosen as the translation by @${author.login}`);
+      if (autoPicked > 0) parts.push(`${autoPicked} string(s) now show the auto-pick`);
+      if (chosenCount === 0 && autoPicked === 0) parts.push("msgstr is left as it was");
+      plan.applied.push(`${key}: ${parts.join("; ")}${collaborator ? "" : `; a collaborator chooses (@${author.login} is ${author.association})`}`);
+    }
   }
   return plan;
+}
+
+/** Whether a suggestion keeps the source's placeholders (the guard every candidate passes on append). */
+function placeholderCheck(msgid: string, text: string): boolean {
+  return !("refused" in checkedCandidate(msgid, text));
 }

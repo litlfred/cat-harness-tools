@@ -10,7 +10,7 @@
  * returns goes through the same writer (`../translation-candidates.ts`
  * `addCandidates`), which checks placeholders, appends to the
  * `translation-candidates/v1` sidecar and fills an empty `msgstr` with the
- * first good candidate, `#, fuzzy`. A candidate is never a verdict.
+ * ranked default pick, `#, fuzzy`. A candidate is never a verdict.
  *
  * A source that does not translate on demand (a platform such as Weblate,
  * whose strings were translated by people there) does not need this

@@ -10,8 +10,10 @@
  *
  * Reads the `issues` event GitHub wrote, never the issue body from a shell
  * variable: the body is untrusted text and is only ever parsed as JSON. The
- * adjudicator is the event's `issue.user.login`, with its
- * `author_association`; nothing in the body can name anyone else.
+ * reviewer is the event's `issue.user.login`, with its `author_association`;
+ * nothing in the body can name anyone else. An owner, member or collaborator
+ * adjudicates; anyone else proposes, and their suggestions are recorded as
+ * candidates for a collaborator to choose among (owner, 2026-11-18).
  *
  * {@link planAdjudication} (`scripts/lib/translation-adjudication.ts`) decides
  * every write; this script resolves the layer's declared directories, checks
@@ -27,7 +29,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { readDeclaration, instanceDirectories } from "../schemas/kg/cat-harness.js";
 import { criteriaAttestationsHome, TranslationAttestationsSchema } from "../schemas/sdlc/qa-attestations.ts";
 import { TranslationNodeSchema } from "../schemas/content/translation.ts";
-import { parseIssueBody, planAdjudication, type AdjudicationPayload } from "./lib/translation-adjudication.ts";
+import { CANDIDATES_SUFFIX, candidatesProblems, parseIssueBody, planAdjudication, type AdjudicationPayload } from "./lib/translation-adjudication.ts";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -88,9 +90,18 @@ function main(): number {
           attestationSubject: (cat) => cat,
         });
 
-    // Every attestation and translation node is checked against its schema
-  // before anything is written: a record that would not validate is not written.
+  // Every attestation, candidates sidecar and translation node is checked
+  // against its schema before anything is written: a record that would not
+  // validate is not written.
   for (const [rel, text] of plan.writes) {
+    if (rel.endsWith(CANDIDATES_SUFFIX)) {
+      const problems = candidatesProblems(JSON.parse(text));
+      if (problems.length > 0) {
+        console.error(`translation-adjudicate: ${rel} would not validate: ${problems.join("; ")}`);
+        return 2;
+      }
+      continue;
+    }
     const schema = rel.endsWith(".attestations.json") ? TranslationAttestationsSchema : rel.endsWith(".json") ? TranslationNodeSchema : undefined;
     if (schema === undefined) continue;
     const r = schema.safeParse(JSON.parse(text));

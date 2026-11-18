@@ -701,6 +701,7 @@
     "translation:adjudicate": "bun run cat-harness-tools/scripts/translation-adjudicate.ts",
     "translation:platforms": "bun run cat-harness-tools/scripts/translation-platforms.ts",
     "translation:candidates": "bun run cat-harness-tools/scripts/translation-candidates.ts",
+    "translation:review:publish": "bun run cat-harness-tools/scripts/publish-translation-review.ts",
     "translation:status": "bun run cat-harness-tools/scripts/gen-translation-status.ts",
     "translation:status:check": "bun run cat-harness-tools/scripts/gen-translation-status.ts --check",
     "uml:overview": "bun run cat-harness-tools/scripts/gen-uml-overview.ts",
