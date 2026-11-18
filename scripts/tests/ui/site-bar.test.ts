@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 import { expandRail, railDataJson } from "../../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS, bodyTag, injectNavbar } from "../../lib/navbar.ts";
-import { SEARCH_EXCLUDE_META, elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../../lib/site-bar.ts";
+import { SEARCH_EXCLUDE_META, SEARCH_POST_BUILD_META, elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../../lib/site-bar.ts";
 import { railStandalonePages } from "../../mount-instance-docs.ts";
 import { PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE } from "../../page-layout.ts";
 import { firstPaintSchemeScript } from "../../lib/scheme-css.ts";
@@ -94,6 +94,17 @@ describe("withSiteBar", () => {
     expect(out).toContain(SEARCH_EXCLUDE_META);
     expect(bare).not.toContain(SEARCH_EXCLUDE_META);
     expect(withSiteBar(stripThemeSidebar(THEME_PAGE("Guide")), { toRoot: "..", title: "x" })).not.toContain(SEARCH_EXCLUDE_META);
+  });
+  test("a layer's own page is marked to be indexed after the build; any other non-theme page is not (owner, 2026-11-17)", () => {
+    const page = `<!doctype html><html><head><title>t</title></head><body><p>handbook</p></body></html>`;
+    const search = ["assets/js/vendor/lunr.min.js", "assets/js/just-the-docs.js"];
+    const layer = withSiteBar(page, { toRoot: ".", title: "dth-phc", search, indexAfterBuild: true });
+    expect(layer).toContain(SEARCH_POST_BUILD_META);
+    // Still excluded from the THEME's index, which a tree that is never split keeps.
+    expect(layer).toContain(SEARCH_EXCLUDE_META);
+    expect(withSiteBar(page, { toRoot: ".", title: "api", search })).not.toContain(SEARCH_POST_BUILD_META);
+    // No search box, nothing to index for.
+    expect(withSiteBar(page, { toRoot: ".", title: "dth-phc", indexAfterBuild: true })).not.toContain(SEARCH_POST_BUILD_META);
   });
   test("an IG page keeps its own bar", () => {
     const ig = `<html><head></head><body><div class="ig-topbar fa-page-bar">IG</div></body></html>`;

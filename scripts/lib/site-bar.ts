@@ -106,6 +106,19 @@ export function themeSearchHtml(placeholder = "Search this site"): string {
 /** The marker `publish-verify` reads for a page left out of the search index on purpose. */
 export const SEARCH_EXCLUDE_META = '<meta name="fa-search-exclude" content="true">';
 
+/**
+ * The marker for a page the theme's index cannot hold but the SITE's search
+ * should: a mounted layer's own HTML, laid out by its own generator, such as
+ * a handbook under `/en/<layer>/`. `search-split.ts` reads each such
+ * page of the built site and adds its sections to the index before cutting
+ * the scopes (owner, 2026-11-17: "we've lost some of the search indexing
+ * features and layered knowledge graph"; measured that day: one handbook site
+ * indexed 0 of its handbook's pages). The page keeps
+ * {@link SEARCH_EXCLUDE_META} too, because a tree that is never split (a
+ * build that stops before `search-split`) still has the theme's index only.
+ */
+export const SEARCH_POST_BUILD_META = '<meta name="fa-search-post-build" content="true">';
+
 export interface SiteBarOptions {
   /** Back to the site's root from this page: `.`, `..`, … */
   toRoot: string;
@@ -118,6 +131,12 @@ export interface SiteBarOptions {
    * has no box there rather than one that searches nothing.
    */
   search?: readonly string[];
+  /**
+   * The page is a layer's own content, so `search-split` indexes it after
+   * the build ({@link SEARCH_POST_BUILD_META}). Absent for pages whose text
+   * search would only repeat, such as TypeDoc's `api/`.
+   */
+  indexAfterBuild?: boolean;
 }
 
 /**
@@ -153,7 +172,9 @@ export function withSiteBar(html: string, o: SiteBarOptions): string {
       // HTML) gets the box but is never in the theme's index, which only
       // Jekyll builds. The marker says so, so publish-verify's search-index
       // counts it as excluded on purpose, not as a gap in the index.
-      out = beforeHeadEnd(out, SEARCH_EXCLUDE_META + scripts);
+      // A layer's own page is indexed after the build instead
+      // (`search-split.ts`, {@link SEARCH_POST_BUILD_META}).
+      out = beforeHeadEnd(out, SEARCH_EXCLUDE_META + (o.indexAfterBuild ? SEARCH_POST_BUILD_META : "") + scripts);
     }
   }
   if (!out.includes(PAGE_LAYOUT_MARK)) out = beforeHeadEnd(out, pageLayoutTags(`${o.toRoot}/`));
