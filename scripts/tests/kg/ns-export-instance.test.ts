@@ -5,10 +5,11 @@
  * @graphNode none — a test
  */
 import { describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { defaultGraphTypologies, graphTypologyIri } from "../../../schemas/kg/graph-typology-registry.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import {
   bootstrapVocabularyPath,
@@ -216,8 +217,48 @@ describe("bootstrapVocabularyPath resolves from both the index root and the cat-
       expect(out.kind).toBe("built");
       if (out.kind !== "built") return;
       expect(out.url).toBe("https://litlfred.github.io/bootstrap/v0/ns/");
-      expect(out.paths).toEqual(["v0/ns/index.html", "v0/ns/index.jsonld", "v0/ns/index.json"]);
+      expect(out.paths.slice(0, 3)).toEqual(["v0/ns/index.html", "v0/ns/index.jsonld", "v0/ns/index.json"]);
       expect(out.terms).toBeGreaterThan(0);
+      // Every other path is one term's own page (owner report, 2026-11-18).
+      expect(out.paths.slice(3).every((p) => out.termPages[p] !== undefined)).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  // Owner report, 2026-11-18: the subgraph link on every directory page,
+  // `https://litlfred.github.io/bootstrap/v0/ns/graphTypology/skills`, answered
+  // 404 because the vocabulary was published as one index page and no term
+  // had a page of its own. A Graph Typology IRI the site links must be a page
+  // the vocabulary publishes: this fails on any such dangling ns link.
+  test("every Graph Typology IRI in bootstrap's namespace is a page bootstrap's vocabulary publishes", () => {
+    const workspace = resolve(HARNESS_ROOT, "..");
+    const tmp = mkdtempSync(join(tmpdir(), "bootstrap-vocab-links-"));
+    try {
+      cpSync(join(workspace, "bootstrap", "bootstrap.json"), join(tmp, "bootstrap", "bootstrap.json"), { recursive: true });
+      cpSync(join(workspace, "bootstrap", "ns.jsonld"), join(tmp, "bootstrap", "ns.jsonld"), { recursive: true });
+      const out = buildVocabularyOne(tmp, "bootstrap");
+      expect(out.kind).toBe("built");
+      if (out.kind !== "built") return;
+      const decl = JSON.parse(readFileSync(join(workspace, "bootstrap", "bootstrap.json"), "utf-8")) as {
+        directories?: Array<{ graphTypologies?: string[] }>;
+      };
+      const names = new Set<string>();
+      for (const d of decl.directories ?? []) for (const t of d.graphTypologies ?? []) names.add(t);
+      for (const name of defaultGraphTypologies.names()) {
+        if (graphTypologyIri(name, defaultGraphTypologies.get(name)).startsWith(out.url)) names.add(name);
+      }
+      expect(names.size).toBeGreaterThan(0);
+      const dangling: string[] = [];
+      for (const name of names) {
+        const iri = `${out.url}graphTypology/${name}`;
+        const page = `${iri.slice(out.iriBase.length).replace(/\/$/, "")}/index.html`;
+        if (out.termPages[page] === undefined) dangling.push(iri);
+      }
+      expect(dangling).toEqual([]);
+      // The index carries each term as an anchor and links its page.
+      expect(out.html).toContain(`id="graphTypology/skills"`);
+      expect(out.html).toContain(`href="graphTypology/skills/"`);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

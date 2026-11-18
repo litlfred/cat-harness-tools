@@ -154,7 +154,7 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
  * for `.jsonld`.
  */
 export type VocabularyOutcome =
-  | { kind: "built"; instance: string; iriBase: string; url: string; paths: string[]; terms: number; content: string; html: string }
+  | { kind: "built"; instance: string; iriBase: string; url: string; paths: string[]; terms: number; content: string; html: string; termPages: Record<string, string> }
   | { kind: "skipped"; instance: string; reason: string }
   | { kind: "failed"; instance: string; problems: string[] };
 
@@ -181,15 +181,18 @@ export function buildVocabularyOne(repoRoot: string, instance: string): Vocabula
   const id = (doc as { "@id"?: unknown })["@id"];
   const where = vocabularyPaths(id, iriBase, decl.contextPath);
   if ("problem" in where) return { kind: "failed", instance, problems: [`${instance}: ${where.problem}`] };
+  const pages = termPages(instance, String(id), iriBase, doc);
+  if ("problems" in pages) return { kind: "failed", instance, problems: pages.problems.map((p) => `${instance}: ${p}`) };
   return {
     kind: "built",
     instance,
     iriBase,
     url: String(id),
-    paths: where.paths,
+    paths: [...where.paths, ...Object.keys(pages.pages)],
     terms: report.defined.length,
     content: `${JSON.stringify(doc, null, 2)}\n`,
     html: vocabularyHtml(instance, String(id), doc),
+    termPages: pages.pages,
   };
 }
 
@@ -207,7 +210,12 @@ export function vocabularyHtml(instance: string, id: string, doc: unknown): stri
     .map((n) => {
       const label = String(n["label"] ?? n["prefLabel"] ?? n["@id"]);
       const def = n["definition"] ?? n["comment"];
-      return `<li><code>${escHtml(String(n["@id"]))}</code> ${escHtml(label)}${def === undefined ? "" : ` — ${escHtml(String(def))}`}</li>`;
+      // A term of this namespace is a link to its own page (slash form) and an
+      // anchor here, so `…/ns/#Term` and `…/ns/Term` both land on it.
+      const local = localNameOf(String(n["@id"]), id, doc);
+      const name = `<code>${escHtml(String(n["@id"]))}</code>`;
+      const linked = local !== undefined && id.endsWith("/") ? `<a href="${escHtml(local)}/">${name}</a>` : name;
+      return `<li${local === undefined ? "" : ` id="${escHtml(local)}"`}>${linked} ${escHtml(label)}${def === undefined ? "" : ` — ${escHtml(String(def))}`}</li>`;
     })
     .join("\n");
   // `</` cannot appear inside the script element, so it is escaped in the JSON.
@@ -229,6 +237,93 @@ ${json}
 <ul>
 ${rows}
 </ul>
+</body>
+</html>
+`;
+}
+
+/** `n`'s `@id` expanded against `doc`'s own `@context` prefixes (a compact `p:x` or an absolute IRI). */
+export function expandTermId(termId: string, doc: unknown): string {
+  const ctx = (doc as { "@context"?: unknown })["@context"];
+  const m = /^([A-Za-z][\w.-]*):(?!\/\/)(.*)$/.exec(termId);
+  if (m === null || ctx === null || typeof ctx !== "object" || Array.isArray(ctx)) return termId;
+  const ns = (ctx as Record<string, unknown>)[m[1]!];
+  const iri = typeof ns === "string" ? ns : typeof ns === "object" && ns !== null ? (ns as { "@id"?: unknown })["@id"] : undefined;
+  return typeof iri === "string" && /[/#]$/.test(iri) ? `${iri}${m[2]}` : termId;
+}
+
+/**
+ * The part of a term's IRI below the namespace `id` (`graphTypology/skills`
+ * for `…/v0/ns/graphTypology/skills`), or `undefined` when the term is not in
+ * this namespace (a term of another layer, or the namespace itself).
+ */
+export function localNameOf(termId: string, id: string, doc: unknown): string | undefined {
+  const full = expandTermId(termId, doc);
+  const ns = id.endsWith("/") || id.endsWith("#") ? id : `${id}#`;
+  if (!full.startsWith(ns) || full.length === ns.length) return undefined;
+  return full.slice(ns.length);
+}
+
+/**
+ * One page per term of a SLASH namespace, at the path its IRI names
+ * (`<rel>/<local>/index.html`), because a slash IRI is a URL a reader follows:
+ * the subgraph links on every directory page point at `…/v0/ns/graphTypology/<name>`,
+ * and before these pages existed every one of them answered 404 (owner report,
+ * 2026-11-18). A hash namespace needs none: its terms are anchors on the
+ * one document ({@link vocabularyHtml}). A term whose local name cannot be a
+ * path (empty, `.`/`..` segments, a `#` or `?`, or one that collides with the
+ * namespace's own index files) is refused, never silently left dangling.
+ */
+export function termPages(instance: string, id: string, iriBase: string, doc: unknown): { pages: Record<string, string> } | { problems: string[] } {
+  if (!id.endsWith("/")) return { pages: {} };
+  const base = `${iriBase.replace(/\/+$/, "")}/`;
+  if (!id.startsWith(base)) return { pages: {} };
+  const rel = id.slice(base.length).replace(/\/+$/, "");
+  const graph = ((doc as { "@graph"?: unknown[] })["@graph"] ?? []) as Array<Record<string, unknown>>;
+  const pages: Record<string, string> = {};
+  const problems: string[] = [];
+  for (const n of graph) {
+    if (typeof n["@id"] !== "string") continue;
+    const local = localNameOf(n["@id"], id, doc);
+    if (local === undefined) continue;
+    const segs = local.replace(/\/$/, "").split("/");
+    if (/[#?\s]/.test(local) || segs.some((s) => s === "" || s === "." || s === "..") || ["index.html", "index.jsonld", "index.json"].includes(segs[0]!)) {
+      problems.push(`term ${n["@id"]} has a local name (\`${local}\`) that cannot be served as a page below ${id}`);
+      continue;
+    }
+    const path = `${rel}/${segs.join("/")}/index.html`;
+    if (pages[path] !== undefined) {
+      problems.push(`term ${n["@id"]} would be served at \`${path}\`, which another term already takes`);
+      continue;
+    }
+    pages[path] = termHtml(instance, id, expandTermId(n["@id"], doc), segs.length, n, doc);
+  }
+  return problems.length > 0 ? { problems } : { pages };
+}
+
+/** The page a term's own IRI serves: what it is, and the whole term as JSON-LD. */
+export function termHtml(instance: string, id: string, iri: string, depth: number, node: Record<string, unknown>, doc: unknown): string {
+  const label = String(node["prefLabel"] ?? node["label"] ?? node["@id"]);
+  const def = node["definition"] ?? node["comment"];
+  const up = "../".repeat(depth);
+  const term = { "@context": (doc as { "@context"?: unknown })["@context"], ...node, "@id": iri };
+  const json = JSON.stringify(term, null, 2).replace(/<\//g, "<\\/");
+  const defined = typeof node["isDefinedBy"] === "string" ? `<p>Defined by <a href="${escHtml(String(node["isDefinedBy"]))}">${escHtml(String(node["isDefinedBy"]))}</a>.</p>\n` : "";
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escHtml(label)} — ${escHtml(instance)} vocabulary</title>
+<link rel="canonical" href="${escHtml(iri)}">
+<script type="application/ld+json">
+${json}
+</script>
+</head>
+<body>
+<h1>${escHtml(label)}</h1>
+<p><code>${escHtml(iri)}</code></p>
+${def === undefined ? "" : `<p>${escHtml(String(def))}</p>\n`}${defined}<p>A term of the <a href="${up}">${escHtml(instance)} vocabulary</a> (<code>${escHtml(id)}</code>; machine-readable: <a href="${up}index.jsonld">index.jsonld</a>).</p>
 </body>
 </html>
 `;
@@ -485,11 +580,12 @@ async function main(argv: readonly string[]): Promise<number> {
     for (const p of outcome.paths) {
       const dest = join(outDir, p);
       mkdirSync(dirname(dest), { recursive: true });
-      writeFileSync(dest, p.endsWith(".html") ? outcome.html : outcome.content);
+      writeFileSync(dest, outcome.termPages[p] ?? (p.endsWith(".html") ? outcome.html : outcome.content));
     }
     // The list the workflow publishes, one path per line, so it never restates them.
     writeFileSync(join(outDir, ".paths"), `${outcome.paths.join("\n")}\n`);
-    console.log(`built ${outcome.instance}'s vocabulary: ${outcome.terms} term(s); to be served at ${outcome.url} (${outcome.paths.join(", ")})`);
+    const pageCount = Object.keys(outcome.termPages).length;
+    console.log(`built ${outcome.instance}'s vocabulary: ${outcome.terms} term(s), ${pageCount} term page(s); to be served at ${outcome.url} (${outcome.paths.filter((p) => outcome.termPages[p] === undefined).join(", ")})`);
     return 0;
   }
   if (cmd === "publish") {
