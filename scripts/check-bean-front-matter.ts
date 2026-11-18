@@ -63,6 +63,7 @@ import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { BeanStatusSchema } from "../schemas/tools/tool-types.ts";
 import {
   beanDefsDir,
+  declaredStoreDeterminedEmpty,
   readBeanStore,
   type BeanStore,
   type SkippedFile,
@@ -515,6 +516,18 @@ function main(): void {
   // result over a non-empty directory means every file failed to look like a
   // bean — which is worse than one that fails to parse.
   if (report.beans === 0) {
+    // EXCEPT a store declared, mounted and determined empty: a state branch
+    // seeded empty on purpose (owner, 2026-11-17: "nothing to examine means
+    // pass"). Every file in it is accounted for, so the zero is a fact rather
+    // than an unread store; an undeclared or unreadable one still fails here.
+    const empty = declaredStoreDeterminedEmpty(root);
+    if (empty !== undefined) {
+      console.log(
+        `Bean front matter (0 beans)\n  ✓ check:bean-front-matter: the declared bean store at ${empty} is mounted ` +
+          "and holds no bean — nothing to parse, so nothing failed (a determined-empty store, not an unread one)",
+      );
+      process.exit(0);
+    }
     console.error(
       `::error::check-bean-front-matter: the store at ${beanDefsDir(root) ?? "(unresolved)"} ` +
         "yielded no beans — every count here would be vacuous",

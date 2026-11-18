@@ -46,7 +46,7 @@ import { BEAN_SCHEMA_TAG, BeanKind } from "../schemas/sdlc/bean-graph.ts";
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { acceptsSchemaTag } from "../schemas/kg/node-kind.ts";
 
-import { NOT_BEANS, readBeanStore } from "./bean-store-read.ts";
+import { declaredStoreDeterminedEmpty, NOT_BEANS, readBeanStore } from "./bean-store-read.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 
@@ -209,6 +209,14 @@ function main(argv: readonly string[]): void {
   // An empty store is nothing to tag, but under `--check` a pass over it would
   // be vacuous, so it fails there as `check-bean-front-matter` does.
   if (r.files === 0) {
+    // A declared store seeded empty on purpose is nothing to tag and nothing
+    // unread (`declaredStoreDeterminedEmpty`); only the store this run located
+    // itself qualifies, never an arbitrary `--dir`.
+    const seededEmpty = dirArg === undefined ? declaredStoreDeterminedEmpty(repoRootFor(HARNESS_ROOT)) : undefined;
+    if (check && seededEmpty !== undefined) {
+      if (!quiet) console.log(`Bean tags — the declared bean store at ${seededEmpty} is mounted and holds no bean, nothing to tag (a determined-empty store, not an unread one)`);
+      process.exit(0);
+    }
     if (check) {
       console.error(`::error::beans-retag: ${dir} holds no bean files, so a pass here would be vacuous`);
       process.exit(1);
