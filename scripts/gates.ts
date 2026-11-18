@@ -2377,7 +2377,22 @@ export function finishGatesReport(report: GatesReport, code: number): GatesRepor
   return GatesReportSchema.parse({ ...report, exitCode, outcome });
 }
 
+/**
+ * The scripts {@link SCRIPT_EXEMPTIONS} declares `kind: "report"`, as `{script: reason}`:
+ * what `run-gates.py` asks (`--report-scripts`), so its skip is this table and
+ * not a copy of it that can drift (check:draft-beans ran as a gate in INDEX mode).
+ */
+export function reportScripts(exemptions: readonly ScriptExemption[] = SCRIPT_EXEMPTIONS): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const e of exemptions) if (e.kind === "report") out[e.script] = e.reason;
+  return out;
+}
+
 if (import.meta.main) {
+  if (process.argv.includes("--report-scripts")) {
+    console.log(JSON.stringify(reportScripts()));
+    process.exit(0);
+  }
   // Compile-gates query / run
   if (process.argv.includes("--compile-gates-list")) {
     console.log("Declared Content Compile Gates:");

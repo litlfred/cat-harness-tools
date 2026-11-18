@@ -407,6 +407,52 @@ SUPPLIED_INPUTS = {
 }
 
 
+# Scripts `gates.ts` declares `kind: "report"`: check scripts CI deliberately
+# does not gate, each with its reason there (`ScriptExemption`). Asked of
+# gates.ts itself (`--report-scripts`, its SCRIPT_EXEMPTIONS: its own table,
+# each present instance's declared `gateExemptions.scripts` and the index's),
+# so the two cannot drift. A hand list here missed one: check:draft-beans is
+# `report` because a PR checkout has no `origin/main` (exit 2), but only
+# LAYER_MODE_SCRIPTS skipped it, so an instance that is its own index (INDEX
+# mode) still ran it as a gate.
+#
+# Except the `report` scripts THIS file wires as gates on purpose, each with
+# what it needs: the ones it supplies an input (SUPPLIED_INPUTS:
+# check:test-budgets reads the shard's junit report) and the ones it runs over
+# the tree as mounted (AS_MOUNTED_SCRIPTS: separation:cutover:check). Skipping
+# those would stop judging them silently.
+#
+# gates.ts that cannot answer (absent, or exits non-zero, or prints no JSON
+# object) is said on stderr, and then no script is skipped as a report: the
+# gate runs and reports what it reports, rather than this guessing at a skip.
+_REPORTS = {}
+
+
+def report_scripts(root):
+    """script -> why, for every script gates.ts calls `kind: "report"` in `root`."""
+    if root in _REPORTS:
+        return _REPORTS[root]
+    tools = instances_in(root).get("cat-harness-tools", "cat-harness-tools")
+    src = os.path.join(tools, "scripts", "gates.ts")
+    out, why = {}, None
+    if not os.path.isfile(os.path.join(root, src)):
+        why = "is absent"
+    else:
+        try:
+            r = subprocess.run(["bun", src, "--report-scripts"], cwd=root, capture_output=True, text=True, timeout=300)
+            got = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+            if isinstance(got, dict):
+                out = {s: f'gates.ts declares it `kind: "report"`: {reason}' for s, reason in got.items()}
+            else:
+                why = f"exited {r.returncode} with no JSON object ({(r.stderr or '').strip()[-200:]})"
+        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+            why = f"could not be asked ({e.__class__.__name__})"
+    if why:
+        print(f"run-gates: {src} --report-scripts {why}, so no script is skipped as a gates.ts `report`", file=sys.stderr)
+    _REPORTS[root] = out
+    return out
+
+
 def gate_args(script, env=None):
     """(extra arguments, skip reason) for a declared gate: ([], None) for one that needs none."""
     fn = SUPPLIED_INPUTS.get(script)
@@ -429,6 +475,9 @@ def skip_reason(root, script, env=None, own=None, declarer=None):
         return "sweep-only", SWEEP_ONLY_SCRIPTS[script]
     if script in QA_REPORT_SCRIPTS:
         return "qa-report", QA_REPORT_SCRIPTS[script]
+    reports = report_scripts(root)
+    if script in reports and script not in SUPPLIED_INPUTS and script not in AS_MOUNTED_SCRIPTS:
+        return "report", reports[script]
     if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
         return "layer-mode", LAYER_MODE_SCRIPTS[script]
     why = untracked_corpus_reason(root, declarer, script, own)
