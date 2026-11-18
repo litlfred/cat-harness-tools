@@ -29,7 +29,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
-import { changedContentFiles, checkCorpusGate } from "../src/workflow/corpus-gate.js";
+import { changedContentFiles, checkCorpusGate, prBaseTime } from "../src/workflow/corpus-gate.js";
 import { readBlockManifest } from "../pipeline/qa-utils.js";
 import { loadBlockModuleSync } from "../pipeline/block-module.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
@@ -92,10 +92,11 @@ const files = changedContentFiles(
     : git(["diff", "--name-status", "-M100%", "--diff-filter=d", `${since}...HEAD`]),
 );
 
-// The commit the diff starts from, as a time: a change-set instance in the
-// workflow store started after it also covers its blocks (change-set-coverage.ts).
-const baseRef = staged ? "HEAD" : git(["merge-base", since!, "HEAD"])[0];
-const baseTime = baseRef ? git(["show", "-s", "--format=%cI", baseRef])[0] : undefined;
+// The PR's fork point, as a time: a change-set instance in the workflow store
+// started after it also covers its blocks (change-set-coverage.ts). The fork
+// point, not the merge base, which moves to main's tip when main is merged in
+// (prBaseTime).
+const baseTime = staged ? git(["show", "-s", "--format=%cI", "HEAD"])[0] : prBaseTime(git, since!);
 
 const findings = await checkCorpusGate(repoRoot, { files, platformRoot, labelFor, baseTime });
 const refused = findings.filter((f) => !f.allowed);

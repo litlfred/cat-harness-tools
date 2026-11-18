@@ -2427,6 +2427,7 @@ jobs:
         #                  `record` on a push, which traces the rest.
         env:
           GATE_CONE: ${{ github.event_name == 'push' && 'record' || 'skip' }}
+          PR_COMMITS: ${{ github.event.pull_request.commits || '' }}
           GATE_JOBS: ${{ inputs.gate-jobs }}
           GATE_SHARD: ${{ matrix.shard }}/${{ inputs.gate-shards }}
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
@@ -2440,6 +2441,16 @@ jobs:
           if [ "$MODE" = "index" ]; then
             if [ "$SIDE" = "head" ] && git -C fa rev-parse -q --verify 'HEAD^2' >/dev/null; then
               GATE_DIFF_BASE="$(git -C fa rev-parse 'HEAD^1')"
+              # The gate ties a stored change set to the PR by the PR's fork
+              # point (corpus-gate.ts prBaseTime), which a main-merge does not
+              # move (WorldHealthOrganization/dth-cs#3). At depth 2 that commit
+              # is not here; the PR's commit count reaches it along the PR's
+              # own line. Without it the gate keeps the merge base: stricter,
+              # never looser.
+              if [ -n "$PR_COMMITS" ]; then
+                git -C fa fetch --no-tags --quiet --deepen="$((PR_COMMITS + 1))" origin "$(git -C fa rev-parse HEAD)" \
+                  || echo "::warning::could not deepen the root to the PR's fork point; the corpus gate uses the merge base"
+              fi
             else
               GATE_DIFF_BASE="$(git -C fa rev-parse HEAD)"
             fi
