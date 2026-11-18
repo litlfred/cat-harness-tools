@@ -1878,7 +1878,7 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     script: "check:draft-beans",
     kind: "report",
     reason:
-      "IT JUDGES THE WORK PLAN AGAINST OTHER BRANCHES, not a commit (bean `folio-assistant-3432`): it reports draft decision beans that exist on no ancestor of the default branch, so it needs the bean store mounted from its state branch and the default branch's history, which a pull-request checkout (one commit, no `origin/main`) does not carry: there it exits 2, `could not determine default branch ref`, measured in a single-branch clone. Its finding is about a SIBLING's unmerged branch, so as a gate it would redden this PR for somebody else's draft. Run it from a goal-review sweep",
+      "IT JUDGES THE WORK PLAN AGAINST OTHER BRANCHES, not a commit (bean `folio-assistant-3432`): it reports draft decision beans that exist on no ancestor of the default branch, so it needs the bean store mounted from its state branch and the default branch's history, which a pull-request checkout (one commit, no `origin/main`) does not carry: it names the branch from `GITHUB_BASE_REF`, the event's declared default or the remote's HEAD and fetches it (cat-harness-tools#2460), and with no draft decision bean it never asks. Its finding is about a SIBLING's unmerged branch, so as a gate it would redden this PR for somebody else's draft. Run it from a goal-review sweep",
   },
   {
     script: "branch:readme:check",
