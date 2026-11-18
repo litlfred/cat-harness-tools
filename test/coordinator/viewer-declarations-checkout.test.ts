@@ -78,7 +78,21 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     // A corpus-wide visualiser with per-instance sub-graphs opens the subject's view.
     expect(resolveFor("who-iris", "library")).toMatch(committed("cat-harness/library/who-iris/index.html"));
     // A declared nested sub-graph path (`subgraphUnder`), never one inferred from the pages.
-    expect(resolveFor("cat-harness", "skills")).toBe("cat-harness/docs/cat-harness/auto-docs/index/skills/skills/index.html");
+    const autoDocsSkills = "cat-harness/docs/cat-harness/auto-docs/index/skills/skills/index.html";
+    // Once cat-harness declares the Skills hub (a `skills` visualiser drawn by
+    // `skill-docs`, owner card "Skills hub", option A, 2026-11-18), its OWN
+    // `skills` directory opens the hub; `covers` names only that layer's
+    // directories, so another layer's `skills` directory still opens the
+    // nested auto-docs view. Before it does, cat-harness's opens auto-docs.
+    const hub = declaredVisualisers(REPO).find((v) => v.harness === "cat-harness" && v.renderedBy === "skill-docs");
+    if (hub !== undefined) {
+      expect(resolveFor("cat-harness", "skills")).toMatch(committed(`cat-harness/${hub.id}/index.html`));
+      if (dirs.some((d) => d.instance === "bootstrap" && d.dir.id === "skills")) {
+        expect(resolveFor("bootstrap", "skills")).toBe(autoDocsSkills);
+      }
+    } else {
+      expect(resolveFor("cat-harness", "skills")).toBe(autoDocsSkills);
+    }
     // ...and for `subgraphs: "instance"` too (owner, 2026-10-15, "3a"): each
     // layer's glossary tile opens `glossary/instance/<instance>/`, never
     // the shared page, so it cannot meet `glossary/skills/` and the like.
