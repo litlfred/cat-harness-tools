@@ -9,10 +9,10 @@ import { fileURLToPath } from "node:url";
  * not. Decided from `location.hostname` at load, so ONE page is served here
  * from several hosts, intercepted, and judged on each.
  *
- * WHAT IS SERVED: this layer's `draft-banner.js` and `page-layout.css`, and
- * the `<noscript>` fallback `pageLayoutTags` emits, copied byte for byte from
- * `page-layout.ts` (which names its files through bun's `import.meta.dir`, so
- * Playwright, under node, reads them by path instead). The rail and page bar
+ * WHAT IS SERVED: this layer's `draft-banner.js`, `page-layout.css` and
+ * `draft-banner-noscript.css`, and the `<noscript>` fallback `pageLayoutTags`
+ * emits, read from `page-layout.ts` (which names its files through bun's
+ * `import.meta.dir`, so Playwright, under node, reads them by path instead). The rail and page bar
  * are hand-built with their real classes.
  *
  * NO BACKTICKS INSIDE THE PAGE TEMPLATE LITERAL (`bmr0`).
@@ -20,12 +20,16 @@ import { fileURLToPath } from "node:url";
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "../scripts");
 const BANNER_JS = readFileSync(join(SCRIPTS, "templates/draft-banner.js"), "utf8");
 const LAYOUT_CSS = readFileSync(join(SCRIPTS, "templates/page-layout.css"), "utf8");
+const NOSCRIPT_CSS = readFileSync(join(SCRIPTS, "templates/draft-banner-noscript.css"), "utf8");
 const NOSCRIPT = (() => {
   const src = readFileSync(join(SCRIPTS, "page-layout.ts"), "utf8");
-  const m = /export const DRAFT_BANNER_NOSCRIPT =\s*`([^`]*)` \+\s*`([^`]*)`;/.exec(src);
-  if (!m) throw new Error("page-layout.ts: DRAFT_BANNER_NOSCRIPT not found in the expected shape");
-  return (m[1]! + m[2]!).replace(/\\\\/g, "\\");
+  const file = /export const DRAFT_BANNER_NOSCRIPT_CSS_FILE = "([^"]+)";/.exec(src);
+  const tag = /export function draftBannerNoscript\(up: string\): string \{\s*return `([^`]*)`;/.exec(src);
+  if (!file || !tag) throw new Error("page-layout.ts: draftBannerNoscript not found in the expected shape");
+  return tag[1]!.replace("${up}", "/").replace("${DRAFT_BANNER_NOSCRIPT_CSS_FILE}", file[1]!);
 })();
+/** Paths the page fetched, so a test can say what a scripted page did NOT load. */
+let fetched: string[] = [];
 
 function html(staging: boolean): string {
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -37,9 +41,12 @@ ${staging ? '<div data-fa-staging-banner style="position:fixed;top:0;left:0;righ
 }
 
 async function open(p: Page, url: string, staging = false): Promise<void> {
+  fetched = [];
   await p.route("**/*", (r) => {
     const u = new URL(r.request().url());
+    fetched.push(u.pathname);
     if (u.pathname.endsWith("/draft-banner.js")) return r.fulfill({ contentType: "text/javascript", body: BANNER_JS });
+    if (u.pathname.endsWith("/draft-banner-noscript.css")) return r.fulfill({ contentType: "text/css", body: NOSCRIPT_CSS });
     return r.fulfill({ contentType: "text/html", body: html(staging) });
   });
   await p.goto(url);
@@ -70,6 +77,8 @@ test.describe("the DRAFT banner", () => {
       // And the page's content starts below it: nothing it covers.
       const h1 = (await p.locator("h1").boundingBox())!;
       expect(h1.y).toBeGreaterThanOrEqual(box.height);
+      // The no-script stylesheet is for pages that run no script; this one did.
+      expect(fetched.filter((f) => f.endsWith("/draft-banner-noscript.css"))).toEqual([]);
     });
   }
 
@@ -101,5 +110,6 @@ test.describe("the DRAFT banner with no script", () => {
     await open(p, "https://worldhealthorganization.github.io/dth-hrh/index.html");
     const before = await p.evaluate(() => getComputedStyle(document.body, "::before").content);
     expect(before).toContain("DRAFT");
+    expect(fetched).toContain("/assets/draft-banner-noscript.css");
   });
 });
