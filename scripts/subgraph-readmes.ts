@@ -65,6 +65,8 @@ import { contentIsOffCheckout } from "../schemas/kg/subgraph-source.ts";
 import { forDirectory, processIndex, resolveProcess, type ProcessIndex } from "./governing-process.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, mayLeaveMain, writeQaResult } from "./qa-results.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { readmeOwesVisualiser, readmeVisualisers, siteBase } from "./readme-visualisers.ts";
+import { visualisersReaching } from "./viewer-declarations.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
@@ -143,6 +145,9 @@ export function harnessInstances(repo: string): InstanceInput[] {
   // not pay for a walk whose answer nothing asks for.
   let processes: ProcessIndex | undefined;
   const index = (): ProcessIndex => (processes ??= processIndex(repo));
+  // The site this checkout publishes, read once: every visualiser link is
+  // under it (`readme-visualisers.ts`).
+  const site = siteBase(repo);
   for (const inst of layerRootsIn(repo)) {
     // A remote mount is another repository's bytes (bean `nn8e`, `hupw`): its READMEs
     // are generated there, and writing here would only break the lock's digest.
@@ -154,6 +159,7 @@ export function harnessInstances(repo: string): InstanceInput[] {
       continue;
     }
     if (!decl) continue;
+    const reaching = visualisersReaching(repo, inst);
     out.push({
       root: inst,
       decl: decl as unknown as InstanceInput["decl"],
@@ -185,6 +191,12 @@ export function harnessInstances(repo: string): InstanceInput[] {
         // gets a view, because the section has to say *could not determine*.
         const declared = (d as { coverage?: { process?: string } }).coverage?.process;
         const subdirs = subdirDescriptions(abs, d.graphTypologies as string[]);
+        // Where the directory is SEEN, and whether it must be: the writer
+        // links each page and records `no-visualiser` when one is owed and
+        // none renders it (owner, 2026-11-18).
+        const viewed = d as unknown as Parameters<typeof readmeVisualisers>[0];
+        const visualisers = readmeVisualisers(viewed, decl.name, inst, repo, abs, site, reaching);
+        const owesVisualiser = readmeOwesVisualiser(decl.name, viewed);
         return {
           id: d.id,
           path: d.path,
@@ -196,6 +208,8 @@ export function harnessInstances(repo: string): InstanceInput[] {
           // (bean `0dav`): its working copy being missing is not a finding.
           mayBeAbsent: Boolean((d as { absent?: unknown }).absent) || mayLeaveMain(d as { graphTypologies?: string[]; storage?: unknown }),
           ...(Object.keys(subdirs).length > 0 ? { subdirs } : {}),
+          visualisers,
+          owesVisualiser,
           ...(declared !== undefined
             ? { process: forDirectory(resolveProcess(index(), declared), repo, abs) }
             : {}),
