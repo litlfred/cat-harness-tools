@@ -33,7 +33,14 @@ function step(): Step {
 }
 
 /** Run the step as `event` would; `existing` is an open repin PR, or none. */
-function runStep(event: string, existing?: number, labelFails = false, gitBody?: string, createFails?: string): { code: number; calls: string[]; summary: string } {
+function runStep(
+  event: string,
+  existing?: number,
+  labelFails = false,
+  gitBody?: string,
+  createFails?: string,
+  labels: { have?: string[]; createRefused?: boolean } = { have: ["needs-repin"] },
+): { code: number; calls: string[]; summary: string } {
   const dir = mkdtempSync(join(tmpdir(), "standing-repin-"));
   const log = join(dir, "calls.log");
   const stub = (name: string, body: string) => {
@@ -50,6 +57,8 @@ function runStep(event: string, existing?: number, labelFails = false, gitBody?:
       `if [ "$1 $2" = "pr view" ]; then echo 42; fi`,
       labelFails ? `if [ "$1 $2" = "pr edit" ] && [[ "$*" == *--add-label* ]]; then exit 1; fi` : "",
       createFails ? `if [ "$1 $2" = "pr create" ]; then echo '${createFails}' >&2; exit 1; fi` : "",
+      `if [ "$1 $2" = "label list" ]; then printf '%s\\n' ${(labels.have ?? []).map((l) => `'${l}'`).join(" ")}; fi`,
+      labels.createRefused ? `if [ "$1 $2" = "label create" ]; then echo 'HTTP 403' >&2; exit 1; fi` : "",
     ].join("\n"),
   );
   writeFileSync(join(dir, "repin.md"), "moved cat-harness\n");
@@ -166,5 +175,38 @@ describe("standing repin moves the workflow pins with the lock when it may (cat-
     expect(r.code).not.toBe(0);
     expect(r.calls.some((c) => c.startsWith("git checkout -q HEAD~1"))).toBe(false);
     expect(r.calls.some((c) => c.startsWith("gh pr create"))).toBe(false);
+  });
+});
+
+describe("standing repin creates the needs-repin label where the repository has none (owner, card 2026-11-18)", () => {
+  const labelCalls = (calls: readonly string[]) => calls.filter((c) => c.startsWith("gh label create") || (c.startsWith("gh pr edit") && c.includes("--add-label")));
+
+  test("a repository without the label gets it created, before the PR is labelled", () => {
+    const r = runStep("schedule", undefined, false, undefined, undefined, { have: ["bug", "release"] });
+    expect(r.code).toBe(0);
+    const calls = labelCalls(r.calls);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatch(/^gh label create needs-repin --color \S+ --description /);
+    expect(calls[1]).toBe("gh pr edit 42 --add-label needs-repin");
+  });
+
+  test("a repository that has the label is left as it is: no create, no --force", () => {
+    const r = runStep("schedule");
+    expect(r.code).toBe(0);
+    expect(r.calls.some((c) => c.startsWith("gh label create"))).toBe(false);
+    expect(r.calls).toContain("gh pr edit 42 --add-label needs-repin");
+  });
+
+  test("the create is idempotent: a refused create is a warning, and the labelling still decides", () => {
+    const r = runStep("schedule", undefined, false, undefined, undefined, { have: [], createRefused: true });
+    expect(r.code).toBe(0);
+    expect(r.calls.some((c) => c.startsWith("gh label create needs-repin"))).toBe(true);
+    expect(r.calls.some((c) => c.startsWith("gh label") && c.includes("--force"))).toBe(false);
+    expect(r.calls).toContain("gh pr edit 42 --add-label needs-repin");
+  });
+
+  test("a label that still cannot be added after the create fails the run, as before", () => {
+    const r = runStep("schedule", undefined, true, undefined, undefined, { have: [] });
+    expect(r.code).not.toBe(0);
   });
 });

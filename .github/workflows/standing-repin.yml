@@ -44,7 +44,8 @@
 #   4. When a tracked file changed, push `repin/standing-<date>` and open ONE
 #      PR, or update the one already open (any `repin/standing-*` head), so
 #      runs never stack PRs. Then label it `needs-repin` for the merge
-#      manager, whatever started the run. It NEVER merges and never asks for
+#      manager, whatever started the run, creating the label first in a
+#      repository that has none (owner, card 2026-11-18). It NEVER merges and never asks for
 #      auto-merge; an auto-merge already on the PR (set before this rule) is
 #      turned off, since its content just changed under it. See "Who merges".
 #
@@ -252,6 +253,18 @@ jobs:
           fi
           # Never merge, never auto-merge (owner, 2026-11-13, "C. No auto-merge"):
           # queue it for the merge manager, whatever started the run ($EVENT).
+          # Create the label first when the repository has none (owner, card
+          # 2026-11-18: ten sites failed here every six hours, "could not
+          # label #N", because `gh pr edit --add-label` refuses a label the
+          # repository does not have). Idempotent: an existing label is left
+          # as it is (no --force, so its colour and description stay), and a
+          # refused create is only a warning, since the label step below
+          # still says whether the PR got its label.
+          if ! gh label list --limit 1000 --json name --jq '.[].name' 2>/dev/null | grep -qxF "$REPIN_LABEL"; then
+            gh label create "$REPIN_LABEL" --color "fbca04" \
+              --description "A standing repin PR, queued for the merge manager" >/dev/null 2>&1 \
+              || echo "::warning::could not create the \`$REPIN_LABEL\` label (it may exist already, or the token may not create labels)"
+          fi
           gh pr edit "$number" --add-label "$REPIN_LABEL" \
             || { echo "::error::could not label #$number \`$REPIN_LABEL\` (does the label exist here?): the merge manager would not see it"; exit 1; }
           gh pr merge "$number" --disable-auto >/dev/null 2>&1 || true

@@ -47,18 +47,20 @@ const READY = "Already judged? (marked ready for review)";
 const FAST = "Fast tier only (advisory; the full checks gate a release)";
 
 /** Run a step's script; `${{ … }}` in it is replaced from `subs`. */
-function runStep(step: Step, env: Record<string, string>, subs: Record<string, string> = {}): { code: number; out: string; summary: string } {
+function runStep(step: Step, env: Record<string, string>, subs: Record<string, string> = {}): { code: number; out: string; summary: string; output: string } {
   const dir = mkdtempSync(join(tmpdir(), "job-graph-"));
   const summary = join(dir, "summary");
   writeFileSync(summary, "");
+  const output = join(dir, "output");
+  writeFileSync(output, "");
   let script = step.run!;
   for (const [k, v] of Object.entries(subs)) script = script.split(k).join(v);
   const r = spawnSync("bash", ["-c", script], {
     encoding: "utf-8",
-    // input-site: env PATH #b146a4ab — PATH handed to a child process, which decides which binaries it runs
-    env: { PATH: process.env.PATH ?? "", GITHUB_STEP_SUMMARY: summary, ...env },
+    // input-site: env PATH #00552802 — PATH handed to a child process, which decides which binaries it runs
+    env: { PATH: process.env.PATH ?? "", GITHUB_STEP_SUMMARY: summary, GITHUB_OUTPUT: output, ...env },
   });
-  return { code: r.status ?? -1, out: r.stdout + r.stderr, summary: readFileSync(summary, "utf-8") };
+  return { code: r.status ?? -1, out: r.stdout + r.stderr, summary: readFileSync(summary, "utf-8"), output: readFileSync(output, "utf-8") };
 }
 
 describe("the job graph", () => {
@@ -80,8 +82,10 @@ describe("the job graph", () => {
     expect(jobs.run!.if).toContain("needs.prepare-base.result == 'success'");
     // compare: not when prepare-head decided the fast tier.
     expect(jobs.compare!.if).toContain("needs.prepare-head.outputs.full != 'false'");
-    // lock-coherence: not when prepare-head's lock step passed.
+    // lock-coherence: not when prepare-head's lock step passed, nor on the
+    // fast tier, where prepare-head's advisory verdict names a red lock.
     expect(jobs["lock-coherence"]!.if).toContain("needs.prepare-head.outputs.lock-coherence != 'success'");
+    expect(jobs["lock-coherence"]!.if).toContain("needs.prepare-head.outputs.full != 'false'");
     expect(jobs["record-writers"]!.if).toContain("github.event_name == 'push'");
   });
 
@@ -143,28 +147,107 @@ describe("the folded steps' scripts", () => {
       { "${{ inputs.quick-paths }}": "docs/", "${{ inputs.quick-test }}": "test/x.test.ts" },
     );
 
-  test("fast tier: the typecheck decides, as compare's draft verdict did", () => {
+  const red = (r: { code: number; output: string }) => r.code === 0 && r.output.includes("verdict=red");
+  const green = (r: { code: number; output: string }) => r.code === 0 && r.output.includes("verdict=green");
+
+  test("fast tier: the typecheck decides, as compare's draft verdict did, and a red is advisory (exit 0, verdict=red)", () => {
     const ok = fast({});
-    expect(ok.code).toBe(0);
+    expect(green(ok)).toBe(true);
     expect(ok.summary).toContain(`### ${FAST}`);
     expect(ok.summary).toContain("fast tier: prepare-head success, typecheck success");
-    expect(fast({ TYPECHECK: "failure" }).code).toBe(1);
-    expect(fast({ PREPARED: "failure" }).out).toContain("::error::fast tier: the PR side could not be prepared (failure)");
+    const tsc = fast({ TYPECHECK: "failure" });
+    expect(red(tsc)).toBe(true);
+    expect(tsc.out).toContain("::warning title=Fast tier RED (advisory)::fast tier: typecheck failed");
+    expect(tsc.summary).toContain("**Verdict: RED (advisory)**");
+    expect(fast({ PREPARED: "failure" }).out).toContain("::warning title=Fast tier RED (advisory)::fast tier: the PR side could not be prepared (failure)");
+  });
+
+  test("fast tier: a step red under continue-on-error is named from the steps' outcomes", () => {
+    const steps = JSON.stringify({
+      tier: { outcome: "success" },
+      "fa-mount": { outcome: "failure", conclusion: "success" },
+      "fa-install": { outcome: "success" },
+      "judged-key": { outcome: "failure" }, // never a gate
+      tsc: { outcome: "failure" }, // named on its own
+    });
+    const r = fast({ STEPS: steps });
+    expect(red(r)).toBe(true);
+    expect(r.out).toContain("the PR side could not be prepared (failure (red: fa-mount))");
+    expect(r.out).not.toContain("judged-key");
+    expect(green(fast({ STEPS: JSON.stringify({ tier: { outcome: "success" }, "judged-key": { outcome: "failure" } }) }))).toBe(true);
+  });
+
+  test("fast tier: a red lock step is reported here, since lock-coherence skips on the fast tier", () => {
+    const r = fast({ LOCK: "failure" });
+    expect(red(r)).toBe(true);
+    expect(r.out).toContain("the lock pins do not agree");
   });
 
   test("fast tier: a reused or pins-only PR passes with nothing run", () => {
     const reused = fast({ REUSED: "true", REUSED_RUN: "https://example.invalid/run/1", TYPECHECK: "skipped" });
-    expect(reused.code).toBe(0);
+    expect(green(reused)).toBe(true);
     expect(reused.summary).toContain("SKIPPED — already passed as judged in run https://example.invalid/run/1");
     const pins = fast({ SKIP: "true", TYPECHECK: "skipped" });
-    expect(pins.code).toBe(0);
+    expect(green(pins)).toBe(true);
     expect(pins.summary).toContain("changes only the caller's own pins");
   });
 
   test("fast tier: the quick lane needs its tests and the typecheck", () => {
-    expect(fast({ QUICK: "true", TESTS: "success" }).code).toBe(0);
+    expect(green(fast({ QUICK: "true", TESTS: "success" }))).toBe(true);
     expect(fast({ QUICK: "true", TESTS: "success" }).summary).toContain("quick lane: this PR changes only `docs/`");
-    expect(fast({ QUICK: "true", TESTS: "failure" }).code).toBe(1);
-    expect(fast({ QUICK: "true", TESTS: "success", TYPECHECK: "failure" }).code).toBe(1);
+    expect(red(fast({ QUICK: "true", TESTS: "failure" }))).toBe(true);
+    expect(red(fast({ QUICK: "true", TESTS: "success", TYPECHECK: "failure" }))).toBe(true);
+  });
+});
+
+/**
+ * ADVISORY FAST TIER (owner, card 2026-11-18): on a PR without `release` /
+ * `ready-to-merge` no job concludes `failure`; the full tier still fails hard.
+ */
+describe("the advisory fast tier", () => {
+  const FAST_COE = "${{ steps.tier.outputs.full == 'false' }}";
+  // Steps whose red never failed the job (`continue-on-error: true` before
+  // this rule), and the lock step, which the lock-coherence job reports.
+  const ALWAYS = new Set(["true", "${{ github.job == 'prepare-head' }}"]);
+
+  test("every prepare-head step after the tier is continue-on-error on the fast tier only", () => {
+    const after = head.slice(1, -1);
+    expect(after.length).toBeGreaterThan(40);
+    for (const s of after) {
+      const coe = String(s["continue-on-error"] ?? "");
+      expect(coe === FAST_COE || ALWAYS.has(coe), `${s.id ?? s.name}: ${coe}`).toBe(true);
+    }
+    // The tier step itself and the verdict are never continue-on-error.
+    expect(head[0]!["continue-on-error"]).toBeUndefined();
+    expect(byName(FAST)["continue-on-error"]).toBeUndefined();
+  });
+
+  test("a fast-tier step that can go red has an id, so the verdict can name it", () => {
+    for (const s of head.slice(1, -1)) {
+      if (String(s["continue-on-error"]) === FAST_COE) expect(s.id, s.name ?? s.uses).toBeTruthy();
+    }
+    expect(byName(FAST).env?.STEPS).toBe("${{ toJSON(steps) }}");
+    expect(jobs["prepare-head"]!.outputs!["fast-verdict"]).toBe("${{ steps.fast-verdict.outputs.verdict }}");
+  });
+
+  test("the expression is false outside prepare-head's fast tier: the full tier and every other job fail hard", () => {
+    // Only prepare-head has a `tier` step, so in prepare-base, run and the
+    // shards (which share these steps as YAML aliases) it is never true.
+    for (const [name, job] of Object.entries(jobs)) {
+      if (name === "prepare-head") continue;
+      expect((job.steps ?? []).some((s) => s.id === "tier"), name).toBe(false);
+    }
+    // compare (the full-tier judge) has no continue-on-error at all.
+    for (const s of jobs.compare!.steps ?? []) expect(String(s["continue-on-error"] ?? "")).not.toBe(FAST_COE);
+  });
+
+  test("layers-ref waits for the tier and is a warning on the fast tier only", () => {
+    const j = jobs["layers-ref"]!;
+    expect(j.needs).toEqual(["prepare-head"]);
+    expect(j.if).toContain("!cancelled()");
+    const step = j.steps!.find((s) => s.name === "Is this lock's layers ref published?")!;
+    expect(step.env?.ADVISORY).toBe("${{ needs.prepare-head.outputs.full == 'false' }}");
+    expect(step.run).toContain('if [ "$ADVISORY" = "true" ]');
+    expect(step.run).toContain('echo "::error::$msg"');
   });
 });

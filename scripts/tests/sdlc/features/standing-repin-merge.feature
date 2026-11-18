@@ -38,3 +38,29 @@ Feature: Standing repin leaves the merge to the merge manager
     When the step runs for a schedule event
     Then the step fails
     And no call asks for "--auto"
+
+  @test:scripts/tests/sdlc/standing-repin-merge.test.ts::standing_repin_creates_the_needs-repin_label_where_the_repository_has_none_(owner,_card_2026-11-18)::a_repository_without_the_label_gets_it_created,_before_the_PR_is_labelled
+  Scenario: A repository without the needs-repin label gets it created before the PR is labelled
+    Given a repository whose labels do not include "needs-repin"
+    When the PR step runs
+    Then it creates "needs-repin" with a colour and a description
+    And then labels the PR "needs-repin", and the run passes
+
+  @test:scripts/tests/sdlc/standing-repin-merge.test.ts::standing_repin_creates_the_needs-repin_label_where_the_repository_has_none_(owner,_card_2026-11-18)::a_repository_that_has_the_label_is_left_as_it_is:_no_create,_no_--force
+  Scenario: A repository that has the label is left as it is
+    Given a repository that has "needs-repin"
+    When the PR step runs
+    Then it creates no label and labels the PR
+
+  @test:scripts/tests/sdlc/standing-repin-merge.test.ts::standing_repin_creates_the_needs-repin_label_where_the_repository_has_none_(owner,_card_2026-11-18)::the_create_is_idempotent:_a_refused_create_is_a_warning,_and_the_labelling_still_decides
+  Scenario: A refused create is a warning, and the labelling still decides
+    Given a repository without the label whose label create is refused
+    When the PR step runs
+    Then it never passes --force to a label command
+    And it still labels the PR, and the run passes
+
+  @test:scripts/tests/sdlc/standing-repin-merge.test.ts::standing_repin_creates_the_needs-repin_label_where_the_repository_has_none_(owner,_card_2026-11-18)::a_label_that_still_cannot_be_added_after_the_create_fails_the_run,_as_before
+  Scenario: A label that cannot be added after the create still fails the run
+    Given a repository without the label, where adding the label fails
+    When the PR step runs
+    Then the run fails
