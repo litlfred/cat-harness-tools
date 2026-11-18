@@ -31,7 +31,7 @@ import {
   sourceFor,
   type CandidateSourceAdapter,
 } from "../lib/translation-sources/index.ts";
-import { collectCandidates } from "../translation-candidates.ts";
+import { collectCandidates, main } from "../translation-candidates.ts";
 
 const PO = `# Spanish catalogue
 msgid ""
@@ -227,8 +227,8 @@ describe("mergeCandidates: the never-overwrite rule and the first-candidate fill
     expect(candidatesProblems(r.sidecar)).toEqual([]);
     const fuzzy = r.sidecar.entries.find((e) => e.msgid === "Already a machine guess")!;
     expect(fuzzy.candidates).toEqual([
-      { text: "ES:Already a machine guess", source: OPUS, msgidHash: msgidHash({ msgid: "Already a machine guess" }) },
-      { text: "AR:Already a machine guess", source: ARGOS, msgidHash: msgidHash({ msgid: "Already a machine guess" }) },
+      { text: "ES:Already a machine guess", source: OPUS, msgidHash: msgidHash({ msgid: "Already a machine guess" }), qa: { placeholders: { pass: true } } },
+      { text: "AR:Already a machine guess", source: ARGOS, msgidHash: msgidHash({ msgid: "Already a machine guess" }), qa: { placeholders: { pass: true } } },
     ]);
   });
 
@@ -350,8 +350,8 @@ describe("collectCandidates over a layer", () => {
     const side = JSON.parse(read(root, "es/start/a.candidates.json"));
     expect(candidatesProblems(side)).toEqual([]);
     expect(side.entries.find((e: { msgid: string }) => e.msgid === "Open {name} now").candidates).toEqual([
-      { text: "O:Open {name} now", source: { kind: "open-mt", id: "opus-en-es", at: "2026-11-14T12:00:00.000Z" }, msgidHash: msgidHash({ msgid: "Open {name} now" }) },
-      { text: "A:Open {name} now", source: { kind: "open-mt", id: "argos-en-es", at: "2026-11-14T12:00:00.000Z" }, msgidHash: msgidHash({ msgid: "Open {name} now" }) },
+      { text: "O:Open {name} now", source: { kind: "open-mt", id: "opus-en-es", at: "2026-11-14T12:00:00.000Z" }, msgidHash: msgidHash({ msgid: "Open {name} now" }), qa: { placeholders: { pass: true } } },
+      { text: "A:Open {name} now", source: { kind: "open-mt", id: "argos-en-es", at: "2026-11-14T12:00:00.000Z" }, msgidHash: msgidHash({ msgid: "Open {name} now" }), qa: { placeholders: { pass: true } } },
     ]);
     expect(read(root, "es/start/a.po")).toContain('#, fuzzy\nmsgid "Open {name} now"\nmsgstr "O:Open {name} now"');
     const node = JSON.parse(read(root, "es/start/a.json"));
@@ -464,5 +464,41 @@ describe("collectCandidates over a layer", () => {
     const node = JSON.parse(read(root, "pt-BR/start/a.json"));
     expect(node).toMatchObject({ label: "trans:pt-BR/start/a", locale: "pt-BR", status: { locale: "pt-BR", official: false, generatedBy: "web-service" } });
     expect(read(root, "pt-BR/start/a.po")).toContain('msgstr "Abrir {name} agora"');
+  });
+});
+
+describe("re-ranking and official texts (owner, 2026-11-18)", () => {
+  const CAT = '#: docs/a.md:1\nmsgid "Save"\nmsgstr ""\n\n#: docs/a.md:2\nmsgid "Open"\nmsgstr ""\n';
+  const at = "2026-11-18T12:00:00Z";
+  test("a better candidate replaces an earlier auto-pick on the next merge; the auto-pick is recorded as chosen", () => {
+    const first = mergeCandidates(CAT, emptySidecar("es", "a"), [{ msgid: "Save", text: "Salvar", source: OPUS }], { at });
+    expect(poEntries(first.po)[0]).toMatchObject({ msgstr: "Salvar", fuzzy: true });
+    expect(first.sidecar.entries[0]!.chosen).toEqual({ text: "Salvar", how: "auto", at, candidate: { kind: "open-mt", id: OPUS.id } });
+    const second = mergeCandidates(first.po, first.sidecar, [{ msgid: "Save", text: "Guardar", source: { kind: "human", id: "github:ana" } }], { at });
+    expect(poEntries(second.po)[0]).toMatchObject({ msgstr: "Guardar", fuzzy: true });
+  });
+  test("an adjudicated entry is never re-picked", () => {
+    const first = mergeCandidates(CAT, emptySidecar("es", "a"), [{ msgid: "Save", text: "Salvar", source: OPUS }], { at });
+    first.sidecar.entries[0]!.chosen = { text: "Salvar", how: "adjudicated", by: "github:col", at };
+    const second = mergeCandidates(first.po, first.sidecar, [{ msgid: "Save", text: "Guardar", source: { kind: "official", id: "who", }, sourceText: "Save" }], { at });
+    expect(poEntries(second.po)[0]!.msgstr).toBe("Salvar");
+  });
+  test("--source official records official candidates; an exact sourceText match is not fuzzy, a near one is", async () => {
+    const root = mkdtempSync(join(tmpdir(), "translation-official-"));
+    mkdirSync(join(root, "translations", "es"), { recursive: true });
+    writeFileSync(join(root, "translations", "es", "a.po"), CAT);
+    const from = join(root, "texts.json");
+    writeFileSync(from, JSON.stringify({ locale: "es", catalogue: "a", entries: [{ msgid: "Save", text: "Guardar", sourceText: "Save" }, { msgid: "Open", text: "Abrir", sourceText: "open" }] }));
+    const said: string[] = [];
+    const code = await main(["--instance", root, "--dir", join(root, "translations"), "--source", "official", "--id", "who-ehealth-glossary", "--version", "2024", "--from", from], { log: (s) => said.push(s) });
+    expect(code).toBe(0);
+    const po = readFileSync(join(root, "translations", "es", "a.po"), "utf-8");
+    expect(poEntries(po).find((e) => e.msgid === "Save")).toMatchObject({ msgstr: "Guardar", fuzzy: false });
+    expect(poEntries(po).find((e) => e.msgid === "Open")).toMatchObject({ msgstr: "Abrir", fuzzy: true });
+    const side = JSON.parse(readFileSync(join(root, "translations", "es", "a.candidates.json"), "utf-8"));
+    expect(side.entries[0].candidates[0]).toMatchObject({ text: "Guardar", sourceText: "Save", source: { kind: "official", id: "who-ehealth-glossary", version: "2024" } });
+    expect(side.entries.map((e: { chosen: { how: string } }) => e.chosen.how)).toEqual(["auto-official", "auto"]);
+    expect(said.join("\n")).toContain("2 official candidate(s) recorded from who-ehealth-glossary");
+    expect(await main(["--instance", root, "--dir", join(root, "translations"), "--source", "official", "--id", "x"])).toBe(2);
   });
 });

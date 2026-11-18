@@ -178,7 +178,7 @@ describe("pull: a platform's strings become candidates, never verdicts", () => {
     expect(find(r.po, "Hello").fuzzy).toBe(false);
     const e = r.candidates.entries.find((x) => x.msgid === "Hello")!;
     expect(e.candidates).toEqual([
-      { text: "Salut", source: { kind: "web-service", id: "crowdin", at: AT }, msgidHash: msgidHash({ msgid: "Hello" }), metadata: { platformState: "translated" } } as never,
+      { text: "Salut", source: { kind: "web-service", id: "crowdin", at: AT }, msgidHash: msgidHash({ msgid: "Hello" }), qa: { placeholders: { pass: true } }, metadata: { platformState: "translated" } } as never,
     ]);
     expect(candidatesProblems(r.candidates)).toEqual([]);
   });

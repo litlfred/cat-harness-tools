@@ -10,8 +10,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { msgidHash, poEntries, poHash, type Candidate, type CandidatesEntry, type CandidatesFile } from "../lib/translation-adjudication.ts";
+import { candidatesProblems, msgidHash, poEntries, poHash, type Candidate, type CandidatesEntry, type CandidatesFile } from "../lib/translation-adjudication.ts";
 import {
+  applyAutoPick,
+  autoPickOf,
   defaultPick,
   entryFor,
   pickTier,
@@ -26,10 +28,11 @@ import { publishTranslationReview } from "../publish-translation-review.ts";
 
 const H = msgidHash({ msgid: "Save" });
 const c = (text: string, kind: Candidate["source"]["kind"], id: string, extra: Partial<Candidate> = {}): Candidate => ({ text, source: { kind, id }, msgidHash: H, ...extra });
-const entry = (candidates: Candidate[], adjudications?: CandidatesEntry["adjudications"]): CandidatesEntry => ({ msgid: "Save", candidates, ...(adjudications ? { adjudications } : {}) });
+const entry = (candidates: Candidate[], chosen?: CandidatesEntry["chosen"]): CandidatesEntry => ({ msgid: "Save", candidates, ...(chosen ? { chosen } : {}) });
+const SAVE = { msgid: "Save" };
 
-describe("the default pick (owner, 2026-11-18: official > human-adjudicated > human-proposed > agent > MT)", () => {
-  test("tiers, whatever order the candidates were recorded in", () => {
+describe("the auto-pick (owner, 2026-11-18: official 0, adjudicated 1, human 2, platform 3, agent 4, MT 5; +10 for a QA fail)", () => {
+  test("rank order, whatever order the candidates were recorded in", () => {
     const e = entry([
       c("MT", "open-mt", "opus-mt-en-fr"),
       c("Svc", "web-service", "deepl"),
@@ -38,54 +41,95 @@ describe("the default pick (owner, 2026-11-18: official > human-adjudicated > hu
       c("Person", "human", "github:ana"),
       c("Official", "official", "who-glossary"),
     ]);
-    expect(rankCandidates(e, H).map((r) => `${r.candidate.text}:${r.tier}`)).toEqual([
-      "Official:official",
-      "Weblate:human-proposed",
-      "Person:human-proposed",
-      "Agent:agent",
-      "MT:mt",
-      "Svc:mt",
+    expect(rankCandidates(e, H).map((r) => `${r.candidate.text}:${r.tier}:${r.score}`)).toEqual([
+      "Official:official:0",
+      "Person:human-proposed:2",
+      "Weblate:platform:3",
+      "Agent:agent:4",
+      "MT:mt:5",
+      "Svc:mt:5",
     ]);
-    // A text a collaborator once chose ranks as human-adjudicated, above proposals.
-    expect(pickTier(c("Agent", "agent", "x"), new Set(["Agent"]))).toBe("human-adjudicated");
+    // The text a collaborator chose ranks as adjudicated.
+    expect(pickTier(c("Agent", "agent", "x"), "Agent")).toBe("human-adjudicated");
   });
-  test("a QA failure demotes below every clean candidate; a stale one goes last", () => {
+  test("a QA failure adds 10; a check not run is not a failure", () => {
     const e = entry([
-      c("Person, wrong term", "human", "github:ana", { qa: { glossary: { missing: ["immunization"], checked: ["immunization"] } } }),
-      c("Agent, low round trip", "agent", "a", { qa: { roundTrip: { score: 0.4, back: "x" } } }),
-      c("Old human", "human", "github:bo", { msgidHash: "0000000000000000" }),
-      c("MT, clean", "open-mt", "opus", { qa: { roundTrip: { score: 0.95 } } }),
+      c("Person, wrong term", "human", "github:ana", { qa: { glossary: { pass: false, missing: ["immunization"] } } }),
+      c("MT, clean", "open-mt", "opus", { qa: { roundtrip: { score: 0.95, threshold: 0.7, pass: true } } }),
+      c("Agent, bad placeholders", "agent", "a", { qa: { placeholders: { pass: false } } }),
+      c("MT, no QA run", "open-mt", "argos"),
     ]);
-    expect(rankCandidates(e, H).map((r) => r.candidate.text)).toEqual(["MT, clean", "Person, wrong term", "Agent, low round trip", "Old human"]);
+    const r = rankCandidates(e, H);
+    expect(r.map((x) => `${x.candidate.text}:${x.score}`)).toEqual(["MT, clean:5", "MT, no QA run:5", "Person, wrong term:12", "Agent, bad placeholders:14"]);
     expect(qaFailures(e.candidates[0]!)).toEqual([expect.stringContaining("immunization")]);
-    expect(qaFailures(e.candidates[1]!)).toEqual([expect.stringContaining("round trip 0.40")]);
+    expect(qaFailures({ qa: { roundtrip: { score: 0.4, threshold: 0.7, pass: false } } })).toEqual([expect.stringContaining("round trip 0.40")]);
   });
-  test("a current adjudication is the pick; otherwise the top candidate, always unofficial", () => {
+  test("ties go to the newest; a stale candidate is listed last and never auto-picked", () => {
+    const e = entry([
+      c("Old", "human", "github:a", { source: { kind: "human", id: "github:a", at: "2026-11-01T00:00:00Z" } }),
+      c("New", "human", "github:b", { source: { kind: "human", id: "github:b", at: "2026-11-17T00:00:00Z" } }),
+      c("Stale official", "official", "who", { msgidHash: "0000000000000000" }),
+    ]);
+    expect(rankCandidates(e, H).map((r) => r.candidate.text)).toEqual(["New", "Old", "Stale official"]);
+    expect(autoPickOf(e, H)!.candidate.text).toBe("New");
+    expect(autoPickOf(entry([e.candidates[2]!]), H)).toBeUndefined();
+  });
+  test("a collaborator's choice is the pick; otherwise the auto-pick, unofficial unless an exact official match", () => {
     const e = entry([c("A", "agent", "a"), c("B", "human", "github:b")]);
-    expect(defaultPick(e, H)).toEqual({ kind: "auto", text: "B", index: 1, tier: "human-proposed", unofficial: true });
-    const adj = { by: "github:col", at: "2026-11-18T00:00:00Z", issue: "https://github.com/o/r/issues/1", text: "A", chose: { kind: "agent" as const, id: "a" }, msgidHash: H };
-    expect(defaultPick(entry(e.candidates, [adj]), H)).toMatchObject({ kind: "adjudicated", text: "A" });
-    // An adjudication of an older source text is not current: back to the ranking, where its text now ranks human-adjudicated.
-    expect(defaultPick(entry(e.candidates, [{ ...adj, msgidHash: "0000000000000000" }]), H)).toMatchObject({ kind: "auto", text: "A", tier: "human-adjudicated" });
-    expect(defaultPick(undefined, H)).toBeUndefined();
+    expect(defaultPick(e, SAVE)).toEqual({ kind: "auto", text: "B", index: 1, tier: "human-proposed", official: false, unofficial: true });
+    const chosen = { text: "A", how: "adjudicated" as const, by: "github:col", at: "2026-11-18T00:00:00Z", issue: 1, candidate: { kind: "agent" as const, id: "a" } };
+    expect(defaultPick(entry(e.candidates, chosen), SAVE)).toMatchObject({ kind: "adjudicated", text: "A" });
+    expect(defaultPick(entry([c("Enregistrer", "official", "who", { sourceText: "Save" })]), SAVE)).toMatchObject({ official: true, unofficial: false });
+    expect(defaultPick(undefined, SAVE)).toBeUndefined();
+  });
+});
+
+describe("applying the auto-pick to a catalogue", () => {
+  const po = (msgstr: string, flags = "") => `${flags}msgid "Save"\nmsgstr "${msgstr}"\n`;
+  const at = "2026-11-18T12:00:00Z";
+  const one = (text: string) => poEntries(text)[0]!;
+  test("an exact official match is written without fuzzy, as auto-official", () => {
+    const e = entry([c("Enregistrer", "official", "who-glossary", { sourceText: "Save" }), c("Sauver", "agent", "a")]);
+    const r = applyAutoPick(po(""), e, one(po("")), at)!;
+    expect(one(r.po)).toMatchObject({ msgstr: "Enregistrer", fuzzy: false });
+    expect(r.chosen).toEqual({ text: "Enregistrer", how: "auto-official", at, candidate: { kind: "official", id: "who-glossary" } });
+  });
+  test("a near match (case, whitespace, punctuation, other wording) or no sourceText is fuzzy and auto", () => {
+    for (const sourceText of ["save", "Save ", "Save.", "Store", undefined]) {
+      const e = entry([c("Enregistrer", "official", "who", sourceText === undefined ? {} : { sourceText })]);
+      const r = applyAutoPick(po(""), e, one(po("")), at)!;
+      expect(one(r.po)).toMatchObject({ msgstr: "Enregistrer", fuzzy: true });
+      expect(r.chosen.how).toBe("auto");
+    }
+  });
+  test("a better candidate replaces an earlier auto-pick; an adjudicated entry is never re-picked; other text is left alone", () => {
+    const first = applyAutoPick(po(""), entry([c("Sauver", "agent", "a")]), one(po("")), at)!;
+    const e = entry([c("Sauver", "agent", "a"), c("Enregistrer", "human", "github:ana")], first.chosen);
+    const better = applyAutoPick(first.po, e, one(first.po), at)!;
+    expect(one(better.po)).toMatchObject({ msgstr: "Enregistrer", fuzzy: true });
+    const adjudicated = entry(e.candidates, { text: "Sauver", how: "adjudicated", by: "github:col", at });
+    expect(applyAutoPick(po("Sauver"), adjudicated, one(po("Sauver")), at)).toBeUndefined();
+    expect(applyAutoPick(po("Garder"), e, one(po("Garder")), at)).toBeUndefined();
   });
 });
 
 describe("a string's status", () => {
   const po = (msgstr: string, flags = "") => poEntries(`${flags}msgid "Save"\nmsgstr "${msgstr}"\n`)[0]!;
   test("every status the ruling lists, and unattributed when nothing records provenance", () => {
-    const adj = { by: "github:col", at: "t", issue: "https://github.com/o/r/issues/1", text: "Enregistrer", chose: "own-text" as const, msgidHash: H };
-    const e = entry([c("Sauver", "agent", "a"), c("Sauvegarder", "open-mt", "m"), c("Garder", "human", "github:x"), c("Officiel", "official", "who")], [adj]);
+    const chosen = { text: "Enregistrer", how: "adjudicated" as const, by: "github:col", at: "t", issue: 1 };
+    const e = entry([c("Sauver", "agent", "a"), c("Sauvegarder", "open-mt", "m"), c("Garder", "human", "github:x"), c("Officiel", "official", "who")], chosen);
     expect(stringStatus(po(""), e, H)).toBe("missing");
     expect(stringStatus(po("Enregistrer"), e, H)).toBe("adjudicated");
-    expect(stringStatus(po("Enregistrer"), entry([], [{ ...adj, msgidHash: "0000000000000000" }]), H)).toBe("stale");
     expect(stringStatus(po("Sauver", "#, fuzzy\n"), e, H)).toBe("agent");
     expect(stringStatus(po("Sauvegarder", "#, fuzzy\n"), e, H)).toBe("mt");
     expect(stringStatus(po("Garder", "#, fuzzy\n"), e, H)).toBe("proposed");
-    expect(stringStatus(po("Officiel"), e, H)).toBe("official");
+    // An official text that was not an exact match is a proposal until chosen; an auto-official one is official.
+    expect(stringStatus(po("Officiel", "#, fuzzy\n"), e, H)).toBe("proposed");
+    expect(stringStatus(po("Officiel"), entry(e.candidates, { text: "Officiel", how: "auto-official", at: "t" }), H)).toBe("official");
     expect(stringStatus(po("Texte"), undefined, H, { officialCatalogue: true })).toBe("official");
     expect(stringStatus(po("Texte"), undefined, H, { generatedBy: "agent" })).toBe("agent");
     expect(stringStatus(po("Texte"), undefined, H)).toBe("unattributed");
+    expect(stringStatus(po("Vieux"), entry([c("Vieux", "agent", "a", { msgidHash: "0000000000000000" })]), H)).toBe("stale");
     expect(stringStatus(poEntries('#, fuzzy\n#| msgid "Sav"\nmsgid "Save"\nmsgstr "Sauver"\n')[0]!, e, H)).toBe("stale");
     expect(STRING_STATUSES).toEqual(["official", "adjudicated", "proposed", "agent", "mt", "missing", "stale", "unattributed"]);
   });
@@ -95,6 +139,22 @@ describe("a string's status", () => {
     const found = entryFor(side, e);
     expect(found.previous).toBe(true);
     expect(rankCandidates(found.entry, msgidHash(e))[0]!.stale).toBe(true);
+  });
+});
+
+describe("the candidates schema accepts the new fields and rejects bad ones", () => {
+  const file = (cand: object, chosen?: object) => ({ $schema: "translation-candidates/v1", locale: "fr", catalogue: "c", entries: [{ msgid: "Save", candidates: [cand], ...(chosen ? { chosen } : {}) }] });
+  test("accepts", () => {
+    expect(candidatesProblems(file(
+      { text: "Enregistrer", source: { kind: "official", id: "who", version: "2024", at: "2026-11-18T00:00:00Z", by: "github:ana", issue: 12 }, msgidHash: H, sourceText: "Save", qa: { glossary: { pass: true }, placeholders: { pass: true }, roundtrip: { score: 0.9, threshold: 0.7, pass: true, engine: "opus" }, at: "t" } },
+      { text: "Enregistrer", how: "adjudicated", by: "github:ana", at: "t", issue: 12, reason: "glossary term", candidate: { kind: "official", id: "who" } },
+    ))).toEqual([]);
+  });
+  test("rejects", () => {
+    expect(candidatesProblems(file({ text: "x", source: { kind: "human", id: "github:a", issue: "https://x" } }))).toEqual([expect.stringContaining("issue must be an issue number")]);
+    expect(candidatesProblems(file({ text: "x", source: { kind: "agent", id: "a" }, qa: { roundtrip: { score: 2 } } }))).toEqual([expect.stringContaining("roundtrip")]);
+    expect(candidatesProblems(file({ text: "x", source: { kind: "agent", id: "a" } }, { text: "x", how: "decreed", at: "t" }))).toEqual([expect.stringContaining("how must be one of")]);
+    expect(candidatesProblems(file({ text: "x", source: { kind: "agent", id: "a" } }, { text: "x", how: "adjudicated", at: "t" }))).toEqual([expect.stringContaining("by must be github:<login>")]);
   });
 });
 
@@ -111,7 +171,7 @@ const SIDE: CandidatesFile = {
       msgid: "Save",
       candidates: [
         { text: "Sauver", source: { kind: "agent", id: "claude-opus-5-5", at: "2026-11-14T10:00:00Z" }, msgidHash: msgidHash({ msgctxt: "button", msgid: "Save" }) },
-        { text: "Enregistrer", source: { kind: "human", id: "github:ana", issue: "https://github.com/o/r/issues/3" }, msgidHash: msgidHash({ msgctxt: "button", msgid: "Save" }), qa: { roundTrip: { score: 0.9 } } },
+        { text: "Enregistrer", source: { kind: "human", id: "github:ana", issue: 3 }, msgidHash: msgidHash({ msgctxt: "button", msgid: "Save" }), qa: { roundtrip: { score: 0.9, threshold: 0.7, pass: true } } },
       ],
     },
   ],
@@ -134,7 +194,7 @@ describe("the strings projection", () => {
       ["Enregistrer", "human-proposed", false, false],
       ["Sauver", "agent", true, false],
     ]);
-    expect(fr.candidates[0]!.source.issue).toBe("https://github.com/o/r/issues/3");
+    expect(fr.candidates[0]!.source.issue).toBe(3);
     expect(p.strings.find((s) => s.msgid === "Hello")!.locales.fr).toMatchObject({ text: "Bonjour", status: "agent" });
   });
 

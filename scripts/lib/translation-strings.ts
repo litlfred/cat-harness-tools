@@ -13,25 +13,28 @@
  *      (`translation-candidates/v1`); the pane offers each with its
  *      provenance — source and version, date, author, the source-string hash
  *      (so a stale one shows), and QA results.
- *   3. Collaborators adjudicate (`StringAdjudication` in the sidecar).
- *   4. When nobody has adjudicated, the default pick is ranked
- *      {@link PICK_TIERS}: official > human-adjudicated > human-proposed >
- *      agent > MT, a candidate failing QA after every clean one, a stale one
- *      last. An auto-pick is always `unofficial`.
+ *   3. Collaborators adjudicate (the entry's `chosen`, `how: "adjudicated"`).
+ *   4. When nobody has adjudicated, the auto-pick is ranked {@link PICK_TIERS}:
+ *      official 0, adjudicated 1, human 2, translation platform 3, agent 4,
+ *      MT 5, plus {@link QA_PENALTY} for a QA failure; ties to the newest; a
+ *      stale candidate is never picked. An auto-pick is fuzzy and unofficial,
+ *      except an official candidate whose source English matches the msgid
+ *      exactly (owner amendment, 2026-11-18), which is `auto-official`.
  *
  * This module is pure: it reads text it is given. The projection a site
  * publishes ({@link stringsProjection}) is what the pane reads, so the pane
  * restates none of these rules beyond drawing what it is told.
  */
 import {
+  applyAdjudication,
+  applySuggestion,
   msgidHash,
   poEntries,
   type Candidate,
-  type CandidateSource,
   type CandidatesEntry,
   type CandidatesFile,
+  type Chosen,
   type PoEntry,
-  type StringAdjudication,
 } from "./translation-adjudication.ts";
 
 /** The translation platforms whose strings people translate (`translation-sources/platforms.ts` PLATFORMS). */
@@ -43,7 +46,7 @@ const PLATFORM_IDS: readonly string[] = ["weblate", "crowdin", "transifex"];
  *
  * | status        | the `msgstr` the page shows …                                              |
  * |---------------|-----------------------------------------------------------------------------|
- * | `official`    | is in a catalogue signed off as official, or is an `official` source's text |
+ * | `official`    | is in a catalogue signed off as official, or an exact-match official text   |
  * | `adjudicated` | is what a collaborator chose, for the source text as it is now              |
  * | `proposed`    | is a person's proposal (an issue, a translation platform) nobody adjudicated |
  * | `agent`       | is an agent model's candidate                                               |
@@ -55,81 +58,118 @@ const PLATFORM_IDS: readonly string[] = ["weblate", "crowdin", "transifex"];
 export const STRING_STATUSES = ["official", "adjudicated", "proposed", "agent", "mt", "missing", "stale", "unattributed"] as const;
 export type StringStatus = (typeof STRING_STATUSES)[number];
 
-/** The default pick's order, best first (ruling 4, accepted by the owner 2026-11-18). */
-export const PICK_TIERS = ["official", "human-adjudicated", "human-proposed", "agent", "mt"] as const;
+/**
+ * The auto-pick's rank, best first (owner, 2026-11-18): official 0,
+ * adjudicated 1, human 2, translation platform (Weblate, Crowdin, Transifex)
+ * 3, agent 4, MT 5. A QA failure adds {@link QA_PENALTY}.
+ */
+export const PICK_TIERS = ["official", "human-adjudicated", "human-proposed", "platform", "agent", "mt"] as const;
 export type PickTier = (typeof PICK_TIERS)[number];
+export const QA_PENALTY = 10;
 
-/** A round trip scoring below this fails QA. */
-export const ROUND_TRIP_MIN = 0.7;
-
-const sameSource = (a: CandidateSource, b: CandidateSource) => a.kind === b.kind && a.id === b.id;
-
-/** The tier of one candidate. `adjudicatedTexts` are texts a collaborator once chose for this string. */
-export function pickTier(c: Pick<Candidate, "text" | "source">, adjudicatedTexts: ReadonlySet<string> = new Set()): PickTier {
+/** The tier of one candidate. `chosenText` is what a collaborator chose for this string, if anyone did. */
+export function pickTier(c: Pick<Candidate, "text" | "source">, chosenText?: string): PickTier {
   const k = c.source.kind;
   if (k === "official") return "official";
-  const byPerson = k === "human" || (k === "web-service" && PLATFORM_IDS.includes(c.source.id.toLowerCase()));
-  if (adjudicatedTexts.has(c.text)) return "human-adjudicated";
-  if (byPerson) return "human-proposed";
+  if (chosenText !== undefined && c.text === chosenText) return "human-adjudicated";
+  if (k === "human") return "human-proposed";
+  if (k === "web-service" && PLATFORM_IDS.includes(c.source.id.toLowerCase())) return "platform";
   if (k === "agent") return "agent";
   return "mt";
 }
 
-/** What a candidate's QA results say is wrong with it; empty when it passes, or carries none. */
+/** What a candidate's QA results say failed; empty when it passes, or carries none (a check not run is not a failure). */
 export function qaFailures(c: Pick<Candidate, "qa">): string[] {
   const out: string[] = [];
-  const g = c.qa?.glossary;
-  if (g && g.missing.length > 0) out.push(`glossary: ${g.missing.join(", ")} not translated as the glossary fixes`);
-  const r = c.qa?.roundTrip;
-  if (r && r.score < ROUND_TRIP_MIN) out.push(`round trip ${r.score.toFixed(2)} < ${ROUND_TRIP_MIN}`);
+  const q = c.qa;
+  if (q?.glossary && !q.glossary.pass) out.push(`glossary: ${(q.glossary.missing ?? []).join(", ") || "terms"} not translated as the glossary fixes`);
+  if (q?.placeholders && !q.placeholders.pass) out.push("placeholders do not round-trip");
+  if (q?.roundtrip && !q.roundtrip.pass) out.push(`round trip ${q.roundtrip.score.toFixed(2)} < ${q.roundtrip.threshold}`);
   return out;
 }
 
-/** Whether a candidate or adjudication was made for another source text than `hash`. */
+/** Whether a candidate was made for another source text than `hash`. */
 export const isStale = (x: { msgidHash?: string }, hash: string): boolean => x.msgidHash !== undefined && x.msgidHash !== hash;
 
-/** One candidate as ranked: its index in the sidecar, tier, QA and staleness. */
+/** One candidate as ranked: its index in the sidecar, tier, score, QA and staleness. */
 export interface RankedCandidate {
   index: number;
   candidate: Candidate;
   tier: PickTier;
+  /** Tier index, plus {@link QA_PENALTY} for a QA failure. Lower is better. */
+  score: number;
   qaFailures: string[];
   stale: boolean;
 }
 
 /**
- * Rank a string's candidates for the default pick: clean candidates by tier
- * first, then those failing QA (by tier), then stale ones (by tier). A QA
- * failure demotes a candidate below every clean one, not only within its tier.
- * Ties keep the order they were recorded in. `hash` is the string's
+ * Rank a string's candidates: by score; ties to the newest `source.at`, then
+ * the order recorded. Stale candidates are listed after every other one and
+ * are never the auto-pick ({@link autoPickOf}). `hash` is the string's
  * {@link msgidHash} now.
  */
-export function rankCandidates(entry: Pick<CandidatesEntry, "candidates" | "adjudications"> | undefined, hash: string, accept: (c: Candidate) => boolean = () => true): RankedCandidate[] {
+export function rankCandidates(entry: Pick<CandidatesEntry, "candidates" | "chosen"> | undefined, hash: string, accept: (c: Candidate) => boolean = () => true): RankedCandidate[] {
   if (!entry) return [];
-  const chosen = new Set((entry.adjudications ?? []).map((a) => a.text));
+  const chosenText = entry.chosen?.how === "adjudicated" ? entry.chosen.text : undefined;
   const ranked = entry.candidates
-    .map((candidate, index) => ({ index, candidate, tier: pickTier(candidate, chosen), qaFailures: qaFailures(candidate), stale: isStale(candidate, hash) }))
+    .map((candidate, index) => {
+      const tier = pickTier(candidate, chosenText);
+      const qa = qaFailures(candidate);
+      return { index, candidate, tier, score: PICK_TIERS.indexOf(tier) + (qa.length > 0 ? QA_PENALTY : 0), qaFailures: qa, stale: isStale(candidate, hash) };
+    })
     .filter((r) => accept(r.candidate));
-  const band = (r: RankedCandidate) => (r.stale ? 2 : r.qaFailures.length > 0 ? 1 : 0);
-  return ranked.sort((a, b) => band(a) - band(b) || PICK_TIERS.indexOf(a.tier) - PICK_TIERS.indexOf(b.tier) || a.index - b.index);
+  const at = (r: RankedCandidate) => r.candidate.source.at ?? "";
+  return ranked.sort((a, b) => Number(a.stale) - Number(b.stale) || a.score - b.score || at(b).localeCompare(at(a)) || a.index - b.index);
 }
 
-/** The string's current adjudication: the last one, when its source text is still the string's. */
-export function currentAdjudication(entry: Pick<CandidatesEntry, "adjudications"> | undefined, hash: string): StringAdjudication | undefined {
-  const last = entry?.adjudications?.[entry.adjudications.length - 1];
-  return last && !isStale(last, hash) ? last : undefined;
+/** The auto-pick: the best-ranked candidate that is not stale. */
+export function autoPickOf(entry: Pick<CandidatesEntry, "candidates" | "chosen"> | undefined, hash: string, accept?: (c: Candidate) => boolean): RankedCandidate | undefined {
+  return rankCandidates(entry, hash, accept).find((r) => !r.stale);
 }
 
-/** The default pick: the current adjudication when there is one, else the best-ranked candidate, labelled unofficial. */
+/**
+ * Whether an official candidate's auto-pick is official: only when it names
+ * its source English and that English is the entry's msgid exactly (owner
+ * amendment, 2026-11-18). Whitespace, case or punctuation differences are not
+ * a match.
+ */
+export const exactOfficial = (c: Candidate, e: { msgid: string }): boolean => c.source.kind === "official" && c.sourceText !== undefined && c.sourceText === e.msgid;
+
+/** The default pick: the collaborator's choice when there is one, else the auto-pick. */
 export type DefaultPick =
-  | { kind: "adjudicated"; text: string; adjudication: StringAdjudication }
-  | { kind: "auto"; text: string; index: number; tier: PickTier; unofficial: true };
+  | { kind: "adjudicated"; text: string; chosen: Chosen }
+  | { kind: "auto"; text: string; index: number; tier: PickTier; official: boolean; unofficial: boolean };
 
-export function defaultPick(entry: CandidatesEntry | undefined, hash: string): DefaultPick | undefined {
-  const adj = currentAdjudication(entry, hash);
-  if (adj) return { kind: "adjudicated", text: adj.text, adjudication: adj };
-  const top = rankCandidates(entry, hash)[0];
-  return top ? { kind: "auto", text: top.candidate.text, index: top.index, tier: top.tier, unofficial: true } : undefined;
+export function defaultPick(entry: CandidatesEntry | undefined, e: { msgid: string; msgctxt?: string; msgidPlural?: string }): DefaultPick | undefined {
+  if (entry?.chosen?.how === "adjudicated") return { kind: "adjudicated", text: entry.chosen.text, chosen: entry.chosen };
+  const top = autoPickOf(entry, msgidHash(e));
+  if (!top) return undefined;
+  const official = exactOfficial(top.candidate, e);
+  return { kind: "auto", text: top.candidate.text, index: top.index, tier: top.tier, official, unofficial: !official };
+}
+
+/**
+ * Apply the auto-pick to one singular entry of a catalogue, in memory: the
+ * `msgstr` changes only when it is empty or is itself an earlier auto-pick,
+ * never over a collaborator's choice or text whose provenance is not an
+ * auto-pick. An exact-match official candidate is written without `fuzzy`
+ * (`auto-official`); any other is fuzzy and unofficial (`auto`). Returns the
+ * new catalogue and the entry's new `chosen`, or `undefined` for no change.
+ */
+export function applyAutoPick(po: string, entry: CandidatesEntry | undefined, e: PoEntry, at: string, accept?: (c: Candidate) => boolean): { po: string; chosen: Chosen; source: Candidate["source"] } | undefined {
+  if (!entry || e.msgidPlural !== undefined) return undefined;
+  if (entry.chosen?.how === "adjudicated") return undefined;
+  const auto = entry.chosen !== undefined && entry.chosen.text === e.msgstr;
+  if (e.msgstr !== "" && !auto) return undefined;
+  const top = autoPickOf(entry, msgidHash(e), accept);
+  if (!top) return undefined;
+  const c = top.candidate;
+  const how = exactOfficial(c, e) ? "auto-official" : "auto";
+  if (c.text === e.msgstr && entry.chosen?.how === how) return undefined;
+  const ctx = e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {};
+  const r = how === "auto-official" ? applyAdjudication(po, { ...ctx, msgid: e.msgid, current: e.msgstr, suggested: c.text }) : applySuggestion(po, { ...ctx, msgid: e.msgid, current: e.msgstr, suggested: c.text });
+  if ("refused" in r) return undefined;
+  return { po: r.text, chosen: { text: c.text, how, at, candidate: { kind: c.source.kind, id: c.source.id } }, source: c.source };
 }
 
 const keyOf = (msgctxt: string | undefined, msgid: string) => `${msgctxt ?? ""}\u0004${msgid}`;
@@ -163,14 +203,15 @@ export function stringStatus(
 ): StringStatus {
   if (e.forms.every((f) => f === "")) return "missing";
   if (e.previousMsgid !== undefined || o.foundUnderPrevious) return "stale";
-  const last = entry?.adjudications?.[entry.adjudications.length - 1];
-  if (last && last.text === e.msgstr) return isStale(last, hash) ? "stale" : "adjudicated";
+  const chosen = entry?.chosen && entry.chosen.text === e.msgstr ? entry.chosen : undefined;
+  if (chosen?.how === "adjudicated") return "adjudicated";
+  if (chosen?.how === "auto-official" && !e.fuzzy) return "official";
   if (o.officialCatalogue && !e.fuzzy) return "official";
   const matching = (entry?.candidates ?? []).filter((c) => c.text === e.msgstr);
-  if (matching.some((c) => isStale(c, hash)) && !matching.some((c) => !isStale(c, hash))) return "stale";
-  const tiers = matching.map((c) => pickTier(c));
-  if (tiers.includes("official")) return "official";
-  if (tiers.includes("human-proposed")) return "proposed";
+  if (matching.length > 0 && matching.every((c) => isStale(c, hash))) return "stale";
+  const tiers = matching.filter((c) => !isStale(c, hash)).map((c) => pickTier(c));
+  // An official text that is not an exact match is a proposal until a collaborator chooses it.
+  if (tiers.some((t) => t === "official" || t === "human-proposed" || t === "platform")) return "proposed";
   if (tiers.includes("agent")) return "agent";
   if (tiers.includes("mt")) return "mt";
   const g = (o.generatedBy ?? "").toLowerCase();
@@ -188,7 +229,11 @@ export const TRANSLATION_STRINGS_SCHEMA = "folio-translation-strings/v1" as cons
 /** One candidate as the pane shows it. */
 export interface ProjectedCandidate extends Candidate {
   tier: PickTier;
+  /** {@link RankedCandidate.score}. */
+  score: number;
   stale: boolean;
+  /** For an official candidate: whether its source English matches the msgid exactly. */
+  exactMatch?: boolean;
   qaFailures: string[];
   /** Its text is what the catalogue says now. */
   current: boolean;
@@ -200,10 +245,10 @@ export interface ProjectedLocaleString {
   forms?: string[];
   status: StringStatus;
   fuzzy: boolean;
-  /** The current adjudication, when there is one. */
-  adjudication?: StringAdjudication;
-  /** The default pick (ruling 4) when no collaborator has adjudicated: `unofficial` always. */
-  pick?: { text: string; candidate: number; tier: PickTier; unofficial: true };
+  /** How the text came to be what it is, when the sidecar records it. */
+  chosen?: Chosen;
+  /** The auto-pick when no collaborator has chosen: unofficial unless an exact official match. */
+  pick?: { text: string; candidate: number; tier: PickTier; unofficial: boolean };
   /** Best-ranked first. */
   candidates: ProjectedCandidate[];
 }
@@ -263,23 +308,27 @@ export function stringsProjection(meta: { layer: string; repository?: string; tr
       strings.set(key, s);
       const found = entryFor(l.sidecar, e);
       const ranked = rankCandidates(found.entry, hash);
-      const adj = currentAdjudication(found.entry, hash);
-      const pick = adj ? undefined : ranked[0];
+      const chosen = found.entry?.chosen;
+      const pickIx = chosen?.how === "adjudicated" || found.previous ? -1 : ranked.findIndex((r) => !r.stale);
+      const pick = pickIx >= 0 ? ranked[pickIx]! : undefined;
       s.locales[locale] = {
         text: e.msgstr,
         ...(e.msgidPlural !== undefined ? { forms: e.forms } : {}),
         status: stringStatus(e, found.entry, hash, { officialCatalogue: l.officialCatalogue, generatedBy: l.generatedBy, foundUnderPrevious: found.previous }),
         fuzzy: e.fuzzy,
-        ...(adj ? { adjudication: adj } : {}),
-        ...(pick ? { pick: { text: pick.candidate.text, candidate: 0, tier: pick.tier, unofficial: true as const } } : {}),
-        candidates: ranked.map((r) => ({ ...r.candidate, tier: r.tier, stale: r.stale || found.previous, qaFailures: r.qaFailures, current: r.candidate.text === e.msgstr })),
+        ...(chosen ? { chosen } : {}),
+        ...(pick ? { pick: { text: pick.candidate.text, candidate: pickIx, tier: pick.tier, unofficial: !exactOfficial(pick.candidate, e) } } : {}),
+        candidates: ranked.map((r) => ({
+          ...r.candidate,
+          tier: r.tier,
+          score: r.score,
+          stale: r.stale || found.previous,
+          ...(r.candidate.source.kind === "official" ? { exactMatch: exactOfficial(r.candidate, e) } : {}),
+          qaFailures: r.qaFailures,
+          current: r.candidate.text === e.msgstr,
+        })),
       };
     }
   }
   return { $schema: TRANSLATION_STRINGS_SCHEMA, ...meta, hashes, strings: [...strings.values()] };
-}
-
-/** The candidate whose source is `s`, when the sidecar entry has one with this text. */
-export function candidateBySource(entry: CandidatesEntry | undefined, text: string, s: CandidateSource): Candidate | undefined {
-  return entry?.candidates.find((c) => c.text === text && sameSource(c.source, s));
 }
