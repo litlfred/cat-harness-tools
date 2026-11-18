@@ -124,8 +124,13 @@ describe("run-gates.py gate inputs", () => {
     for (const s of ["mount:lock:check", "mount:remote:check", "check:draft-beans", "readmes:check", "readme-sections:check", "book:check", "check:standalone"]) {
       const [kind] = py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "layer"})`) as [string, string];
       expect(kind).toBe("layer-mode");
+      // check:draft-beans is gates.ts `report` (no origin/main in a PR checkout),
+      // so it is skipped in INDEX mode too (run-gates-report-scripts.test.ts).
+      if (s === "check:draft-beans") continue;
       expect(py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "index"})`)).toEqual([null, null]);
     }
+    const [kind] = py("run-gates.py", `m.skip_reason(".", "check:draft-beans", {"MODE": "index"})`) as [string, string];
+    expect(kind).toBe("report");
   });
 
   test("another layer's standalone rehearsal is skipped in any root but its own (smart-ra#213)", () => {

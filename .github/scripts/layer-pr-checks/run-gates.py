@@ -475,11 +475,11 @@ def skip_reason(root, script, env=None, own=None, declarer=None):
         return "sweep-only", SWEEP_ONLY_SCRIPTS[script]
     if script in QA_REPORT_SCRIPTS:
         return "qa-report", QA_REPORT_SCRIPTS[script]
+    if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
+        return "layer-mode", LAYER_MODE_SCRIPTS[script]
     reports = report_scripts(root)
     if script in reports and script not in SUPPLIED_INPUTS and script not in AS_MOUNTED_SCRIPTS:
         return "report", reports[script]
-    if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
-        return "layer-mode", LAYER_MODE_SCRIPTS[script]
     why = untracked_corpus_reason(root, declarer, script, own)
     if why:
         return "untracked-corpus", why
