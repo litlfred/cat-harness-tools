@@ -146,8 +146,8 @@ describe("translated (LangText) labels are matched by their source text, never c
   });
   test("the scheme's declared source language is the one matched", () => {
     const fr = [
-      { ...scheme("platform", [authored("Politique", { prefLabel: { en: "Policy", fr: "Politique" } })]), lang: "fr" },
-      { ...scheme("kg", [candidate("Politique")]), lang: "fr" },
+      { id: "platform", instance: "i", lang: "fr", terms: [authored("Politique", { prefLabel: { en: "Policy", fr: "Politique" } })] },
+      { id: "kg", instance: "i", lang: "fr", terms: [candidate("Politique")] },
     ] as never[];
     expect(resolveSkos(candidates(fr), skosIndex(fr))[0]!.exact).toBe("mapped");
   });
