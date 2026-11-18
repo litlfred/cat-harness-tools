@@ -12,10 +12,13 @@
  * show one calendar.
  *
  * `layoutDay` is the pure part: a day's slots placed on a grid, one row per
- * interval between consecutive start and end times. `scheduleHtml` draws it
- * as a CSS grid whose DOM order is the day in time order, each slot carrying
- * its own time and track, so a screen reader and a phone (where the grid
- * stacks into one column per day) read it whole. Every word is in the page's
+ * interval between consecutive start and end times; `tableRows` turns that
+ * into a table's rows of cells, with `rowspan` so the tracks' times line up
+ * and `colspan` across every track for a joint session, a break or logistics.
+ * `scheduleHtml` draws it as a semantic `<table>` per day (owner, 2026-11-18):
+ * a caption, `<th scope>` for the tracks and each row's time, and each slot's
+ * own time and track in its cell, so a phone (where each day stacks into one
+ * column) and a screen reader read it whole. Every word is in the page's
  * text, so the viewer's translation catalogue and the presentation's
  * country renaming reach it with no hook of their own.
  */
@@ -52,6 +55,43 @@ export function layoutDay(slots: readonly WorkshopScheduleSlot[], tracks: readon
   return { times, slots: placed };
 }
 
+/** A cell of a table row: a slot starting in that row, or an empty cell where a track has nothing. */
+export type TableCell = { slot: PlacedSlot; rowspan: number; colspan: number } | { empty: true };
+
+/**
+ * A day's table: one row per interval of `layoutDay`, each row's cells left
+ * to right. A cell covered by a slot that started in an earlier row is left
+ * out, as `rowspan` requires; a track with nothing in an interval gets an
+ * empty cell. Slots of one track never overlap (the schema refuses it).
+ */
+export function tableRows(lay: DayLayout, tracks: number): { time: string; end: string; cells: TableCell[] }[] {
+  const rows = Math.max(0, lay.times.length - 1);
+  const covered: boolean[][] = Array.from({ length: rows + 1 }, () => Array<boolean>(tracks).fill(false));
+  const startsAt = new Map<string, PlacedSlot>();
+  for (const p of lay.slots) {
+    const cols = p.track === undefined ? [...Array(tracks).keys()] : [p.track];
+    startsAt.set(`${p.row}:${cols[0]}`, p);
+    for (let r = p.row; r < p.rowEnd; r++) for (const c of cols) covered[r]![c] = true;
+  }
+  const out: { time: string; end: string; cells: TableCell[] }[] = [];
+  for (let r = 1; r <= rows; r++) {
+    const cells: TableCell[] = [];
+    for (let c = 0; c < tracks; ) {
+      const p = startsAt.get(`${r}:${c}`);
+      if (p) {
+        const colspan = p.track === undefined ? tracks : 1;
+        cells.push({ slot: p, rowspan: p.rowEnd - p.row, colspan });
+        c += colspan;
+      } else {
+        if (!covered[r]![c]) cells.push({ empty: true });
+        c++;
+      }
+    }
+    out.push({ time: lay.times[r - 1]!, end: lay.times[r]!, cells });
+  }
+  return out;
+}
+
 /** The schedule a workshop shows, and the workshop that holds it: its own, else a sibling's that names it as a track. */
 export function scheduleFor(corpus: JourneyCorpus, w: WorkshopEntry): { schedule: WorkshopSchedule; owner: WorkshopEntry } | undefined {
   if (w.workshop.schedule) return { schedule: w.workshop.schedule, owner: w };
@@ -86,19 +126,20 @@ function moduleHref(d: ScheduleDraw, workshopId: string, module: string): string
   return `${d.toWorkshops}${workshopId}/${seg(module)}/`;
 }
 
-function slotHtml(d: ScheduleDraw, p: PlacedSlot, cols: number): string {
+function slotHtml(d: ScheduleDraw, c: { slot: PlacedSlot; rowspan: number; colspan: number }): string {
+  const p = c.slot;
   const x = p.slot;
   const t = p.track === undefined ? undefined : d.schedule.tracks[p.track]!;
   const where = t ? t.label : KIND_LABEL[x.kind];
   const wid = t?.workshop ?? d.owner.workshop.id;
   const href = x.module ? moduleHref(d, wid, x.module) : undefined;
   const code = x.module ? (href ? `<a class="jv-cal-code" href="${e(href)}">${e(x.module)}</a> ` : `<span class="jv-cal-code">${e(x.module)}</span> `) : "";
-  const col = p.track === undefined ? `2 / ${cols + 2}` : `${p.track + 2}`;
   const here = t && wid === d.here.workshop.id ? " is-here" : "";
-  return `<li class="jv-cal-slot jv-cal-${x.kind}${t ? ` jv-cal-t${p.track! % 4}` : ""}${here}" style="grid-row:${p.row + 1} / ${p.rowEnd + 1};grid-column:${col}">
+  const span = `${c.rowspan > 1 ? ` rowspan="${c.rowspan}"` : ""}${c.colspan > 1 ? ` colspan="${c.colspan}"` : ""}`;
+  return `<td class="jv-cal-slot jv-cal-${x.kind}${t ? ` jv-cal-t${p.track! % 4}` : ""}${here}"${span}>
 <p class="jv-cal-when"><time>${e(x.start)}</time>–<time>${e(x.end)}</time> <span class="jv-cal-where">${e(where)}</span></p>
 <p class="jv-cal-title">${code}${e(x.title)}${x.type ? ` <span class="jv-cal-type">${e(x.type)}</span>` : ""}</p>${x.note ? `\n<p class="jv-cal-note">${e(x.note)}</p>` : ""}${x.sessions?.length ? `\n<ul class="jv-cal-parts">${x.sessions.map((s) => `<li>${e(s)}</li>`).join("")}</ul>` : ""}
-</li>`;
+</td>`;
 }
 
 /** The calendar's heading: its own title, else "The two days" (or "The N days"). */
@@ -107,33 +148,34 @@ export function scheduleTitle(sc: WorkshopSchedule): string {
   return sc.title ?? (n === 1 ? "The day" : `The ${n === 2 ? "two" : n === 3 ? "three" : String(n)} days`);
 }
 
-/** The calendar, every day. Empty when the schedule has no days. */
+/** The calendar: a table per day. */
 export function scheduleHtml(d: ScheduleDraw): string {
   const sc = d.schedule;
   const h = d.level ?? 2;
-  const cols = sc.tracks.length;
+  const n = sc.tracks.length;
+  const id = d.id ?? "the-days";
   const days = sc.days
     .map((day) => {
-      const lay = layoutDay(day.slots, sc.tracks);
-      const id = `${d.id ?? "the-days"}-day-${day.day}`;
-      const head = `<li class="jv-cal-head jv-cal-corner" aria-hidden="true" style="grid-row:1;grid-column:1"></li>${sc.tracks
-        .map((t, i) => `<li class="jv-cal-head jv-cal-t${i % 4}${(t.workshop ?? d.owner.workshop.id) === d.here.workshop.id ? " is-here" : ""}" aria-hidden="true" style="grid-row:1;grid-column:${i + 2}">${e(t.label)}</li>`)
-        .join("")}`;
-      const rail = lay.times
-        .slice(0, -1)
-        .map((t, i) => `<li class="jv-cal-time" aria-hidden="true" style="grid-row:${i + 2};grid-column:1">${e(t)}</li>`)
-        .join("");
-      const slots = lay.slots.map((p) => slotHtml(d, p, cols)).join("\n");
-      return `<section class="jv-cal-day" aria-labelledby="${e(id)}">
-<h${h + 1} id="${e(id)}">${e(day.title ?? `Day ${day.day}`)}</h${h + 1}>${day.summary ? `\n<p class="jv-cal-sum">${e(day.summary)}</p>` : ""}
-<ol class="jv-cal-grid" style="--jv-cal-cols:${cols};--jv-cal-rows:${Math.max(1, lay.times.length - 1)}">${head}${rail}
-${slots}</ol>
-</section>`;
+      const rows = tableRows(layoutDay(day.slots, sc.tracks), n);
+      const dayId = `${id}-day-${day.day}`;
+      const head = `<thead><tr><th scope="col" class="jv-cal-timeh">Time</th>${sc.tracks
+        .map((t, i) => `<th scope="col" class="jv-cal-head jv-cal-t${i % 4}${(t.workshop ?? d.owner.workshop.id) === d.here.workshop.id ? " is-here" : ""}">${e(t.label)}</th>`)
+        .join("")}</tr></thead>`;
+      const body = rows
+        .map((r) => `<tr><th scope="row" class="jv-cal-time"><time>${e(r.time)}</time></th>${r.cells.map((c) => ("empty" in c ? `<td class="jv-cal-empty"></td>` : slotHtml(d, c))).join("")}</tr>`)
+        .join("\n");
+      return `<table class="jv-cal-day" id="${e(dayId)}">
+<caption><b>${e(day.title ?? `Day ${day.day}`)}</b>${day.summary ? ` <span class="jv-cal-sum">${e(day.summary)}</span>` : ""}</caption>
+${head}
+<tbody>
+${body}
+</tbody>
+</table>`;
     })
     .join("\n");
-  const id = d.id ?? "the-days";
   return `<section class="jv-cal" id="${e(id)}" aria-labelledby="${e(id)}-h">
 <h${h} id="${e(id)}-h">${e(scheduleTitle(sc))}</h${h}>
 ${sc.intro ? `<div class="jv-cal-intro">${d.md ? d.md(sc.intro) : `<p>${e(sc.intro)}</p>`}</div>\n` : ""}${days}
-</section>`;
+</section>
+`;
 }

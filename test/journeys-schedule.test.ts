@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { parseWorkshop, type WorkshopSchedule } from "../schemas/process/workshop.ts";
 import { storyOf } from "../scripts/journeys/present.ts";
 import type { JourneyCorpus, WorkshopEntry } from "../scripts/journeys/read.ts";
-import { layoutDay, scheduleFor, scheduleHtml, scheduleTitle } from "../scripts/journeys/schedule.ts";
+import { layoutDay, scheduleFor, scheduleHtml, scheduleTitle, tableRows } from "../scripts/journeys/schedule.ts";
 
 const tracks = [{ id: "policy", label: "Policy track", workshop: "policy" }, { id: "technical", label: "Technical track" }];
 const day1: WorkshopSchedule["days"][number] = {
@@ -45,6 +45,24 @@ describe("layoutDay: a day's slots on the grid", () => {
   });
   test("reading order is by time, then a spanning slot, then track order", () => {
     expect(lay.slots.map((p) => p.slot.module ?? p.slot.title)).toEqual(["Registration", "The story we follow", "Coffee", "M1", "T1", "T2"]);
+  });
+});
+
+describe("tableRows: the day as table rows", () => {
+  const rows = tableRows(layoutDay(day1.slots, tracks), 2);
+  const shape = rows.map((r) => [r.time, r.cells.map((c) => ("empty" in c ? "·" : `${c.slot.slot.module ?? c.slot.slot.kind}${c.rowspan > 1 ? `↓${c.rowspan}` : ""}${c.colspan > 1 ? `→${c.colspan}` : ""}`)).join(" ")]);
+  test("a row per interval; a spanning slot takes every track; a long block rowspans opposite shorter ones", () => {
+    expect(shape).toEqual([
+      ["08:30", "logistics→2"],
+      ["09:00", "joint→2"],
+      ["10:30", "break→2"],
+      ["11:00", "M1↓2 T1"],
+      ["11:40", "T2"],
+    ]);
+  });
+  test("a track with nothing in an interval gets an empty cell", () => {
+    const r = tableRows(layoutDay([{ start: "09:00", end: "10:00", kind: "session", track: "technical", title: "x" }], tracks), 2);
+    expect(r[0]!.cells.map((c) => "empty" in c)).toEqual([true, false]);
   });
 });
 
@@ -103,15 +121,16 @@ describe("scheduleFor and scheduleHtml", () => {
     expect(fromPolicy).toMatch(/jv-cal-session jv-cal-t0 is-here[^>]*>\s*<p class="jv-cal-when"><time>11:00<\/time>/);
   });
 
-  test("a grid: time rail, a column per track, spanning rows across both; sessions listed; no table markup", () => {
+  test("a semantic table per day: caption, column headers, a row header per time; spanning rows colspan, long blocks rowspan", () => {
     const html = scheduleHtml({ corpus, here: technical, owner: technical, schedule, toWorkshops: "../" });
     expect(html).toContain(`<h2 id="the-days-h">The two days</h2>`);
-    expect(html).toContain(`<h3 id="the-days-day-1">Day 1</h3>`);
-    expect(html).toContain(`--jv-cal-cols:2;--jv-cal-rows:5`);
-    expect(html).toMatch(/jv-cal-joint" style="grid-row:3 \/ 4;grid-column:2 \/ 4"/);
-    expect(html).toMatch(/jv-cal-t1 is-here" style="grid-row:5 \/ 6;grid-column:3"/);
+    expect(html).toContain(`<caption><b>Day 1</b> <span class="jv-cal-sum">Concepts and the stack.</span></caption>`);
+    expect(html).toContain(`<th scope="col" class="jv-cal-timeh">Time</th><th scope="col" class="jv-cal-head jv-cal-t0">Policy track</th><th scope="col" class="jv-cal-head jv-cal-t1 is-here">Technical track</th>`);
+    expect(html).toContain(`<th scope="row" class="jv-cal-time"><time>11:40</time></th>`);
+    expect(html).toMatch(/<td class="jv-cal-slot jv-cal-joint" colspan="2">/);
+    expect(html).toMatch(/<td class="jv-cal-slot jv-cal-session jv-cal-t0" rowspan="2">\s*<p class="jv-cal-when"><time>11:00<\/time>–<time>12:30<\/time>/);
     expect(html).toContain(`<ul class="jv-cal-parts"><li>P1.1 Welcome</li><li>P1.2 Remarks</li></ul>`);
-    expect(html).not.toContain("<table");
+    expect((html.match(/<table /g) ?? []).length).toBe(2);
   });
 
   test("a module the corpus does not list is named, not linked", () => {
