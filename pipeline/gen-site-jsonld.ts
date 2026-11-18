@@ -43,7 +43,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { join, dirname, relative, resolve } from "node:path";
 import { documentContext } from "../schemas/content/content-context.ts";
-import { atInstanceContext } from "./instance-document-context.ts";
+import { atInstanceContext, awaitingRebase, awaitingRebaseNote } from "./instance-document-context.ts";
 import {
   DOCS_SITE_BASE,
   siteNodeSitePath,
@@ -114,6 +114,7 @@ const check = process.argv.includes("--check");
 let written = 0;
 let unchanged = 0;
 const stale: string[] = [];
+let rebasePending = 0;
 
 function serialise(doc: Record<string, unknown>): string {
   return `${JSON.stringify(doc, null, 2)}\n`;
@@ -128,7 +129,8 @@ function emit(path: string, doc: Record<string, unknown>): void {
     return;
   }
   if (check) {
-    stale.push(relative(REPO_ROOT, path));
+    if (awaitingRebase(prev, next)) rebasePending++;
+    else stale.push(relative(REPO_ROOT, path));
     return;
   }
   mkdirSync(dirname(path), { recursive: true });
@@ -288,6 +290,8 @@ if (check) {
     process.exit(1);
   }
   console.log(`gen-site-jsonld --check: ${unchanged} file(s) up to date (${pages} pages, ${nodes} nodes).`);
+  const note = awaitingRebaseNote("gen-site-jsonld", rebasePending);
+  if (note) console.warn(note);
 } else {
   console.log(
     `gen-site-jsonld: ${written} written, ${unchanged} unchanged (${pages} pages, ${nodes} nodes).`,
