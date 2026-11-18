@@ -55,6 +55,7 @@ import { findDeclarationFile } from "../schemas/kg/cat-harness.js";
 import { findings, generateInstanceContexts, INSTANCE_CONTEXT_PATH, NS_DOCUMENT_CONTEXT_PATH, readInstanceDecls, type GenerateOptions } from "./gen-instance-contexts.ts";
 import { PLACEHOLDER_HTML } from "./pages-bootstrap.ts";
 import { buildVocabulary, instancesPublishingNs } from "./ns-export.ts";
+import { sourceText } from "../schemas/content/lang-text.ts";
 
 export const PAGES_BRANCH = "gh-pages";
 
@@ -208,14 +209,14 @@ export function vocabularyHtml(instance: string, id: string, doc: unknown): stri
   const rows = graph
     .filter((n) => typeof n["@id"] === "string")
     .map((n) => {
-      const label = String(n["label"] ?? n["prefLabel"] ?? n["@id"]);
-      const def = n["definition"] ?? n["comment"];
+      const label = sourceText(n["label"]) ?? sourceText(n["prefLabel"]) ?? String(n["@id"]);
+      const def = sourceText(n["definition"]) ?? sourceText(n["comment"]);
       // A term of this namespace is a link to its own page (slash form) and an
       // anchor here, so `…/ns/#Term` and `…/ns/Term` both land on it.
       const local = localNameOf(String(n["@id"]), id, doc);
       const name = `<code>${escHtml(String(n["@id"]))}</code>`;
       const linked = local !== undefined && id.endsWith("/") ? `<a href="${escHtml(local)}/">${name}</a>` : name;
-      return `<li${local === undefined ? "" : ` id="${escHtml(local)}"`}>${linked} ${escHtml(label)}${def === undefined ? "" : ` — ${escHtml(String(def))}`}</li>`;
+      return `<li${local === undefined ? "" : ` id="${escHtml(local)}"`}>${linked} ${escHtml(label)}${def === undefined ? "" : ` — ${escHtml(def)}`}</li>`;
     })
     .join("\n");
   // `</` cannot appear inside the script element, so it is escaped in the JSON.
@@ -303,8 +304,10 @@ export function termPages(instance: string, id: string, iriBase: string, doc: un
 
 /** The page a term's own IRI serves: what it is, and the whole term as JSON-LD. */
 export function termHtml(instance: string, id: string, iri: string, depth: number, node: Record<string, unknown>, doc: unknown): string {
-  const label = String(node["prefLabel"] ?? node["label"] ?? node["@id"]);
-  const def = node["definition"] ?? node["comment"];
+  // A label or definition may be language-tagged (a map, or JSON-LD value
+  // objects): show its source text, never `[object Object]`.
+  const label = sourceText(node["prefLabel"]) ?? sourceText(node["label"]) ?? String(node["@id"]);
+  const def = sourceText(node["definition"]) ?? sourceText(node["comment"]);
   const up = "../".repeat(depth);
   const term = { "@context": (doc as { "@context"?: unknown })["@context"], ...node, "@id": iri };
   const json = JSON.stringify(term, null, 2).replace(/<\//g, "<\\/");
@@ -323,7 +326,7 @@ ${json}
 <body>
 <h1>${escHtml(label)}</h1>
 <p><code>${escHtml(iri)}</code></p>
-${def === undefined ? "" : `<p>${escHtml(String(def))}</p>\n`}${defined}<p>A term of the <a href="${up}">${escHtml(instance)} vocabulary</a> (<code>${escHtml(id)}</code>; machine-readable: <a href="${up}index.jsonld">index.jsonld</a>).</p>
+${def === undefined ? "" : `<p>${escHtml(def)}</p>\n`}${defined}<p>A term of the <a href="${up}">${escHtml(instance)} vocabulary</a> (<code>${escHtml(id)}</code>; machine-readable: <a href="${up}index.jsonld">index.jsonld</a>).</p>
 </body>
 </html>
 `;

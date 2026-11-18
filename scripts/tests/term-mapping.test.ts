@@ -108,6 +108,56 @@ describe("the index matches when it should — the non-vacuity guard", () => {
   });
 });
 
+describe("translated (LangText) labels are matched by their source text, never crash", () => {
+  // `folio-glossary/v1` allows `prefLabel: { en, fr, … }` (owner, option C,
+  // 2026-11-18). normaliseLabel on such an object threw.
+  const schemes = [
+    scheme("platform", [
+      authored("Policy", { prefLabel: { en: "Policy", fr: "Politique" }, exactMatch: ["http://www.w3.org/ns/odrl/2/Policy"] }),
+      authored("Actor", { prefLabel: { fr: "Acteur", en: "Actor" }, altLabel: [{ en: "Participant", fr: "Participant·e" }] }),
+      authored("Rule", { prefLabel: { en: "Rule" }, altLabel: { en: ["Constraint"], fr: ["Contrainte"] } }),
+    ]),
+    scheme("kg-skills", [
+      { ...candidate("policy"), prefLabel: { en: "policy", fr: "politique" } },
+      candidate("Participant"),
+      candidate("Constraint"),
+      candidate("Politique"),
+      { id: "nolabel", prefLabel: {}, status: "candidate" },
+    ]),
+  ];
+  const idx = skosIndex(schemes);
+  const results = resolveSkos(candidates(schemes), idx);
+  const by = new Map(results.map((r) => [r.term, r]));
+
+  test("a LangText prefLabel indexes and matches as its English text", () => {
+    expect(by.get("policy")!.exact).toBe("mapped");
+    expect(by.get("policy")!.matches?.[0]?.via).toBe("Policy");
+  });
+  test("LangText altLabels — an array of maps, or a map of arrays — index as close matches", () => {
+    expect(by.get("participant")!.concept).toBe("mapped");
+    expect(by.get("participant")!.exact).toBe("unmapped");
+    expect(by.get("constraint")!.concept).toBe("mapped");
+  });
+  test("a translation is not the source: a French label does not match", () => {
+    expect(by.get("politique")!.concept).toBe("unmapped");
+  });
+  test("a term with no usable label is unmapped, not a crash", () => {
+    expect(by.get("nolabel")!.concept).toBe("unmapped");
+  });
+  test("the scheme's declared source language is the one matched", () => {
+    const fr = [
+      { ...scheme("platform", [authored("Politique", { prefLabel: { en: "Policy", fr: "Politique" } })]), lang: "fr" },
+      { ...scheme("kg", [candidate("Politique")]), lang: "fr" },
+    ] as never[];
+    expect(resolveSkos(candidates(fr), skosIndex(fr))[0]!.exact).toBe("mapped");
+  });
+  test("the fhir half takes the source text too", () => {
+    const got = resolveFhir(candidates(schemes), { version: "1", concepts: [{ system: "s", code: "c", display: "Policy" }] });
+    expect(got.find((r) => r.term === "policy")!.concept).toBe("mapped");
+    expect(got.find((r) => r.term === "nolabel")!.concept).toBe("unmapped");
+  });
+});
+
 describe("exactConcepts names WHICH concept was exact (bean 5yhm, SKOS publish)", () => {
   // One candidate, two concepts: A by prefLabel, B by altLabel. `exact` is
   // true, and publishing exactMatch to B would assert an equivalence nothing

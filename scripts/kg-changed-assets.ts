@@ -69,6 +69,7 @@ import { reviewList, type RenderedImpact } from "../schemas/ui/rendered-impact.t
 import { StagingPageComparisonSchema, type StagingPageComparison } from "../schemas/sdlc/staging.ts";
 import { coneByFile, docsMounts, docsRenderedImpact, indexSite } from "./docs-rendered-impact.ts";
 import type { ConeDecision } from "./staging-cone.ts";
+import { sourceText } from "../schemas/content/lang-text.ts";
 
 type Node = Record<string, unknown>;
 
@@ -203,8 +204,8 @@ const kindOf = (n: Node): string | undefined => {
 
 const titleOf = (n: Node): string | undefined => {
   for (const k of ["title", "prefLabel", "name"]) {
-    const v = n[k];
-    if (typeof v === "string" && v !== "") return v;
+    const v = sourceText(n[k]);
+    if (v !== undefined && v !== "") return v;
   }
   return undefined;
 };

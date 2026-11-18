@@ -132,6 +132,7 @@ import { GATE_OWN_PATHS_ENV } from "../scripts/lib/gate-own.ts";
 import { buildQaResult, writeQaResult } from "../scripts/qa-results.ts";
 import { GLOSSARY_SUBJECT_KIND } from "../scripts/kg-qa-report.ts";
 import { parsePoEntries, type PoEntry } from "./po-inject.ts";
+import { schemeSourceLanguage, sourceText, sourceTexts } from "../schemas/content/lang-text.ts";
 
 /** This module, as a QA producer names it. */
 export const GLOSSARY_CHECK_SCRIPT = "pipeline/translation-glossary.ts";
@@ -212,9 +213,6 @@ interface SchemeScope {
   terms: Map<string, string | null>;
 }
 
-const LANG_SOURCE = (t: unknown): string | undefined =>
-  typeof t === "string" ? t : t && typeof t === "object" ? ((t as Record<string, string>).en ?? Object.values(t as Record<string, string>)[0]) : undefined;
-
 /**
  * Read a glossary file's subject areas: the scheme's `subject` and each term's
  * own (by prefLabel and altLabel), and which terms are not `authored` (they fix
@@ -241,9 +239,10 @@ export function readSchemeScope(file: string): SchemeScope | undefined {
     return undefined;
   }
   const terms = new Map<string, string | null>();
+  const lang = schemeSourceLanguage(g);
   for (const t of g.terms ?? []) {
     const value = t.status !== "authored" ? null : typeof t.subject === "string" ? t.subject : undefined;
-    for (const l of [LANG_SOURCE(t.prefLabel), ...((t.altLabel as string[] | undefined) ?? [])]) {
+    for (const l of [sourceText(t.prefLabel, lang), ...sourceTexts(t.altLabel, lang)]) {
       if (l && value !== undefined) terms.set(l.toLowerCase(), value);
     }
   }

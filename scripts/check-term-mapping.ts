@@ -43,6 +43,7 @@ import {
   TermMappingsFileSchema,
   normaliseLabel,
 } from "../schemas/content/term-mapping.ts";
+import { sourceText, sourceTexts, schemeSourceLanguage } from "../schemas/content/lang-text.ts";
 import { PinnedTerminologySchema } from "../schemas/content/pinned-terminology.ts";
 import {
   TERM_ADJUDICATIONS_SUFFIX,
@@ -73,8 +74,10 @@ export const FHIR_SNAPSHOT = "cat-harness/external-schemas/who-smart-base.termin
 
 interface GlossTerm {
   id: string;
-  prefLabel: string;
-  altLabel?: string[];
+  /** A string, or a language map (`folio-glossary/v1` allows both): read through {@link sourceText}. */
+  prefLabel: unknown;
+  /** Strings, language maps, or a language map of arrays: read through {@link sourceTexts}. */
+  altLabel?: unknown;
   exactMatch?: string[];
   status?: string;
   source?: string;
@@ -82,6 +85,8 @@ interface GlossTerm {
 interface GlossScheme {
   id: string;
   terms: GlossTerm[];
+  /** The scheme's source language: the text a translated label is matched by. */
+  lang?: string;
   /**
    * The layer that owns the scheme, by {@link schemeOwner}. With `id` it
    * is the scheme's key (bean `q3n9`, owner ruling A, 2026-10-24): a scheme
@@ -191,11 +196,11 @@ export function glossarySchemes(root: string): GlossScheme[] {
   const owners = instanceRoots(root);
   for (const { abs, declaredBy } of declaredGlossaryFiles(root, ".glossary.json")) {
     try {
-      const d = JSON.parse(readFileSync(abs, "utf-8")) as { id?: string; source?: string; terms?: GlossTerm[] };
+      const d = JSON.parse(readFileSync(abs, "utf-8")) as { id?: string; source?: string; terms?: GlossTerm[]; sourceLanguage?: string };
       if (!d.terms) continue;
       const own = schemeOwner(root, { source: d.source, terms: d.terms }, declaredBy, owners);
       if ("error" in own) continue;
-      out.push({ id: d.id ?? basename(abs), terms: d.terms, instance: own.owner });
+      out.push({ id: d.id ?? basename(abs), terms: d.terms, instance: own.owner, lang: schemeSourceLanguage(d) });
     } catch {
       // A scheme that will not parse is `check:glossary`'s finding, not
       // this one's. Saying it twice would make one defect look like two.
@@ -228,8 +233,11 @@ export function skosIndex(schemes: GlossScheme[]): Map<string, ConceptMatch[]> {
       // The external URI where there is one, otherwise the in-repo id — a
       // concept without a URI is still a concept somebody authored.
       const uri = t.exactMatch?.[0] ?? `${s.id}:${t.id}`;
-      add(t.prefLabel, { uri, predicate: "skos:exactMatch", via: t.prefLabel, scheme: s.id });
-      for (const alt of t.altLabel ?? []) {
+      // The SOURCE text: a translated label (a language map) is the same
+      // concept, matched by the language the scheme is authored in.
+      const pref = sourceText(t.prefLabel, s.lang);
+      if (pref !== undefined) add(pref, { uri, predicate: "skos:exactMatch", via: pref, scheme: s.id });
+      for (const alt of sourceTexts(t.altLabel, s.lang)) {
         add(alt, { uri, predicate: "skos:closeMatch", via: alt, scheme: s.id });
       }
     }
@@ -242,12 +250,14 @@ export interface Candidate {
   term: GlossTerm;
   instance: string;
   scheme: string;
+  /** The scheme's source language, when it declares one. */
+  lang?: string;
 }
 
 /** Candidates, which are what the check is ABOUT. */
 export function candidates(schemes: GlossScheme[]): Candidate[] {
   return schemes.flatMap((s) =>
-    s.terms.filter((t) => t.status !== "authored").map((term) => ({ term, instance: s.instance, scheme: s.id })),
+    s.terms.filter((t) => t.status !== "authored").map((term) => ({ term, instance: s.instance, scheme: s.id, ...(s.lang !== undefined ? { lang: s.lang } : {}) })),
   );
 }
 
@@ -255,8 +265,8 @@ export function resolveSkos(
   cands: Candidate[],
   idx: Map<string, ConceptMatch[]>,
 ): TermMapping[] {
-  return cands.map(({ term, instance, scheme }) => {
-    const key = normaliseLabel(term.prefLabel);
+  return cands.map(({ term, instance, scheme, lang }) => {
+    const key = normaliseLabel(sourceText(term.prefLabel, lang) ?? "");
     const hits = idx.get(key) ?? [];
     const exactHit = hits.filter((h) => h.predicate === "skos:exactMatch");
     const exact: MatchState = exactHit.length ? "mapped" : "unmapped";
@@ -319,8 +329,9 @@ export function resolveFhir(
       },
     ]);
   }
-  return cands.map(({ term, instance, scheme }) => {
-    const hits = idx.get(normaliseLabel(term.prefLabel)) ?? [];
+  return cands.map(({ term, instance, scheme, lang }) => {
+    const label = normaliseLabel(sourceText(term.prefLabel, lang) ?? "");
+    const hits = label ? (idx.get(label) ?? []) : [];
     // `closeMatch`, never `exactMatch`: a label matching a code's display
     // means the two are about the same thing, not that the glossary term IS
     // that code. Claiming exactness across vocabularies is the overreach
