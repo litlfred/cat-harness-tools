@@ -3067,7 +3067,11 @@ jobs:
             exit 0
           fi
           # A sandbox's publish waits on its claude/cat-layers/<key> branch
-          # until layers-move.yml moves it (state `pending`): wait for it.
+          # until layers-move.yml moves it (state `pending`): wait for it. The
+          # mover runs on the same events that start this full tier (`labeled`
+          # `release`, `synchronize`, `ready_for_review`), so it moves the ref
+          # during this wait and the next check finds it (owner, card
+          # 2026-11-18; smart-ra#86).
           check() {
             CAT_LAYERS_URL="https://github.com/$1.git" \
               bun "$work/scripts/mount-from-lock.ts" --check-layers --root fa --changed-from "$base" 2>&1
@@ -3090,7 +3094,7 @@ jobs:
               fi
             done
           fi
-          msg="this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin); from a sandbox it lands on a claude/cat-layers/ branch that layers-move.yml moves."
+          msg="this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin); from a sandbox it lands on a claude/cat-layers/ branch that layers-move.yml moves on the PR's next push or \`release\` label, so re-apply \`release\` (or push) once it is there."
           if [ "$ADVISORY" = "true" ]; then
             echo "::warning::fast tier (advisory; the full tier gates the merge): $msg"
             echo "### Layers cache ref: NOT published (advisory on the fast tier; the full tier fails on it)" >> "$GITHUB_STEP_SUMMARY"

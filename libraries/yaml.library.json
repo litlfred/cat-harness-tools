@@ -55,6 +55,7 @@
     "src/workflow/ci-health.ts",
     "test/coordinator/gate-shell-workflow.test.ts",
     "test/coordinator/gates-workflows.test.ts",
+    "test/layer-layers-move.test.ts",
     "test/layer-main-qa-guard.test.ts",
     "test/layer-pr-checks-deferred-verdict.test.ts",
     "test/layer-pr-checks-job-graph.test.ts",

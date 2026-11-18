@@ -1190,6 +1190,11 @@ export const layersRef = (key: string): string => `${LAYERS_REF_PREFIX}${key}`;
  * layers-move workflow (`layer-layers-move.yml`) moves it to
  * `refs/cat/layers/<key>` and deletes the branch; the runner only moves a
  * ref, it never builds one (owner, 2026-11-10, card "B. Branch + small mover").
+ * It runs on every event that starts the PR's full tier (`labeled` `release`,
+ * `synchronize`, `ready_for_review`), so a branch pushed after the re-pin's
+ * first push still moves when the full tier judges the PR (owner, card
+ * 2026-11-18): a push trigger on the branch cannot, since a layers commit
+ * carries the locked layers' overlay, not the index's caller workflow.
  */
 export const LAYERS_BRANCH_PREFIX = "refs/heads/claude/cat-layers/";
 export const layersBranchOf = (ref: string): string => `${LAYERS_BRANCH_PREFIX}${ref.slice(LAYERS_REF_PREFIX.length)}`;
@@ -1467,7 +1472,7 @@ export function publishLayers(root: string, opts: { url?: string; main?: boolean
       const branches = refs.map(layersBranchOf);
       const viaBranch = gitEnv(root, ["push", "-q", "--force", url!, ...branches.map((b) => `${sha}:${b}`)], env);
       if (viaBranch.status !== 0) return { ok: false, key, commit: sha, detail: `git push failed: ${push.stderr.trim().split("\n").pop()}; to the claude/cat-layers/ branch too: ${viaBranch.stderr.trim().split("\n").pop()}` };
-      return { ok: true, key, commit: sha, refs: branches, viaBranch: true, detail: `pushing ${refs.join(", ")} was refused, so ${sha.slice(0, 12)} (${entries.length} files) is on ${branches.map((b) => b.slice("refs/heads/".length)).join(", ")}; the layers-move workflow moves it to the ref when the PR's checks run` };
+      return { ok: true, key, commit: sha, refs: branches, viaBranch: true, detail: `pushing ${refs.join(", ")} was refused, so ${sha.slice(0, 12)} (${entries.length} files) is on ${branches.map((b) => b.slice("refs/heads/".length)).join(", ")}; the layers-move workflow moves it to the ref on the PR's next push or \`release\` label, the events that start the full tier (re-apply \`release\` if the PR already carries it)` };
     }
     const pruned = opts.prune !== undefined ? pruneLayers(url!, opts.prune, [key, ...(opts.keep ?? [])]) : [];
     return { ok: true, key, commit: sha, refs, pruned, detail: `pushed ${sha.slice(0, 12)} (${entries.length} files) to ${refs.join(", ")}${pruned.length ? `; pruned ${pruned.length}` : ""}` };
