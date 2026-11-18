@@ -109,10 +109,10 @@ export const SEARCH_EXCLUDE_META = '<meta name="fa-search-exclude" content="true
 /**
  * The marker for a page the theme's index cannot hold but the SITE's search
  * should: a mounted layer's own HTML, laid out by its own generator, such as
- * dth-phc's handbook under `/en/dth-phc/`. `search-split.ts` reads each such
+ * a handbook under `/en/<layer>/`. `search-split.ts` reads each such
  * page of the built site and adds its sections to the index before cutting
  * the scopes (owner, 2026-11-17: "we've lost some of the search indexing
- * features and layered knowledge graph"; measured that day: the dth-phc site
+ * features and layered knowledge graph"; measured that day: one handbook site
  * indexed 0 of its handbook's pages). The page keeps
  * {@link SEARCH_EXCLUDE_META} too, because a tree that is never split (a
  * build that stops before `search-split`) still has the theme's index only.

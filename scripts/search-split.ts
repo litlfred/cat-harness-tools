@@ -26,14 +26,14 @@
  * ## Pages the theme never laid out
  *
  * The theme indexes only the pages Jekyll builds. A mounted layer's own HTML,
- * such as dth-phc's handbook under `/en/dth-phc/`, is written after Jekyll, so
+ * such as a handbook under `/en/<layer>/`, is written after Jekyll, so
  * it was never in the index. The site bar marks those pages with
  * `SEARCH_POST_BUILD_META` (`lib/site-bar.ts`), and {@link splitSite} adds
  * their sections to `search-data.json`, in the theme's own entry shape,
  * before it cuts the scopes ({@link withPageEntries}). Re-running it replaces
  * those entries rather than repeating them, so a borrowed index stays one
  * copy. Owner, 2026-11-17: *"we've lost some of the search indexing
- * features"*; measured that day, the dth-phc site indexed 0 of its handbook's
+ * features"*; measured that day, one handbook site indexed 0 of its handbook's
  * pages.
  *
  * Otherwise `search-data.json` stays as the theme writes it — staging
@@ -45,9 +45,9 @@
  * ## A small site is one scope
  *
  * Scoping exists for sites whose whole index is too big to load (33 MB on
- * who-iris). A site whose whole index is at most
+ * a folio's catalogue). A site whose whole index is at most
  * {@link WHOLE_SITE_BUDGET_BYTES} is published as ONE platform scope, so
- * every page searches everything. Without that, the dth-phc site (1.4 MB)
+ * every page searches everything. Without that, one handbook site (1.4 MB)
  * searched a 3-entry platform scope on every page, and "interoperability"
  * found 0 of its 94 matches (measured 2026-11-17).
  *
@@ -209,7 +209,7 @@ export const SECTION_BUDGET_BYTES = 512 * 1024;
  * whole index of 4 MiB costs about 1.3 s to build, or a fraction of that
  * prebuilt: comparable to the scoped search it replaces on a small site, and
  * it finds every match. The failure it fixes was measured 2026-11-17: the
- * dth-phc site's 1.4 MB index, split, left every handbook page searching a
+ * index of a handbook site, 1.4 MB, split, left every handbook page searching a
  * 3-entry platform scope.
  */
 export const WHOLE_SITE_BUDGET_BYTES = 4 * 1024 * 1024;
