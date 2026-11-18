@@ -131,7 +131,7 @@ import {
 import { decide, readTip } from "./staging-push-gate.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
-import { buildInstanceSite, linkedDataSteps, recipeFromConfig, siteFields, siteScopeOf, softRun, type SiteRecipe } from "./build-instance-site.ts";
+import { buildInstanceSite, declaredIriBase, linkedDataSteps, recipeFromConfig, siteFields, siteIriCheckStep, siteScopeOf, softRun, type SiteRecipe } from "./build-instance-site.ts";
 import { makeRecord, RECORD_FILE } from "./preview-record.ts";
 import { findReport, injectSite } from "./preview-qa.ts";
 import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
@@ -893,6 +893,13 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   const layer = declaredLayerName(repo);
   if (layer !== undefined) {
     for (const st of linkedDataSteps(dirname(script("publish-instance-context.ts")), layer, shellQuote(site))) softRun(st.label, st.cmd, repo);
+  }
+  // And it serves the IRIs it mints (IRI fix 1A, f): a finding, never a refusal.
+  const declFile = findDeclarationFile(resolve(repo));
+  const iriBase = declFile === undefined ? undefined : declaredIriBase(join(resolve(repo), declFile));
+  if (iriBase !== undefined) {
+    const st = siteIriCheckStep(dirname(script("check-site-iris.ts")), shellQuote(site), iriBase);
+    softRun(st.label, st.cmd, repo, spawnSync, st.ok);
   }
 
   if (target === "preview") {
