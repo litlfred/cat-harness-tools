@@ -491,3 +491,22 @@ test("a source page's per-locale fix files a suggestion for that locale", async 
   const { record } = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!);
   expect(record.items[0]).toMatchObject({ catalogue: "docs/guide", locale: "fr", verdict: "mistranslation", poHash: HASH });
 });
+
+test("the pane's rank equals the tools layer's rankCandidates, fixture for fixture", async ({ page }) => {
+  const { rankCandidates } = await import("../scripts/lib/translation-strings.ts");
+  const H = "aaaaaaaaaaaaaaaa";
+  const c = (text: string, kind: string, id: string, extra: object = {}) => ({ text, source: { kind, id }, msgidHash: H, ...extra });
+  const fixtures = [
+    { candidates: [c("MT", "open-mt", "opus"), c("Svc", "web-service", "deepl"), c("Ag", "agent", "a"), c("Wb", "web-service", "Weblate"), c("Hu", "human", "github:a"), c("Of", "official", "who")] },
+    { candidates: [c("Fail", "human", "github:a", { qa: { glossary: { pass: false, missing: ["x"] } } }), c("Clean", "open-mt", "m", { qa: { roundtrip: { score: 0.9, threshold: 0.7, pass: true } } }), c("Ph", "agent", "a", { qa: { placeholders: { pass: false } } }), c("None", "open-mt", "n")] },
+    { candidates: [c("Old", "human", "github:a", { source: { kind: "human", id: "github:a", at: "2026-11-01T00:00:00Z" } }), c("New", "human", "github:b", { source: { kind: "human", id: "github:b", at: "2026-11-17T00:00:00Z" } }), c("Stale", "official", "who", { msgidHash: "bbbbbbbbbbbbbbbb" }), c("NoHash", "agent", "a", { msgidHash: undefined })] },
+    { candidates: [c("A", "agent", "a"), c("B", "human", "github:b"), c("C", "open-mt", "m", { qa: { roundtrip: { score: 0.2, threshold: 0.7, pass: false } } })], chosen: { text: "A", how: "adjudicated", by: "github:x", at: "t" } },
+    { candidates: [c("A", "agent", "a"), c("B", "human", "github:b")], chosen: { text: "A", how: "auto", at: "t" } },
+    { candidates: [] },
+  ];
+  await serve(page);
+  const js = await page.evaluate(([fs, h]) => (fs as object[]).map((f) => (window as unknown as { faTranslationReview: { rankCandidates: (e: object, h: string) => Array<{ index: number; tier: string; score: number; stale: boolean; qaFailures: unknown[] }> } }).faTranslationReview.rankCandidates(f, h as string).map((r) => ({ index: r.index, tier: r.tier, score: r.score, stale: r.stale, qa: r.qaFailures.length }))), [fixtures, H] as const);
+  const ts = fixtures.map((f) => rankCandidates(f as never, H).map((r) => ({ index: r.index, tier: r.tier, score: r.score, stale: r.stale, qa: r.qaFailures.length })));
+  expect(js).toEqual(ts);
+  expect(ts[0]!.map((r) => r.tier)).toEqual(["official", "human-proposed", "platform", "agent", "mt", "mt"]);
+});
