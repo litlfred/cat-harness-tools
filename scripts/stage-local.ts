@@ -108,7 +108,6 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { shellQuote } from "./run-script.ts";
 
 import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 
@@ -892,7 +891,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   // them (IRI fix 1A, d): a folio built from a workflow file gets them too.
   const layer = declaredLayerName(repo);
   if (layer !== undefined) {
-    for (const st of linkedDataSteps(dirname(script("publish-instance-context.ts")), layer, shellQuote(site))) softRun(st.label, st.cmd, repo);
+    for (const st of linkedDataSteps(dirname(script("publish-instance-context.ts")), layer, site)) softRun(st.label, st.argv, repo);
   }
 
   if (target === "preview") {
