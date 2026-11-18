@@ -420,42 +420,45 @@ describe("every site build publishes its knowledge-graph search (owner, 2026-11-
 });
 
 describe("build-instance-site — every layer's site serves its JSON-LD context and vocabulary (IRI fix 1A, d)", () => {
-  test("the steps build the context into the site and the vocabulary beside it, for the named instance", () => {
-    const steps = linkedDataSteps("cat-harness-tools/scripts", "dth-pc", "'/tmp/site'");
+  test("the steps build the context into the site and the vocabulary beside it, never over a richer one", () => {
+    const steps = linkedDataSteps("cat-harness-tools/scripts", "dth-pc", "/tmp/site");
     expect(steps.map((s) => s.label)).toEqual(["JSON-LD context", "vocabulary (ns)"]);
-    expect(steps[0]!.cmd).toBe("bun run cat-harness-tools/scripts/publish-instance-context.ts build --root . --instance dth-pc --site '/tmp/site'");
-    expect(steps[1]!.cmd).toBe("bun run cat-harness-tools/scripts/publish-instance-context.ts vocab --root . --instance dth-pc --out-dir '/tmp/site'");
+    expect(steps[0]!.argv).toEqual(["run", "cat-harness-tools/scripts/publish-instance-context.ts", "build", "--root", ".", "--instance", "dth-pc", "--site", "/tmp/site"]);
+    expect(steps[1]!.argv).toEqual(["run", "cat-harness-tools/scripts/publish-instance-context.ts", "vocab", "--root", ".", "--instance", "dth-pc", "--out-dir", "/tmp/site", "--keep-existing"]);
   });
 
-  test("an instance name is quoted, never run as shell", () => {
-    expect(linkedDataSteps("t", "a;rm -rf /", "s")[0]!.cmd).toContain("'a;rm -rf /'");
+  test("an instance name or site path is one argument, never shell", () => {
+    expect(linkedDataSteps("t", "a;rm -rf /", "s p")[0]!.argv).toContain("a;rm -rf /");
+    expect(linkedDataSteps("t", "a", "s p")[0]!.argv).toContain("s p");
   });
 
-  test("a failed step is an error annotation and the build goes on", () => {
+  test("softRun spawns bun with the argv, no shell; a failure is an error annotation and the build goes on", () => {
     const logs: string[] = [];
+    const calls: unknown[][] = [];
     const orig = console.log;
     console.log = (m: string) => void logs.push(m);
     try {
-      const fail = (() => ({ status: 1 })) as unknown as typeof spawnSync;
+      const fail = ((cmd: string, args: string[]) => (calls.push([cmd, args]), { status: 1 })) as unknown as typeof spawnSync;
       const pass = (() => ({ status: 0 })) as unknown as typeof spawnSync;
-      expect(softRun("JSON-LD context", "x", ".", fail)).toBe(false);
-      expect(softRun("JSON-LD context", "x", ".", pass)).toBe(true);
+      expect(softRun("JSON-LD context", ["run", "x.ts"], ".", fail)).toBe(false);
+      expect(softRun("JSON-LD context", ["run", "x.ts"], ".", pass)).toBe(true);
     } finally {
       console.log = orig;
     }
+    expect(calls[0]).toEqual(["bun", ["run", "x.ts"]]);
     expect(logs.some((l) => l.startsWith("::error::JSON-LD context failed (exit 1)"))).toBe(true);
   });
 
   test("the build runs the steps for every declared layer, whatever its recipe", () => {
     const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
-    expect(src).toContain("if (declared) for (const st of linkedDataSteps(TOOLS, o.instance, s)) softRun(st.label, st.cmd, root);");
+    expect(src).toContain("if (declared) for (const st of linkedDataSteps(TOOLS, o.instance, site)) softRun(st.label, st.argv, root);");
   });
 });
 
 describe("build-instance-site — a built site serves the IRIs it mints (IRI fix 1A, f)", () => {
   test("the step checks the tree against the declared iriBase, and no JSON-LD (78) is a pass", () => {
-    const st = siteIriCheckStep("cat-harness-tools/scripts", "'/tmp/site'", "https://example.org/layer/");
-    expect(st.cmd).toBe("bun run cat-harness-tools/scripts/check-site-iris.ts --site '/tmp/site' --base https://example.org/layer/");
+    const st = siteIriCheckStep("cat-harness-tools/scripts", "/tmp/site", "https://example.org/layer/");
+    expect(st.argv).toEqual(["run", "cat-harness-tools/scripts/check-site-iris.ts", "--site", "/tmp/site", "--base", "https://example.org/layer/"]);
     expect(st.ok).toEqual([0, 78]);
   });
 
@@ -464,8 +467,8 @@ describe("build-instance-site — a built site serves the IRIs it mints (IRI fix
     console.log = () => undefined;
     try {
       const exit78 = (() => ({ status: 78 })) as unknown as typeof spawnSync;
-      expect(softRun("x", "x", ".", exit78)).toBe(false);
-      expect(softRun("x", "x", ".", exit78, [0, 78])).toBe(true);
+      expect(softRun("x", ["x"], ".", exit78)).toBe(false);
+      expect(softRun("x", ["x"], ".", exit78, [0, 78])).toBe(true);
     } finally {
       console.log = orig;
     }
@@ -484,7 +487,7 @@ describe("build-instance-site — a built site serves the IRIs it mints (IRI fix
   test("the build and the folio path both run the check", () => {
     const build = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
     const stage = readFileSync(join(import.meta.dir, "..", "..", "stage-local.ts"), "utf-8");
-    expect(build).toContain("const st = siteIriCheckStep(TOOLS, s, iriBase);");
-    expect(stage).toContain("siteIriCheckStep(dirname(script(\"check-site-iris.ts\")), shellQuote(site), iriBase)");
+    expect(build).toContain("const st = siteIriCheckStep(TOOLS, site, iriBase);");
+    expect(stage).toContain("siteIriCheckStep(dirname(script(\"check-site-iris.ts\")), site, iriBase)");
   });
 });

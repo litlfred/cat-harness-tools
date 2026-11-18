@@ -113,7 +113,7 @@ describe("declaredLayerName — whose context a folio built from a workflow publ
   test("the folio path runs the same linked-data steps after the rail", () => {
     const src = readFileSync(join(import.meta.dir, "..", "stage-local.ts"), "utf-8");
     const rail = src.indexOf('script("rail-standalone-pages.ts")');
-    const steps = src.indexOf("linkedDataSteps(dirname(script(\"publish-instance-context.ts\")), layer, shellQuote(site))");
+    const steps = src.indexOf("linkedDataSteps(dirname(script(\"publish-instance-context.ts\")), layer, site)");
     expect(rail).toBeGreaterThan(0);
     expect(steps).toBeGreaterThan(rail);
   });

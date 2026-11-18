@@ -979,11 +979,13 @@ function publishKgSearch(site: string, root: string): void {
  * with a warning, a layer with nothing to publish (no `iriBase`, no
  * documents, no terms of its own).
  */
-export function linkedDataSteps(tools: string, instance: string, site: string): Array<{ label: string; cmd: string }> {
-  const script = `bun run ${tools}/publish-instance-context.ts`;
+export function linkedDataSteps(tools: string, instance: string, site: string): Array<{ label: string; argv: string[] }> {
+  const script = join(tools, "publish-instance-context.ts");
   return [
-    { label: "JSON-LD context", cmd: `${script} build --root . --instance ${shellQuote(instance)} --site ${site}` },
-    { label: "vocabulary (ns)", cmd: `${script} vocab --root . --instance ${shellQuote(instance)} --out-dir ${site}` },
+    { label: "JSON-LD context", argv: ["run", script, "build", "--root", ".", "--instance", instance, "--site", site] },
+    // `--keep-existing`: a richer `v<major>/ns` an earlier step wrote (core's
+    // glossary namespace document) is not overwritten.
+    { label: "vocabulary (ns)", argv: ["run", script, "vocab", "--root", ".", "--instance", instance, "--out-dir", site, "--keep-existing"] },
   ];
 }
 
@@ -995,10 +997,10 @@ export function linkedDataSteps(tools: string, instance: string, site: string): 
  * minted under, not the address this build is published at. Exit 78 (the
  * site publishes no JSON-LD) is a pass.
  */
-export function siteIriCheckStep(tools: string, site: string, iriBase: string): { label: string; cmd: string; ok: readonly number[] } {
+export function siteIriCheckStep(tools: string, site: string, iriBase: string): { label: string; argv: string[]; ok: readonly number[] } {
   return {
     label: "minted IRIs are served",
-    cmd: `bun run ${tools}/check-site-iris.ts --site ${site} --base ${shellQuote(iriBase)}`,
+    argv: ["run", join(tools, "check-site-iris.ts"), "--site", site, "--base", iriBase],
     ok: [0, 78],
   };
 }
@@ -1014,16 +1016,17 @@ export function declaredIriBase(declFile: string): string | undefined {
 }
 
 /**
- * Run a step whose failure is a finding, not a refusal: it is reported as an
- * error annotation and the build goes on, so one layer's unresolved prefix
- * does not take its whole site down. Returns whether it passed; an exit in
- * `ok` (default 0) is a pass.
+ * Run `bun <argv>` as a step whose failure is a finding, not a refusal: it is
+ * reported as an error annotation and the build goes on, so one layer's
+ * unresolved prefix does not take its whole site down. No shell: the argv is
+ * passed as it is. Returns whether it passed; an exit in `ok` (default 0) is
+ * a pass.
  */
-export function softRun(label: string, cmd: string, cwd: string, spawn = spawnSync, ok: readonly number[] = [0]): boolean {
+export function softRun(label: string, argv: readonly string[], cwd: string, spawn = spawnSync, ok: readonly number[] = [0]): boolean {
   console.log(`▶ ${label}`);
-  const r = spawn("bash", ["-c", cmd], { cwd, stdio: "inherit", env: process.env });
+  const r = spawn("bun", [...argv], { cwd, stdio: "inherit", env: process.env });
   if (r.status !== null && ok.includes(r.status)) return true;
-  console.log(`::error::${label} failed (exit ${r.status}): ${cmd} — the site is published without it`);
+  console.log(`::error::${label} failed (exit ${r.status}): bun ${argv.join(" ")} — the site is published without it`);
   return false;
 }
 
@@ -1385,7 +1388,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // exist"). After the mounted docs, so a review page they bring is linked.
     run("translation review", `bun run ${TOOLS}/publish-translation-review.ts --root . --site ${s}`, root);
     // Every declared layer's site: its JSON-LD context and vocabulary (IRI fix 1A, d).
-    if (declared) for (const st of linkedDataSteps(TOOLS, o.instance, s)) softRun(st.label, st.cmd, root);
+    if (declared) for (const st of linkedDataSteps(TOOLS, o.instance, site)) softRun(st.label, st.argv, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");
     else if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow ${shellQuote(`https://cdn.jsdelivr.net/gh/${gh.owner}/`)} --allow ${shellQuote(`https://raw.githubusercontent.com/${gh.owner}/`)}`, root);
@@ -1407,8 +1410,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // Every declared layer's site: the IRIs it mints resolve on it (IRI fix 1A, f).
     const iriBase = declFile === undefined ? undefined : declaredIriBase(join(root, declFile));
     if (iriBase !== undefined) {
-      const st = siteIriCheckStep(TOOLS, s, iriBase);
-      softRun(st.label, st.cmd, root, spawnSync, st.ok);
+      const st = siteIriCheckStep(TOOLS, site, iriBase);
+      softRun(st.label, st.argv, root, spawnSync, st.ok);
     }
     if (o.scope) {
       const pruned = pruneUnreferencedImages(site);
