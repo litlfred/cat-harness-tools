@@ -1147,7 +1147,8 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
         if (schemed !== read) writeFileSync(file, schemed);
         continue;
       }
-      const after = withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}) });
+      // A mounted layer's own page: in the site's search, indexed after the build.
+      const after = withSiteBar(railed, { toRoot, title: named.site ?? named.harness ?? m.name, ...(themeSearch ? { search: themeSearch } : {}), indexAfterBuild: true });
       // The docs pages' own locale chrome, on a page Jekyll never laid out (#2219).
       writeFileSync(file, finishRailedPage(m.instanceDir ? withTranslationMeta(after, translationMetaBlock(m.instanceDir)) : after, false));
       injected++;
