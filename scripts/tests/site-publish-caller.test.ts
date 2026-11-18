@@ -30,14 +30,14 @@ describe("site-publish-caller", () => {
   });
 
   test("a manual-only caller (the old IG template's trigger) is named as such", () => {
-    const manual = pinned.replace(/  push:\n(?:    #.*\n)*    branches: \[main, master\]\n/, "");
+    const manual = pinned.replace(/  push:\n(?:    #.*\n)*    branches: \[main\]\n/, "");
     const f = one(manual);
     expect(f).toHaveLength(1);
     expect(f[0]!.why).toContain("manual-only");
   });
 
   test("a path filter on push is a finding", () => {
-    const f = one(pinned.replace("    branches: [main, master]\n", "    branches: [main, master]\n    paths: [docs/**]\n"));
+    const f = one(pinned.replace("    branches: [main]\n", "    branches: [main]\n    paths: [docs/**]\n"));
     expect(f[0]!.why).toContain("filtered by path");
   });
 
