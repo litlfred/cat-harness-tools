@@ -35,6 +35,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 
+import { logicalPathOf, mountedInstancesCached } from "./lib/layer-output.ts";
 import { qaStorageOf } from "./qa-results.ts";
 import { INDEX_FILE, parseQaKey, type QaLocation } from "./qa-store.ts";
 import type { QaFetchState } from "./qa-site-assets.ts";
@@ -101,8 +102,24 @@ export function qaResultLinkFor(
   absPath: string,
   ctx: { repoRoot: string; repoWeb: string | undefined; key?: string; location?: QaLocation },
 ): QaResultLink {
-  const repoPath = relative(ctx.repoRoot, resolve(absPath)).split(sep).join("/");
-  return qaResultHref({ repoWeb: ctx.repoWeb, repoPath, storedOn: qaStorageOf(absPath, ctx.repoRoot, ctx.location), key: ctx.key });
+  // A mounted layer's computed results are READ from its layer output root
+  // (`build/layers/<instance>/…`), but they are ADDRESSED at the layer's own
+  // path: that is where the declaration sits and how the store keys them.
+  // Linking the build copy lost the layer's path, so the declaration missed
+  // and every stored result was addressed `blob/main/build/layers/…`.
+  const logical = logicalOf(ctx.repoRoot, resolve(absPath));
+  const repoPath = relative(ctx.repoRoot, logical).split(sep).join("/");
+  return qaResultHref({ repoWeb: ctx.repoWeb, repoPath, storedOn: qaStorageOf(logical, ctx.repoRoot, ctx.location), key: ctx.key });
+}
+
+/** {@link logicalPathOf} for the link's checkout; an unreadable lock maps nothing, so the path is linked as given. */
+function logicalOf(repoRoot: string, abs: string): string {
+  try {
+    const mounted = mountedInstancesCached(repoRoot);
+    return mounted.size === 0 ? abs : logicalPathOf(repoRoot, abs, mounted);
+  } catch {
+    return abs;
+  }
 }
 
 /**
