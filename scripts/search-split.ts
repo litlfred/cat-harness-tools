@@ -142,6 +142,14 @@ export interface SearchManifest {
   scopes: ManifestScope[];
   /** Absent when the tree publishes no identifier lookup. */
   remote?: RemoteScope[];
+  /**
+   * The layer names a page's URL can carry (`/<layer>/…`, `/<locale>/<layer>/…`),
+   * sorted: what the search panel's "knowledge graph" filter groups results
+   * by (`fa-search-panel` in the theme script). Listed apart from the scopes
+   * because a small site is ONE scope ({@link WHOLE_SITE_BUDGET_BYTES}) and
+   * still has layers to filter by. Absent when the checkout declares none.
+   */
+  layers?: string[];
 }
 
 /** Where `publish-id-lookup.ts` puts the lookup client and its indexes, under the site root. */
@@ -434,6 +442,7 @@ export function render(
     },
     scopes,
     ...(remote.length > 0 ? { remote: [...remote] } : {}),
+    ...(instances.size > 0 ? { layers: [...instances].sort() } : {}),
   };
   files.set(`${SCOPES_DIR}/manifest.json`, JSON.stringify(manifest, null, 2) + "\n");
   return files;
