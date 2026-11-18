@@ -26,6 +26,7 @@
  * | `<instance>/workshops/<workshop id>/sheets/index.html` | the printable sheets |
  * | `<instance>/workshops/<workshop id>/overview/`, `…/walkthrough/<step>/` | the workshop told in a room, with no site chrome (`present.ts`) |
  * | `assets/journeys.css`, `assets/journeys.js` | the style and the script |
+ * | `assets/calendar.css` | a workshop's days as a calendar (`schedule.ts`), on its page and its overview |
  * | `assets/present.css`, `assets/present.js` | the presentation pages' style and script |
  */
 import { readFileSync } from "node:fs";
@@ -57,12 +58,13 @@ import {
 } from "./read.ts";
 import { igProcessPage, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
 import { PRESENT_ASSETS } from "./present-assets.ts";
+import { scheduleFor, scheduleHtml, scheduleTitle } from "./schedule.ts";
 import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
 import { imageSize, type ImageSize } from "./image-size.ts";
 
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
-export const ASSETS = ["journeys.css", "journeys.js", ...PRESENT_ASSETS] as const;
+export const ASSETS = ["journeys.css", "journeys.js", "calendar.css", ...PRESENT_ASSETS] as const;
 
 export interface PageFile {
   path: string;
@@ -371,7 +373,7 @@ function page(o: { title: string; up: string; crumbs: Crumb[]; body: string; kin
 <link rel="icon" href="${e(DEFAULT_ICON)}">
 ${IG_BANNER_OPT_OUT}
 ${NAVBAR_LINKED}
-<link rel="stylesheet" href="${o.up}assets/journeys.css">
+<link rel="stylesheet" href="${o.up}assets/journeys.css">${o.body.includes('class="jv-cal"') ? `\n<link rel="stylesheet" href="${o.up}assets/calendar.css">` : ""}
 <script src="${o.up}assets/journeys.js" defer></script>
 ${panelHead(o.body, `${o.up}assets/`)}
 </head>
@@ -910,6 +912,8 @@ function workshopPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
     )
     .join("");
   const scenarios = ws.scenarios.map((id) => journeyById(corpus, w.instance, id));
+  const sched = scheduleFor(corpus, w);
+  const calendar = sched ? scheduleHtml({ corpus, here: w, owner: sched.owner, schedule: sched.schedule, toWorkshops: "../", md: mdHtml }) : "";
   const body = `<header class="jv-hero">
 <p class="jv-kicker">Workshop · ${e(instanceTitle(corpus, w.instance))}</p>
 <h1>${e(ws.title)}</h1>
@@ -917,8 +921,9 @@ function workshopPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
 ${ws.audience ? `<p><b>For:</b> ${e(ws.audience)}</p>` : ""}
 ${ws.promise ? `<p class="jv-promise">${e(ws.promise)}</p>` : ""}
 ${ws.useCaseStatement ? `<p class="jv-usecase">${e(ws.useCaseStatement)}</p>` : ""}
-<p><a class="jv-btn" href="overview/">Present it: overview and walkthrough</a>${ws.sheetsSource ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">${e(ws.sheetsSource.title ?? "Table canvas")}</a>` : ws.sheets?.length ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">Printable sheets (${ws.sheets.length})</a>` : ""}</p>
+<p><a class="jv-btn" href="overview/">Present it: overview and walkthrough</a>${calendar ? ` <a class="jv-btn" href="#the-days">${e(scheduleTitle(sched!.schedule))}</a>` : ""}${ws.sheetsSource ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">${e(ws.sheetsSource.title ?? "Table canvas")}</a>` : ws.sheets?.length ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">Printable sheets (${ws.sheets.length})</a>` : ""}</p>
 </header>
+${calendar}
 <section><h2>Taught from</h2><ol class="jv-tree">${scenarios.map((j, i) => (j ? journeyCard(corpus, j, up) : `<li class="jv-unresolved">${e(ws.scenarios[i]!)}: no such journey in this checkout</li>`)).join("\n")}</ol></section>
 <section><h2>Modules</h2>${modulesHtml}</section>
 ${ws.tables?.length ? `<section><h2>Reference tables</h2>${ws.tables.map((t) => tableHtml(t)).join("\n")}</section>` : ""}
