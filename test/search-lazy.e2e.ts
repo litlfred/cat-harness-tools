@@ -85,7 +85,7 @@ const INDEX = JSON.stringify({
  * entry index served at once, later keystrokes would search by themselves and
  * a missing replay would go unseen (measured: it did).
  */
-async function load(page: Page): Promise<{ requests: () => number; release: () => void }> {
+async function load(page: Page, opts: { inlineLunr?: boolean } = {}): Promise<{ requests: () => number; release: () => void; lunrRequests: () => number }> {
   let release!: () => void;
   const released = new Promise<void>((go) => { release = go; });
   const JTD = await renderedJtd();
@@ -93,16 +93,21 @@ async function load(page: Page): Promise<{ requests: () => number; release: () =
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/folio-assistant/assets/css/just-the-docs-default.css">
 <style>body { margin: 0; } ${CSS}</style>
-<script>${LUNR}<\/script><script>${JTD}<\/script></head><body>
+${opts.inlineLunr === false ? "" : `<script>${LUNR}<\/script>`}<script>${JTD}<\/script></head><body>
 <div class="side-bar"><div class="site-header"><a class="site-title">folio-assistant</a>
 <button id="menu-button" class="site-button btn-reset" aria-label="Menu"></button></div><nav class="site-nav" id="site-nav"></nav></div>
 <div class="main"><div class="main-header" id="main-header">${SEARCH}</div><div class="main-content-wrap">
 <div class="main-content"><h1>Page</h1><p>Text.</p></div></div></div>
 <script>${UI}<\/script></body></html>`;
   let n = 0;
+  let lunrN = 0;
   await page.route("http://replica.test/**", (route) => {
     const u = new URL(route.request().url());
     if (u.pathname.endsWith("/page.html")) return route.fulfill({ contentType: "text/html", body: PAGE });
+    if (u.pathname === "/folio-assistant/assets/js/vendor/lunr.min.js") {
+      lunrN++;
+      return route.fulfill({ contentType: "application/javascript", body: LUNR });
+    }
     if (u.pathname.endsWith("/assets/js/search-data.json")) {
       n++;
       return released.then(() => route.fulfill({ contentType: "application/json", body: INDEX }));
@@ -116,7 +121,7 @@ async function load(page: Page): Promise<{ requests: () => number; release: () =
   // The theme script must have RUN: a page error here means the replica, not
   // the override, is what got measured.
   expect(errors, "page errors while loading the replica").toEqual([]);
-  return { requests: () => n, release };
+  return { requests: () => n, release, lunrRequests: () => lunrN };
 }
 
 test("loading a page requests no search index", async ({ page }) => {
@@ -142,4 +147,35 @@ test("opening search and typing at once yields results, and the index is fetched
   await page.keyboard.type("gate");
   await expect(page.locator("#search-results .search-result")).not.toHaveCount(0);
   expect(requests()).toBe(1);
+});
+
+// fa-lazy-lunr (owner, 2026-11-18: "lazy load the search indices"): the
+// indices were already fetched on first use, but lunr itself was a <script>
+// in every page's head. The site's head and its site bar no longer write
+// that tag; the theme script loads lunr when search is first opened.
+test("lunr itself is not loaded until search is opened, then once", async ({ page }) => {
+  const { requests, release, lunrRequests } = await load(page, { inlineLunr: false });
+  await page.waitForLoadState("networkidle");
+  expect(lunrRequests()).toBe(0);
+  expect(requests()).toBe(0);
+  await page.click(".fa-search-peek");
+  await page.keyboard.type("bean");
+  await expect.poll(lunrRequests).toBe(1);
+  release();
+  await expect(page.locator("#search-results .search-result")).not.toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.click(".fa-search-peek");
+  await page.fill("#search-input", "");
+  await page.keyboard.type("gate");
+  await expect(page.locator("#search-results .search-result")).not.toHaveCount(0);
+  expect(lunrRequests()).toBe(1);
+});
+
+test("a page that still carries lunr's tag loads it no second time", async ({ page }) => {
+  const { release, lunrRequests } = await load(page);
+  await page.click(".fa-search-peek");
+  await page.keyboard.type("bean");
+  release();
+  await expect(page.locator("#search-results .search-result")).not.toHaveCount(0);
+  expect(lunrRequests()).toBe(0);
 });
