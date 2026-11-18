@@ -18,7 +18,9 @@
  *    - **started since the PR's base**: a running instance in the layer's
  *      workflow store (kept on `cat/<instance>/beans` and mounted, so it can
  *      never be in the PR's diff) whose `startedAt` is after the commit the
- *      PR's diff starts from ({@link startedSince}; owner, 2026-11-17).
+ *      PR's branch forked from main ({@link startedSince}; owner, 2026-11-17),
+ *      which does not move when main is merged into the PR (`prBaseTime` in
+ *      `corpus-gate.ts`).
  *    Either way an old change set cannot authorise a later edit of the same
  *    block;
  * 2. is **still running** — a completed instance is a change set that has

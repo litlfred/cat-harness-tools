@@ -124,9 +124,9 @@ export interface CorpusGateOptions {
    */
   labelFor: LabelForPath;
   /**
-   * The commit time (ISO) of the commit the PR's diff starts from. When set, a
-   * running change-set instance in the repository's workflow store that was
-   * started after it also covers the blocks it names, as one committed in the
+   * The commit time (ISO) of the PR's fork point ({@link prBaseTime}). When
+   * set, a running change-set instance in the repository's workflow store that
+   * was started after it also covers the blocks it names, as one committed in the
    * diff does. A layer whose store is kept on `cat/<instance>/beans` can only
    * use change sets this way (`change-set-coverage.ts`).
    */
@@ -151,6 +151,57 @@ export function readInstance(root: string, id: string): { state?: ReturnType<typ
     if (msg.includes("cannot resolve the workflow instance directory")) return { unreachable: msg };
     throw e;
   }
+}
+
+/** Run git with `args` in the repository, giving its output lines. Throws on a non-zero exit. */
+export type GitLines = (args: string[]) => string[];
+
+/**
+ * The commit time (ISO) of the PR's fork point: the commit on `since` its own
+ * line of work started from. A stored change-set instance started after it is
+ * tied to this PR (`change-set-coverage.ts`).
+ *
+ * Not `git merge-base <since> HEAD`. Once main is merged into the PR, that is
+ * the current main tip, which is newer than the change set's instance, and
+ * every block the change set made went unauthorised on the next run
+ * (WorldHealthOrganization/dth-cs#3, after dth-cs#4 was merged in). The fork
+ * point does not move when main is merged in: it is the first parent of the
+ * oldest commit on the PR's first-parent line that `since` does not hold.
+ *
+ * The PR's line is HEAD's, except under the merge commit CI checks out
+ * (HEAD^1 is `since`'s tip and HEAD^2 the PR head), where it is HEAD^2.
+ * Following first parents only keeps the line the PR's own: a merged-in
+ * branch's older base does not widen the window. Where the history does not
+ * reach the fork point (a shallow clone), this gives the merge base, as
+ * before, which is never older than the fork point: it can only be stricter.
+ */
+export function prBaseTime(git: GitLines, since: string): string | undefined {
+  const time = (ref: string): string | undefined => git(["show", "-s", "--format=%cI", ref])[0];
+  const mergeBase = git(["merge-base", since, "HEAD"])[0];
+  const fallback = mergeBase ? time(mergeBase) : undefined;
+  const has = (ref: string): boolean => {
+    try {
+      return git(["rev-parse", "-q", "--verify", `${ref}^{commit}`]).length > 0;
+    } catch {
+      return false;
+    }
+  };
+  const holds = (ancestor: string): boolean => {
+    try {
+      git(["merge-base", "--is-ancestor", ancestor, since]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const tip = has("HEAD^2") && holds("HEAD^1") && !holds("HEAD^2") ? "HEAD^2" : "HEAD";
+  const line = git(["rev-list", "--first-parent", tip, "--not", since]);
+  const oldest = line[line.length - 1];
+  if (!oldest || !has(`${oldest}^1`)) return fallback;
+  const fork = time(`${oldest}^1`);
+  if (!fork || !fallback) return fork ?? fallback;
+  // The fork point is never later than the merge base; if clocks say it is, keep the stricter one.
+  return Date.parse(fork) <= Date.parse(fallback) ? fork : fallback;
 }
 
 /**
