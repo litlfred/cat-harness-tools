@@ -808,6 +808,10 @@ export function reviewProjection(layers: ReviewLayer[], statusPage: string | und
         maxUrl: MAX_ISSUE_URL,
         candidatesSchema: CANDIDATES_SCHEMA,
         candidatesSuffix: CANDIDATES_SUFFIX,
+        // A suggestion's "choose as the translation" field, honoured for collaborators
+        // only; anyone may propose (owner, 2026-11-18).
+        chooseField: "choose",
+        proposeOpen: true,
       },
       // Each row's `strings`, relative to `base` (owner, 2026-11-18). The
       // vocabularies are the tools layer's, so the pane states neither.

@@ -32,13 +32,13 @@
  *   (`qa-attestations/v1`, criterion {@link ADJUDICATION_CRITERION}) naming
  *   the issue and the hash of the catalogue the person saw.
  * - **mistranslation** (owner, 2026-11-18): every suggestion, from anyone, is
- *   appended to the candidates sidecar as a `human` candidate. A
- *   collaborator's suggestion also adjudicates the string: `msgstr` becomes
- *   their text, not fuzzy, and the sidecar entry's `adjudications` records
- *   who chose which candidate (or their own text) and why. Anyone else's is a
- *   proposal: it fills `msgstr` only when that is empty (fuzzy), flags the
- *   catalogue for a collaborator, and is filed under
- *   {@link PROPOSAL_CRITERION}.
+ *   appended to the candidates sidecar as a `human` candidate, and the string
+ *   is re-ranked: an empty `msgstr`, or an earlier auto-pick, takes the
+ *   auto-pick. A suggestion with `choose: true` from an owner, member or
+ *   collaborator becomes `msgstr`, not fuzzy, and the entry's `chosen`
+ *   records who chose which candidate (or their own text), when and why.
+ *   A proposal is filed under {@link PROPOSAL_CRITERION}, a choice under
+ *   {@link ADJUDICATION_CRITERION}.
  *
  * The PO header `X-Folio-Official` and the locale's `status.json` are never
  * touched: locale sign-off stays a separate, deliberate act
@@ -50,8 +50,9 @@
  * collaborator of the repository is refused, as is one whose catalogue
  * changed since the page showed it (`poHash`). An item is refused when its
  * path leaves the translations directory or its sidecar will not parse. A
- * collaborator's suggestion for a string that is no longer what they saw is
- * recorded as their proposal, not as an adjudication. A refusal is reported
+ * choice against a catalogue that moved, or a string that no longer says what
+ * the chooser saw, is not applied; the suggestion is kept as their proposal.
+ * A proposal itself is never refused for a moved catalogue. A refusal is reported
  * on the issue; it is never a partial record dressed as a whole one.
  *
  * Node-only imports: this module is the part both the page's generator and
@@ -60,6 +61,9 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, normalize, sep } from "node:path";
+
+import { checkedCandidate } from "./machine-translation.ts";
+import { applyAutoPick } from "./translation-strings.ts";
 
 /** The issue body's JSON block declares this. */
 export const ADJUDICATION_SCHEMA = "translation-adjudication/v1" as const;
@@ -95,28 +99,33 @@ export type CandidateSourceKind = (typeof CANDIDATE_SOURCE_KINDS)[number];
 
 export interface CandidateSource {
   kind: CandidateSourceKind;
-  /** The model or service: `claude-opus-5-5`, `opus-mt-en-fr`, `deepl`, `weblate`; a person as `github:<login>`. */
+  /** The model, service or publication: `claude-opus-5-5`, `opus-mt-en-fr`, `deepl`, `weblate`, `who-ehealth-glossary`; a person as `github:<login>`. */
   id: string;
   version?: string;
   /** ISO 8601, when the candidate was produced. */
   at?: string;
-  /** The issue a person's proposal came from (owner, 2026-11-18: `{kind:"human", id:"github:<login>", issue}`). */
-  issue?: string;
+  /** Who: `github:<login>` for a person, or the agent that produced it. */
+  by?: string;
+  /** The issue a person's proposal came from (owner, 2026-11-18). */
+  issue?: number;
 }
 
 /**
  * QA results carried with a candidate, so a reviewer sees them beside it and
- * the default pick demotes a candidate that fails (owner, 2026-11-18).
+ * the auto-pick demotes a candidate that fails (owner, 2026-11-18). A check
+ * that was not run is absent, and absent is not a failure.
  *
  * - `glossary`: the glossary check (`pipeline/translation-glossary.ts`, the
- *   port of `glossary_qa.py`): the fixed terms the source uses (`checked`)
- *   and those whose fixed translation the candidate lacks (`missing`).
- * - `roundTrip`: the candidate translated back to the source language and
- *   scored against it, 0 to 1; `back` is the back-translation.
+ *   port of `glossary_qa.py`), with the fixed terms the candidate lacks.
+ * - `placeholders`: placeholders and markup round-trip (always run on append).
+ * - `roundtrip`: the candidate translated back and scored against the source,
+ *   run only where an engine is configured.
  */
 export interface CandidateQa {
-  glossary?: { missing: string[]; checked?: string[] };
-  roundTrip?: { score: number; back?: string; engine?: string };
+  glossary?: { pass: boolean; missing?: string[] };
+  placeholders?: { pass: boolean };
+  roundtrip?: { score: number; threshold: number; pass: boolean; engine?: string };
+  at?: string;
 }
 
 /** One proposed translation of one string. */
@@ -126,55 +135,55 @@ export interface Candidate {
   /** For a plural entry, every `msgstr[n]`, in order. */
   forms?: string[];
   source: CandidateSource;
-  /** Who wrote it, when the source is a platform or service with translators (a Weblate user). */
-  author?: string;
   /** {@link msgidHash} of the string the candidate translates, when it was made: a mismatch is a stale candidate. */
   msgidHash?: string;
+  /**
+   * For an `official` candidate: the English exactly as the official source
+   * prints it. Only an exact match with the entry's msgid makes its auto-pick
+   * official (owner amendment, 2026-11-18).
+   */
+  sourceText?: string;
   qa?: CandidateQa;
   /** A person's proposal that repeats another source's candidate names that source. */
-  basedOn?: CandidateSource;
+  basedOn?: { kind: CandidateSourceKind; id: string };
   note?: string;
 }
 
+/** How an entry's `msgstr` came to be what it is. */
+export const CHOSEN_HOW = ["adjudicated", "auto-official", "auto"] as const;
+export type ChosenHow = (typeof CHOSEN_HOW)[number];
+
 /**
- * A collaborator's choice for one string (owner, 2026-11-18: "repo
- * collaborators adjudicate by choosing a candidate or entering their own
- * text; that writes msgstr and records who chose and why"). Appended; the
- * last is the string's current adjudication.
+ * What an entry's `msgstr` is, and how it got there (owner, 2026-11-18):
+ * `adjudicated` by a collaborator's choice (who, when, why), `auto-official`
+ * an official candidate whose source English matches exactly (not fuzzy), or
+ * `auto` the top-ranked candidate, fuzzy and unofficial, which a better
+ * candidate replaces on a later merge.
  */
-export interface StringAdjudication {
-  /** `github:<login>`. */
-  by: string;
-  at: string;
-  issue: string;
-  /** The text chosen; it is what `msgstr` says after the adjudication. */
+export interface Chosen {
   text: string;
-  /** The candidate chosen, by its source, or `own-text` when the collaborator typed their own. */
-  chose: CandidateSource | "own-text";
-  /** The collaborator's reason, when they gave one. */
-  why?: string;
-  /** {@link msgidHash} of the string when it was adjudicated. */
-  msgidHash?: string;
-  /** What `msgstr` said before. */
-  previous?: string;
+  how: ChosenHow;
+  /** `github:<login>`, for `adjudicated`. */
+  by?: string;
+  at: string;
+  issue?: number;
+  reason?: string;
+  /** The candidate chosen, by its source; absent when a collaborator typed their own text. */
+  candidate?: { kind: CandidateSourceKind; id: string };
 }
 
 /**
  * The candidates sidecar, `translations/<locale>/<catalogue>.candidates.json`:
  * alternative translations per string, from any number of sources, for a
  * reviewer to choose among. The `.po` keeps one `msgstr`; this file keeps the
- * rest. Writers append; a candidate is never a verdict.
+ * rest. Writers append (deduplicated on text, kind and id); a candidate is
+ * never a verdict.
  *
  * **Candidates are never a barrier to having a translation** (owner,
- * 2026-11-14). A writer that adds candidates for a string whose `msgstr` is
- * empty also puts the default pick (`translation-strings.ts` `rankCandidates`)
- * in the `.po` as its `msgstr`, marked `#, fuzzy`: the page then shows that
- * translation, and it stays the default until a collaborator adjudicates the
- * string. A non-empty `msgstr` is left alone (owner, 2026-11-18).
- *
- * **Several proposals per string** (owner, 2026-11-18): every issue
- * suggestion, from any author, is appended here as a `human` candidate; a
- * collaborator's choice is recorded in `adjudications`.
+ * 2026-11-14). `msgstr` changes only when it is empty, by auto-pick
+ * (`translation-strings.ts` `rankCandidates`), or by a collaborator's choice
+ * (owner, 2026-11-18). Every issue suggestion, from any author, is appended
+ * as a `human` candidate.
  */
 export const CANDIDATES_SCHEMA = "translation-candidates/v1" as const;
 export const CANDIDATES_SUFFIX = ".candidates.json" as const;
@@ -188,7 +197,7 @@ export interface CandidatesEntry {
    * machine-filled, fuzzy).
    */
   candidates: Candidate[];
-  adjudications?: StringAdjudication[];
+  chosen?: Chosen;
 }
 
 export interface CandidatesFile {
@@ -200,24 +209,28 @@ export interface CandidatesFile {
 }
 
 const HEX16 = /^[0-9a-f]{16}$/;
+const PASS = (v: unknown) => v !== null && typeof v === "object" && typeof (v as { pass?: unknown }).pass === "boolean";
 
 /** `undefined` when `v` is a {@link CandidateQa}, else what is wrong. */
 function qaProblem(v: unknown): string | undefined {
   const q = v as Record<string, unknown> | null;
   if (q === null || typeof q !== "object" || Array.isArray(q)) return "must be an object";
   const strs = (x: unknown) => Array.isArray(x) && x.every((y) => typeof y === "string" && y.length <= 500);
-  if (q.glossary !== undefined) {
-    const g = q.glossary as Record<string, unknown> | null;
-    if (g === null || typeof g !== "object" || !strs(g.missing) || (g.checked !== undefined && !strs(g.checked))) return "glossary must list missing (and checked) terms";
+  if (q.glossary !== undefined && (!PASS(q.glossary) || ((q.glossary as { missing?: unknown }).missing !== undefined && !strs((q.glossary as { missing?: unknown }).missing)))) return "glossary must say pass (and list missing terms)";
+  if (q.placeholders !== undefined && !PASS(q.placeholders)) return "placeholders must say pass";
+  if (q.roundtrip !== undefined) {
+    const r = q.roundtrip as Record<string, unknown> | null;
+    if (!PASS(r) || typeof r!.score !== "number" || typeof r!.threshold !== "number" || !(r!.score >= 0 && r!.score <= 1)) return "roundtrip must give score (0 to 1), threshold and pass";
+    if (r!.engine !== undefined && typeof r!.engine !== "string") return "roundtrip.engine must be text";
   }
-  if (q.roundTrip !== undefined) {
-    const r = q.roundTrip as Record<string, unknown> | null;
-    if (r === null || typeof r !== "object" || typeof r.score !== "number" || !(r.score >= 0 && r.score <= 1)) return "roundTrip.score must be a number from 0 to 1";
-    if (r.back !== undefined && typeof r.back !== "string") return "roundTrip.back must be text";
-    if (r.engine !== undefined && typeof r.engine !== "string") return "roundTrip.engine must be text";
-  }
+  if (q.at !== undefined && (typeof q.at !== "string" || q.at.length > 40)) return "at must be a timestamp";
   return undefined;
 }
+
+const kindId = (v: unknown) => {
+  const o = v as Record<string, unknown> | null;
+  return o !== null && typeof o === "object" && (CANDIDATE_SOURCE_KINDS as readonly unknown[]).includes(o.kind) && typeof o.id === "string" && o.id.length > 0;
+};
 
 /** Problems with a candidates file; empty means it is a {@link CandidatesFile}. */
 export function candidatesProblems(c: unknown): string[] {
@@ -241,36 +254,26 @@ export function candidatesProblems(c: unknown): string[] {
       }
       const p = sourceProblem(cc?.source);
       if (p) out.push(`${at}.source ${p}`);
-      if (cc?.basedOn !== undefined) {
-        const b = sourceProblem(cc.basedOn);
-        if (b) out.push(`${at}.basedOn ${b}`);
-      }
-      if (cc?.author !== undefined && (typeof cc.author !== "string" || cc.author.length === 0 || cc.author.length > 200)) out.push(`${at}.author must name a person`);
+      if (cc?.basedOn !== undefined && !kindId(cc.basedOn)) out.push(`${at}.basedOn must name a source kind and id`);
       if (cc?.msgidHash !== undefined && (typeof cc.msgidHash !== "string" || !HEX16.test(cc.msgidHash))) out.push(`${at}.msgidHash must be 16 hex characters`);
+      if (cc?.sourceText !== undefined && !str(cc.sourceText)) out.push(`${at}.sourceText must be text`);
       if (cc?.note !== undefined && !str(cc.note, 2000)) out.push(`${at}.note is too long`);
       if (cc?.qa !== undefined) {
         const q = qaProblem(cc.qa);
         if (q) out.push(`${at}.qa ${q}`);
       }
     });
-    if (e.adjudications !== undefined) {
-      if (!Array.isArray(e.adjudications)) return void out.push(`entries[${i}].adjudications must be a list`);
-      e.adjudications.forEach((a0, j) => {
-        const at = `entries[${i}].adjudications[${j}]`;
-        const a = a0 as Record<string, unknown> | null;
-        if (a === null || typeof a !== "object") return void out.push(`${at} is not an object`);
-        if (typeof a.by !== "string" || !/^github:[A-Za-z0-9-]+(\[bot\])?$/.test(a.by)) out.push(`${at}.by must be github:<login>`);
-        if (typeof a.at !== "string" || a.at.length > 40) out.push(`${at}.at must be a timestamp`);
-        if (typeof a.issue !== "string" || a.issue.length > 300) out.push(`${at}.issue must be the issue's URL`);
-        if (typeof a.text !== "string") out.push(`${at}.text is required`);
-        if (a.chose !== "own-text") {
-          const s = sourceProblem(a.chose);
-          if (s) out.push(`${at}.chose must be own-text or a candidate source: ${s}`);
-        }
-        if (a.why !== undefined && !str(a.why, 2000)) out.push(`${at}.why is too long`);
-        if (a.msgidHash !== undefined && (typeof a.msgidHash !== "string" || !HEX16.test(a.msgidHash))) out.push(`${at}.msgidHash must be 16 hex characters`);
-        if (a.previous !== undefined && typeof a.previous !== "string") out.push(`${at}.previous must be text`);
-      });
+    if (e.chosen !== undefined) {
+      const at = `entries[${i}].chosen`;
+      const ch = e.chosen as Record<string, unknown> | null;
+      if (ch === null || typeof ch !== "object") return void out.push(`${at} is not an object`);
+      if (typeof ch.text !== "string") out.push(`${at}.text is required`);
+      if (!(CHOSEN_HOW as readonly unknown[]).includes(ch.how)) out.push(`${at}.how must be one of ${CHOSEN_HOW.join(", ")}`);
+      if (ch.how === "adjudicated" && (typeof ch.by !== "string" || !/^github:[A-Za-z0-9-]+(\[bot\])?$/.test(ch.by))) out.push(`${at}.by must be github:<login> for an adjudication`);
+      if (typeof ch.at !== "string" || ch.at.length > 40) out.push(`${at}.at must be a timestamp`);
+      if (ch.issue !== undefined && (!Number.isInteger(ch.issue) || (ch.issue as number) <= 0)) out.push(`${at}.issue must be an issue number`);
+      if (ch.reason !== undefined && !str(ch.reason, 2000)) out.push(`${at}.reason is too long`);
+      if (ch.candidate !== undefined && !kindId(ch.candidate)) out.push(`${at}.candidate must name a source kind and id`);
     }
   });
   return out;
@@ -284,7 +287,8 @@ export function sourceProblem(v: unknown): string | undefined {
   if (typeof s.id !== "string" || s.id.length === 0 || s.id.length > 200) return "id must name the model or service";
   if (s.version !== undefined && (typeof s.version !== "string" || s.version.length > 200)) return "version must be text";
   if (s.at !== undefined && (typeof s.at !== "string" || s.at.length > 40)) return "at must be a timestamp";
-  if (s.issue !== undefined && (typeof s.issue !== "string" || !s.issue.startsWith("https://") || s.issue.length > 300)) return "issue must be the issue's https URL";
+  if (s.by !== undefined && (typeof s.by !== "string" || s.by.length === 0 || s.by.length > 200)) return "by must name who";
+  if (s.issue !== undefined && (!Number.isInteger(s.issue) || (s.issue as number) <= 0)) return "issue must be an issue number";
   return undefined;
 }
 
@@ -297,6 +301,14 @@ export interface Suggestion {
   /** The candidate's source when the reviewer picked one rather than typing their own. */
   source?: CandidateSource;
   note?: string;
+  /**
+   * "Choose as the translation": honoured for an owner, member or
+   * collaborator only, whose choice then becomes the string's `msgstr`.
+   * Without it, or from anyone else, the suggestion is a proposal.
+   */
+  choose?: boolean;
+  /** Why the reviewer chose it, recorded with the choice. */
+  reason?: string;
 }
 
 /** One (catalogue, locale) verdict. */
@@ -309,16 +321,7 @@ export interface AdjudicationItem {
   poHash: string;
   suggestions?: Suggestion[];
   note?: string;
-  /**
-   * `propose`: record the suggestions as candidates only, even when the
-   * author could adjudicate. Absent, a collaborator's suggestion adjudicates
-   * the string and anyone else's is a proposal (owner, 2026-11-18).
-   */
-  intent?: Intent;
 }
-
-/** What an item's suggestions ask for: a collaborator's choice, or a proposal for one. */
-export type Intent = "adjudicate" | "propose";
 
 /** The issue body's JSON block. */
 export interface AdjudicationPayload {
@@ -390,7 +393,6 @@ export function payloadProblems(p: unknown): string[] {
     if (it.verdict !== "acceptable" && it.verdict !== "mistranslation") out.push(`${at}.verdict must be acceptable or mistranslation`);
     if (typeof it.poHash !== "string" || !HASH_RE.test(it.poHash)) out.push(`${at}.poHash must be 16 hex characters`);
     if (it.note !== undefined && !str(it.note, 2000)) out.push(`${at}.note is too long`);
-    if (it.intent !== undefined && it.intent !== "adjudicate" && it.intent !== "propose") out.push(`${at}.intent must be adjudicate or propose`);
     if (it.verdict === "acceptable" && it.suggestions !== undefined && (!Array.isArray(it.suggestions) || it.suggestions.length > 0)) {
       out.push(`${at}: an acceptable verdict carries no suggestions`);
     }
@@ -407,6 +409,8 @@ export function payloadProblems(p: unknown): string[] {
           if (!str(s.current)) out.push(`${sat}.current is required (the text you saw)`);
           if (!str(s.suggested) || s.suggested.trim().length === 0) out.push(`${sat}.suggested is required`);
           if (s.note !== undefined && !str(s.note, 2000)) out.push(`${sat}.note is too long`);
+          if (s.choose !== undefined && typeof s.choose !== "boolean") out.push(`${sat}.choose must be true or false`);
+          if (s.reason !== undefined && !str(s.reason, 2000)) out.push(`${sat}.reason is too long`);
           if (s.source !== undefined) {
             const sp = sourceProblem(s.source);
             if (sp) out.push(`${sat}.source ${sp}`);
@@ -447,7 +451,7 @@ export function issueBody(p: AdjudicationPayload): string {
   const lines: string[] = [
     `Translation review of **${p.layer}** (\`${p.translations}\`), filed from the translation status page.`,
     "",
-    "By filing this issue, I (its author) review the translations below. The workflow records my GitHub login as the reviewer and opens a pull request; nothing is recorded in anyone else's name. If I am a collaborator of the repository my choices are adjudications; otherwise each suggestion is recorded as a proposal beside the others.",
+    "By filing this issue, I (its author) review the translations below. The workflow records my GitHub login as the reviewer and opens a pull request; nothing is recorded in anyone else's name. Each suggestion is recorded as a proposal beside the others; one marked \"chooses\" becomes the translation only if I am a collaborator of the repository.",
     "",
   ];
   const acc = p.items.filter((i) => i.verdict === "acceptable");
@@ -462,7 +466,7 @@ export function issueBody(p: AdjudicationPayload): string {
     for (const i of mis) {
       lines.push(`- \`${i.locale}\` ${code(i.catalogue)}${i.note ? ` — ${i.note}` : ""}`);
       for (const s of i.suggestions ?? []) {
-        lines.push(`  - ${code(s.msgid)}${s.msgctxt ? ` (context ${code(s.msgctxt)})` : ""}: ${code(s.current)} → ${code(s.suggested)}${s.source ? ` (candidate from ${s.source.kind} ${code(s.source.id)})` : ""}${s.note ? ` — ${s.note}` : ""}`);
+        lines.push(`  - ${s.choose ? "chooses" : "proposes"} ${code(s.msgid)}${s.msgctxt ? ` (context ${code(s.msgctxt)})` : ""}: ${code(s.current)} → ${code(s.suggested)}${s.source ? ` (candidate from ${s.source.kind} ${code(s.source.id)})` : ""}${s.reason ? ` because ${s.reason}` : ""}${s.note ? ` — ${s.note}` : ""}`);
       }
     }
     lines.push("");
@@ -746,6 +750,12 @@ export function applyAdjudication(text: string, s: Pick<Suggestion, "msgctxt" | 
 /** The attestation criterion a proposal (not an adjudication) is filed under. */
 export const PROPOSAL_CRITERION = "human-proposal" as const;
 
+/** The issue number in an issue's URL; `undefined` when the URL names none. */
+export function issueNumber(url: string): number | undefined {
+  const m = /\/issues\/(\d+)(?:[#?].*)?$/.exec(url);
+  return m ? Number(m[1]) : undefined;
+}
+
 /**
  * Decide every write an issue makes. Pure apart from reading the layer's
  * files: the caller writes {@link Plan.writes}, so a test can inspect the
@@ -753,17 +763,21 @@ export const PROPOSAL_CRITERION = "human-proposal" as const;
  *
  * The owner's rulings of 2026-11-18:
  *
- * - **Anyone can propose.** Every suggestion, from any author, is appended to
+ * - **PROPOSE (anyone).** Every suggestion, from any author, is appended to
  *   the catalogue's candidates sidecar as `{kind: "human", id:
- *   "github:<login>", issue}`. A proposal never conflicts with another: the
- *   sidecar keeps them all. `msgstr` is left alone unless it is empty, when
- *   the proposal fills it, fuzzy.
- * - **Collaborators adjudicate.** An owner's, member's or collaborator's
- *   suggestion (unless the item says `intent: "propose"`) also writes
- *   `msgstr`, not fuzzy, and appends to the entry's `adjudications` who chose
- *   which candidate (or their own text) and why. A string that changed since
- *   they saw it is recorded as their proposal only.
- * - **Only collaborators accept** a whole catalogue (`acceptable`).
+ *   "github:<login>", by, issue}`, with its `msgidHash` and placeholder QA.
+ *   A proposal is never refused for a changed catalogue and never conflicts
+ *   with another: the sidecar keeps them all. Then the string is re-ranked:
+ *   an empty `msgstr`, or one that is itself an earlier auto-pick, takes the
+ *   auto-pick (`translation-strings.ts` `applyAutoPick`).
+ * - **ADJUDICATE (owners, members, collaborators, with `choose: true`).** The
+ *   suggestion becomes the string's `msgstr`, not fuzzy, and the entry's
+ *   `chosen` says `adjudicated`, by whom, when, in which issue, why, and
+ *   which candidate. The catalogue-hash and current-text checks apply here
+ *   only: a choice against a catalogue that moved is refused, and the
+ *   proposal is kept.
+ * - **ACCEPT (owners, members, collaborators).** `acceptable` signs off the
+ *   catalogue, and each fuzzy entry in it is adjudicated as it stands.
  */
 export function planAdjudication(input: PlanInput): Plan {
   const plan: Plan = { writes: new Map(), applied: [], refused: [] };
@@ -783,6 +797,7 @@ export function planAdjudication(input: PlanInput): Plan {
     return plan;
   }
   const person = `github:${author.login}`;
+  const issue = issueNumber(input.issueUrl);
   const seen = new Set<string>();
   for (const item of p.items) {
     const key = `${item.locale}/${item.catalogue}`;
@@ -801,14 +816,7 @@ export function planAdjudication(input: PlanInput): Plan {
       plan.refused.push(`${key}: there is no catalogue ${poRel}`);
       continue;
     }
-
-    let poText = current;
-    let role: "adjudicator" | "proposer" = "adjudicator";
-    const appliedSuggestions: Suggestion[] = [];
-    let sidecarText: string | undefined;
-    let adjudicated = 0;
-    let proposed = 0;
-    let filled = 0;
+    const moved = poHash(current) !== item.poHash;
     if (item.verdict === "acceptable") {
       if (!collaborator) {
         plan.refused.push(
@@ -817,19 +825,44 @@ export function planAdjudication(input: PlanInput): Plan {
         );
         continue;
       }
-      if (poHash(current) !== item.poHash) {
+      if (moved) {
         plan.refused.push(`${key}: the catalogue changed since the page showed it (hash ${item.poHash}, now ${poHash(current)}); reload the page and review it again`);
         continue;
       }
-    } else {
-      role = collaborator && item.intent !== "propose" ? "adjudicator" : "proposer";
-      const sidecarAbs = join(input.layerRoot, sidecarRel);
-      const raw = plan.writes.has(sidecarRel) ? (JSON.parse(plan.writes.get(sidecarRel)!) as unknown) : readJson(sidecarAbs);
-      if (raw === null || (raw !== undefined && candidatesProblems(raw).length > 0)) {
-        plan.refused.push(`${key}: its candidates file ${sidecarRel} is not ${CANDIDATES_SCHEMA}; it is never overwritten, so nothing is recorded for this catalogue`);
-        continue;
+    }
+
+    const sidecarAbs = join(input.layerRoot, sidecarRel);
+    const raw = plan.writes.has(sidecarRel) ? (JSON.parse(plan.writes.get(sidecarRel)!) as unknown) : readJson(sidecarAbs);
+    if (raw === null || (raw !== undefined && candidatesProblems(raw).length > 0)) {
+      plan.refused.push(`${key}: its candidates file ${sidecarRel} is not ${CANDIDATES_SCHEMA}; it is never overwritten, so nothing is recorded for this catalogue`);
+      continue;
+    }
+    const sidecar: CandidatesFile = (raw as CandidatesFile | undefined) ?? { $schema: CANDIDATES_SCHEMA, locale: item.locale, catalogue: item.catalogue, entries: [] };
+    const entryOf = (e: PoEntry): CandidatesEntry => {
+      let x = sidecar.entries.find((y) => y.msgid === e.msgid && (y.msgctxt ?? undefined) === (e.msgctxt ?? undefined));
+      if (!x) {
+        x = { ...(e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {}), msgid: e.msgid, candidates: [] };
+        sidecar.entries.push(x);
       }
-      const sidecar: CandidatesFile = (raw as CandidatesFile | undefined) ?? { $schema: CANDIDATES_SCHEMA, locale: item.locale, catalogue: item.catalogue, entries: [] };
+      return x;
+    };
+
+    let poText = current;
+    const recorded: Suggestion[] = [];
+    let chosenCount = 0;
+    let proposed = 0;
+    let autoPicked = 0;
+    if (item.verdict === "acceptable") {
+      // Each fuzzy entry is adjudicated as it stands.
+      for (const e of poEntries(current)) {
+        if (!e.fuzzy || e.msgidPlural !== undefined || e.msgstr === "") continue;
+        const r = applyAdjudication(poText, { ...(e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {}), msgid: e.msgid, current: e.msgstr, suggested: e.msgstr });
+        if ("refused" in r) continue;
+        poText = r.text;
+        entryOf(e).chosen = { text: e.msgstr, how: "adjudicated", by: person, at: input.at, ...(issue ? { issue } : {}), ...(item.note ? { reason: item.note } : {}) };
+        chosenCount++;
+      }
+    } else {
       for (const s of item.suggestions ?? []) {
         const what = `msgid ${JSON.stringify(s.msgid.slice(0, 80))}`;
         const e = poEntries(poText).find((x) => x.msgid === s.msgid && (x.msgctxt ?? undefined) === (s.msgctxt || undefined));
@@ -842,63 +875,63 @@ export function planAdjudication(input: PlanInput): Plan {
           continue;
         }
         const hash = msgidHash(e);
-        let entry = sidecar.entries.find((x) => x.msgid === e.msgid && (x.msgctxt ?? undefined) === (e.msgctxt ?? undefined));
-        if (!entry) {
-          entry = { ...(e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {}), msgid: e.msgid, candidates: [] };
-          sidecar.entries.push(entry);
-        }
-        // Every suggestion is a proposal, recorded beside the others.
+        const entry = entryOf(e);
+        // PROPOSE: always recorded, beside the others (deduplicated on text, kind and id).
         if (!entry.candidates.some((c) => c.text === s.suggested && c.source.kind === "human" && c.source.id === person)) {
+          const ph = placeholderCheck(s.msgid, s.suggested);
           entry.candidates.push({
             text: s.suggested,
-            source: { kind: "human", id: person, at: input.at, issue: input.issueUrl },
+            source: { kind: "human", id: person, by: person, at: input.at, ...(issue ? { issue } : {}) },
             msgidHash: hash,
-            ...(s.source ? { basedOn: s.source } : {}),
+            ...(s.source ? { basedOn: { kind: s.source.kind, id: s.source.id } } : {}),
+            qa: { placeholders: { pass: ph }, at: input.at },
             ...(s.note ? { note: s.note } : {}),
           });
         }
         proposed++;
-        if (role === "adjudicator") {
+        recorded.push(s);
+        // ADJUDICATE: a collaborator's explicit choice.
+        if (s.choose === true && collaborator) {
+          if (moved) {
+            plan.refused.push(`${key}: the catalogue changed since the page showed it, so @${author.login}'s choice for ${what} is not applied; it is kept as their proposal`);
+            continue;
+          }
           const r = applyAdjudication(poText, s);
           if ("refused" in r) {
-            plan.refused.push(`${key}: ${r.refused}; recorded as @${author.login}'s proposal, not adjudicated`);
+            plan.refused.push(`${key}: ${r.refused}; @${author.login}'s choice is not applied, and is kept as their proposal`);
             continue;
           }
           poText = r.text;
-          entry.adjudications = [
-            ...(entry.adjudications ?? []),
-            {
-              by: person,
-              at: input.at,
-              issue: input.issueUrl,
-              text: s.suggested,
-              chose: s.source ?? "own-text",
-              ...(s.note || item.note ? { why: s.note ?? item.note! } : {}),
-              msgidHash: hash,
-              previous: e.msgstr,
-            },
-          ];
-          adjudicated++;
-          appliedSuggestions.push(s);
-        } else {
-          // msgstr is left alone unless it is empty (owner, 2026-11-18).
-          if (e.forms.every((f) => f === "")) {
-            const r = applySuggestion(poText, { ...s, current: "" });
-            if ("text" in r) {
-              poText = r.text;
-              filled++;
-            }
-          }
-          appliedSuggestions.push(s);
+          const why = s.reason ?? s.note ?? item.note;
+          entry.chosen = {
+            text: s.suggested,
+            how: "adjudicated",
+            by: person,
+            at: input.at,
+            ...(issue ? { issue } : {}),
+            ...(why ? { reason: why } : {}),
+            ...(s.source ? { candidate: { kind: s.source.kind, id: s.source.id } } : {}),
+          };
+          chosenCount++;
+          continue;
+        }
+        if (s.choose === true && !collaborator) {
+          plan.refused.push(`${key}: only an owner, member or collaborator can choose the translation of ${what}, and @${author.login} is ${author.association}; it is recorded as their proposal`);
+        }
+        // Re-rank: an empty msgstr, or an earlier auto-pick, takes the auto-pick.
+        const picked = applyAutoPick(poText, entry, poEntries(poText).find((x) => x.msgid === e.msgid && (x.msgctxt ?? undefined) === (e.msgctxt ?? undefined))!, input.at);
+        if (picked) {
+          poText = picked.po;
+          entry.chosen = picked.chosen;
+          autoPicked++;
         }
       }
       if (proposed === 0) continue;
-      const issues = candidatesProblems(sidecar);
-      if (issues.length > 0) {
-        plan.refused.push(`${key}: the candidates file would not validate (${issues[0]}); nothing is recorded for this catalogue`);
-        continue;
-      }
-      sidecarText = json(sidecar);
+    }
+    const issues = candidatesProblems(sidecar);
+    if (issues.length > 0) {
+      plan.refused.push(`${key}: the candidates file would not validate (${issues[0]}); nothing is recorded for this catalogue`);
+      continue;
     }
 
     // The translation node: what the review cells and the status page read.
@@ -924,15 +957,15 @@ export function planAdjudication(input: PlanInput): Plan {
       status.level = "block";
       delete status.flaggedForReview;
       delete status.flagReason;
-    } else if (adjudicated > 0) {
-      // A sign-off covered the old text; the strings' own record says who chose the new.
+    } else if (chosenCount > 0) {
+      // A sign-off covered the old text; the entries' `chosen` say who chose the new.
       status.official = false;
       delete status.signedOffBy;
       delete status.signedOffAt;
       delete status.level;
     } else {
       status.flaggedForReview = true;
-      status.flagReason = `${proposed} proposal(s) by ${author.login} in ${input.issueUrl} await a collaborator's adjudication`;
+      status.flagReason = `${proposed} proposal(s) by ${author.login} in ${input.issueUrl} await a collaborator's choice`;
     }
     node.status = status;
 
@@ -951,35 +984,38 @@ export function planAdjudication(input: PlanInput): Plan {
       criteria: {},
     };
     const criteria = (att.criteria as Record<string, unknown[]>) ?? {};
-    const criterion = role === "adjudicator" && (item.verdict === "acceptable" || adjudicated > 0) ? ADJUDICATION_CRITERION : PROPOSAL_CRITERION;
+    const criterion = item.verdict === "acceptable" || chosenCount > 0 ? ADJUDICATION_CRITERION : PROPOSAL_CRITERION;
     const entry: Record<string, unknown> = {
       reviewer: { kind: "human", id: person },
       verdict: item.verdict,
       at: input.at,
       issue: input.issueUrl,
       po_hash: item.poHash,
-      ...(item.verdict === "mistranslation" ? { po_hash_after: poHash(poText) } : {}),
+      ...(poText !== current ? { po_hash_after: poHash(poText) } : {}),
       ...(item.note ? { note: item.note } : {}),
-      ...(appliedSuggestions.length > 0 ? { suggestions: appliedSuggestions } : {}),
+      ...(recorded.length > 0 ? { suggestions: recorded } : {}),
     };
     criteria[criterion] = [...(criteria[criterion] ?? []), entry];
     att.criteria = criteria;
 
     // Every write of this item, or none.
     if (poText !== current) plan.writes.set(poRel, poText);
-    if (sidecarText !== undefined) plan.writes.set(sidecarRel, sidecarText);
+    if (item.verdict !== "acceptable" || chosenCount > 0) plan.writes.set(sidecarRel, json(sidecar));
     plan.writes.set(nodeRel, json(node));
     plan.writes.set(attRel, json(att));
-    if (item.verdict === "acceptable") plan.applied.push(`${key}: accepted`);
-    else if (adjudicated > 0) {
-      plan.applied.push(`${key}: ${adjudicated} string(s) adjudicated by @${author.login}; their choices are recorded in ${sidecarRel}`);
-    } else {
-      plan.applied.push(
-        `${key}: ${proposed} proposal(s) recorded beside the other candidates` +
-          (filled > 0 ? `; ${filled} empty string(s) now show the proposal, fuzzy` : "; msgstr is left as it was") +
-          (!collaborator && item.intent !== "propose" ? ` (@${author.login} is not an owner, member or collaborator, ${author.association}, so a collaborator adjudicates)` : ""),
-      );
+    if (item.verdict === "acceptable") plan.applied.push(`${key}: accepted${chosenCount > 0 ? `; ${chosenCount} fuzzy string(s) adjudicated as they stand` : ""}`);
+    else {
+      const parts = [`${proposed} proposal(s) recorded beside the other candidates`];
+      if (chosenCount > 0) parts.push(`${chosenCount} chosen as the translation by @${author.login}`);
+      if (autoPicked > 0) parts.push(`${autoPicked} string(s) now show the auto-pick`);
+      if (chosenCount === 0 && autoPicked === 0) parts.push("msgstr is left as it was");
+      plan.applied.push(`${key}: ${parts.join("; ")}${collaborator ? "" : `; a collaborator chooses (@${author.login} is ${author.association})`}`);
     }
   }
   return plan;
+}
+
+/** Whether a suggestion keeps the source's placeholders (the guard every candidate passes on append). */
+function placeholderCheck(msgid: string, text: string): boolean {
+  return !("refused" in checkedCandidate(msgid, text));
 }

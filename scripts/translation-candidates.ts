@@ -36,6 +36,17 @@
  * Paid services (DeepL, Google Cloud Translation, Azure Translator, Amazon
  * Translate) are not engines here; see `translation-sources/index.ts`.
  *
+ * An OFFICIAL source is not an engine but a publication (owner, 2026-11-18):
+ *
+ *   bun run cat translation:candidates --instance <layer root> \
+ *     --source official --id <publication id> --from <texts.json> [--version <v>]
+ *
+ * where `texts.json` is `{locale, catalogue, entries: [{msgctxt?, msgid,
+ * text, sourceText?}]}`: the publication's translation of each string and the
+ * English exactly as the publication prints it. Each becomes an `official`
+ * candidate; it ranks first, and is auto-picked as official (not fuzzy) only
+ * where `sourceText` equals the msgid exactly.
+ *
  * Options: `--locale es,fr` (default every locale directory) · `--only
  * <catalogue>` · `--dir <path>` for a translations directory other than the
  * declared one · `--model <id>` to override the engine's model ·
@@ -200,6 +211,7 @@ export async function main(argv: string[], over: MainOverrides = {}): Promise<nu
     }
     translations = tdir.path.replace(/\/+$/, "");
   }
+  if (arg("--source") !== undefined) return official(root, translations, arg, has("--dry-run"), say);
   let sources: CandidateSourceAdapter[];
   if (over.sources) sources = over.sources;
   else {
@@ -262,6 +274,47 @@ export async function main(argv: string[], over: MainOverrides = {}): Promise<nu
   }
   if (result.potOnly.length) say(`\n${result.potOnly.length} template(s) have no .po beside them (--init starts them).`);
   return added + filled > 0 ? 0 : 3;
+}
+
+/** `--source official`: one publication's texts, as `official` candidates of one catalogue. */
+function official(root: string, translations: string, arg: (name: string) => string | undefined, dryRun: boolean, say: (s: string) => void): number {
+  const id = arg("--id");
+  const from = arg("--from");
+  if (arg("--source") !== "official" || !id || !from) {
+    console.error("translation-candidates: --source official needs --id <publication id> and --from <texts.json> (the only --source is official).");
+    return 2;
+  }
+  let doc: { locale?: unknown; catalogue?: unknown; entries?: unknown };
+  try {
+    doc = JSON.parse(readFileSync(from, "utf-8")) as typeof doc;
+  } catch (e) {
+    console.error(`translation-candidates: ${from} will not parse: ${(e as Error).message}`);
+    return 2;
+  }
+  if (typeof doc.locale !== "string" || typeof doc.catalogue !== "string" || !Array.isArray(doc.entries)) {
+    console.error(`translation-candidates: ${from} must be {locale, catalogue, entries: [{msgctxt?, msgid, text, sourceText?}]}.`);
+    return 2;
+  }
+  const at = new Date().toISOString();
+  const input: CandidateInput[] = [];
+  for (const e of doc.entries as Array<Record<string, unknown>>) {
+    if (typeof e?.msgid !== "string" || typeof e.text !== "string") continue;
+    input.push({
+      ...(typeof e.msgctxt === "string" ? { msgctxt: e.msgctxt } : {}),
+      msgid: e.msgid,
+      text: e.text,
+      ...(typeof e.sourceText === "string" ? { sourceText: e.sourceText } : {}),
+      source: { kind: "official", id, ...(arg("--version") ? { version: arg("--version")! } : {}), at },
+    });
+  }
+  const r = addCandidates(input, { root, translations, locale: doc.locale, catalogue: doc.catalogue, dryRun });
+  if (r.refused) {
+    console.error(`translation-candidates: ${doc.locale}/${doc.catalogue}: ${r.refused}`);
+    return 2;
+  }
+  say(`${r.added} official candidate(s) ${dryRun ? "would be " : ""}recorded from ${id}; ${r.filled.length} string(s) auto-picked.`);
+  for (const x of r.rejected) say(`  not recorded ${JSON.stringify(x.msgid.slice(0, 80))}: ${x.reason}`);
+  return r.added + r.filled.length > 0 ? 0 : 3;
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)));
