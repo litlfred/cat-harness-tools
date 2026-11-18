@@ -38,8 +38,14 @@ import {
   sectionOfPath,
   split,
   tokenCount,
+  WHOLE_SITE_BUDGET_BYTES,
+  pageEntries,
+  postBuildPages,
+  relUrlOfPage,
+  withPageEntries,
   type SearchManifest,
 } from "../search-split.ts";
+import { SEARCH_EXCLUDE_META, SEARCH_POST_BUILD_META } from "../lib/site-bar.ts";
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -345,7 +351,8 @@ describe("splitSite — scoped by the checkout the site was built from (who-iris
     const repo = checkout();
     const dir = site(idx);
     try {
-      const out = splitSite(dir, repo, { harnessRoot: HARNESS_ROOT })!;
+      // A fixture this small is one scope by default; the budget off, it is split by layer.
+      const out = splitSite(dir, repo, { harnessRoot: HARNESS_ROOT, wholeSiteBudget: 0 })!;
       const m = JSON.parse(readFileSync(join(dir, SCOPES_DIR, "manifest.json"), "utf-8")) as SearchManifest;
       expect(m).toEqual(out.manifest);
       const got = new Map(m.scopes.map((s): [string, (string | number)[]] => [s.id, [s.kind, s.entries]]));
@@ -359,7 +366,7 @@ describe("splitSite — scoped by the checkout the site was built from (who-iris
       // The checkout's own layer is the site's root: never a scope of its own.
       expect(m.scopes.some((s) => s.id === "who-iris")).toBe(false);
       for (const s of m.scopes) expect(readFileSync(join(dir, s.path), "utf-8").length).toBe(s.bytes);
-      expect(splitSite(dir, repo, { harnessRoot: HARNESS_ROOT, check: true })!.stale).toEqual([]);
+      expect(splitSite(dir, repo, { harnessRoot: HARNESS_ROOT, check: true, wholeSiteBudget: 0 })!.stale).toEqual([]);
     } finally {
       rmSync(repo, { recursive: true, force: true });
       rmSync(dir, { recursive: true, force: true });
@@ -388,5 +395,107 @@ describe("splitSite — scoped by the checkout the site was built from (who-iris
       rmSync(repo, { recursive: true, force: true });
       rmSync(bare, { recursive: true, force: true });
     }
+  });
+});
+
+describe("a small site is one scope — dth-phc, 2026-11-17", () => {
+  // Measured that day: dth-phc's 1.4 MB index, split, left every handbook page
+  // searching a 3-entry platform scope; "interoperability" found 0 of 94.
+  const idx = {
+    0: { relUrl: "/", title: "home" },
+    1: { relUrl: "/smart-trust/p.html", title: "layer page" },
+    2: { relUrl: "/fr/x.html", title: "locale page" },
+  };
+  test("under the budget: one platform scope holding every entry", () => {
+    const m = JSON.parse(render(JSON.stringify(idx), INSTANCES, LOCALES, SECTION_BUDGET_BYTES, [], PREBUILT_TOKEN_BUDGET, WHOLE_SITE_BUDGET_BYTES).get(`${SCOPES_DIR}/manifest.json`)!) as SearchManifest;
+    expect(m.scopes.map((s) => [s.id, s.kind, s.entries])).toEqual([[PLATFORM, "platform", 3]]);
+    expect(m.scopes[0]!.entries).toBe(m.source.entries);
+  });
+  test("over the budget: split by layer and locale as before", () => {
+    const m = JSON.parse(render(JSON.stringify(idx), INSTANCES, LOCALES, SECTION_BUDGET_BYTES, [], PREBUILT_TOKEN_BUDGET, 10).get(`${SCOPES_DIR}/manifest.json`)!) as SearchManifest;
+    expect(m.scopes.map((s) => s.id).sort()).toEqual([PLATFORM, "locale-fr", "smart-trust"]);
+  });
+  test("splitSite applies it by default", () => {
+    const repo = mkdtempSync(join(tmpdir(), "search-split-small-repo-"));
+    const dir = mkdtempSync(join(tmpdir(), "search-split-small-site-"));
+    try {
+      mkdirSync(join(repo, "smart-trust"), { recursive: true });
+      writeFileSync(join(repo, "smart-trust", "smart-trust.json"), JSON.stringify({ name: "smart-trust" }));
+      mkdirSync(join(dir, "assets/js"), { recursive: true });
+      writeFileSync(join(dir, SOURCE_PATH), JSON.stringify(idx));
+      expect(splitSite(dir, repo, { harnessRoot: HARNESS_ROOT })!.manifest.scopes.map((s) => s.id)).toEqual([PLATFORM]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("a layer's own pages are indexed after the build — owner, 2026-11-17", () => {
+  const HANDBOOK = `<!doctype html><html><head><title>Handbook | dth-phc</title>${SEARCH_EXCLUDE_META}${SEARCH_POST_BUILD_META}</head><body>
+<nav class="fa-nav"><a href="./">Rail link text</a></nav>
+<div id="main-header" class="main-header fa-page-bar"><a>Site bar</a><input id="search-input"></div>
+<main><h1>Digital transformation handbook</h1><p>Opening words.</p>
+<h2 id="ch1">Chapter 1. Introduction</h2><p>Point of service systems and <b>interoperability</b>.</p>
+<script>var notText = 1;</script>
+<h3>Unlinked heading</h3><p>Still chapter one.</p>
+<h2 id="ch2">Chapter 2</h2><p>Governance.</p></main>
+<footer>Footer text</footer></body></html>`;
+
+  test("pageEntries: the page, then one entry per linkable heading, chrome left out", () => {
+    const e = pageEntries(HANDBOOK, "/en/dth-phc/", "/dth-phc");
+    expect(e.map((x) => [x.title, x.relUrl])).toEqual([
+      ["Digital transformation handbook", "/en/dth-phc/"],
+      ["Chapter 1. Introduction", "/en/dth-phc/#ch1"],
+      ["Chapter 2", "/en/dth-phc/#ch2"],
+    ]);
+    expect(e.every((x) => x.doc === "Handbook")).toBe(true);
+    expect(e[0]!.content).toBe("Opening words.");
+    expect(e[1]!.content).toBe("Point of service systems and interoperability . Unlinked heading Still chapter one.");
+    expect(e[1]!.url).toBe("/dth-phc/en/dth-phc/#ch1");
+    const all = JSON.stringify(e);
+    for (const chrome of ["Rail link text", "Site bar", "notText", "Footer text"]) expect(all).not.toContain(chrome);
+  });
+
+  test("relUrlOfPage: an index page is its directory, as the theme writes it", () => {
+    expect(relUrlOfPage("/s", "/s/en/dth-phc/index.html")).toBe("/en/dth-phc/");
+    expect(relUrlOfPage("/s", "/s/en/dth-phc/ch1.html")).toBe("/en/dth-phc/ch1.html");
+    expect(relUrlOfPage("/s", "/s/index.html")).toBe("/");
+  });
+
+  test("splitSite adds the marked pages to the index, once, and the scopes partition it", () => {
+    const repo = mkdtempSync(join(tmpdir(), "search-split-pages-repo-"));
+    const dir = mkdtempSync(join(tmpdir(), "search-split-pages-site-"));
+    try {
+      mkdirSync(join(dir, "assets/js"), { recursive: true });
+      mkdirSync(join(dir, "en/dth-phc"), { recursive: true });
+      mkdirSync(join(dir, "api"), { recursive: true });
+      const theme = { 0: { doc: "Home", title: "Home", content: "x", url: "/dth-phc/", relUrl: "/" } };
+      writeFileSync(join(dir, SOURCE_PATH), JSON.stringify(theme));
+      writeFileSync(join(dir, "en/dth-phc/index.html"), HANDBOOK);
+      // Excluded, but not marked for indexing (TypeDoc's api/): left out.
+      writeFileSync(join(dir, "api/index.html"), `<html><head>${SEARCH_EXCLUDE_META}</head><body><main><h1>API</h1><p>class</p></main></body></html>`);
+      expect(postBuildPages(dir).map((p) => p.relUrl)).toEqual(["/en/dth-phc/"]);
+
+      const out = splitSite(dir, repo, { harnessRoot: HARNESS_ROOT })!;
+      const index = JSON.parse(readFileSync(join(dir, SOURCE_PATH), "utf-8")) as Record<string, { relUrl: string; url: string }>;
+      expect(Object.values(index).map((e) => e.relUrl)).toEqual(["/", "/en/dth-phc/", "/en/dth-phc/#ch1", "/en/dth-phc/#ch2"]);
+      expect(index["1"]!.url).toBe("/dth-phc/en/dth-phc/"); // the base URL read off the theme's own entries
+      expect(out.manifest.source.entries).toBe(4);
+      expect(out.manifest.scopes.reduce((n, s) => n + s.entries, 0)).toBe(4);
+      expect(splitSite(dir, repo, { harnessRoot: HARNESS_ROOT, check: true })!.stale).toEqual([]);
+
+      // Run again over its own output (a borrowed index): replaced, not repeated.
+      splitSite(dir, repo, { harnessRoot: HARNESS_ROOT });
+      expect(Object.keys(JSON.parse(readFileSync(join(dir, SOURCE_PATH), "utf-8")) as object)).toHaveLength(4);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("withPageEntries leaves a tree with no marked page byte for byte as the theme wrote it", () => {
+    const text = JSON.stringify({ 0: { relUrl: "/" } });
+    expect(withPageEntries(text, [])).toBe(text);
   });
 });

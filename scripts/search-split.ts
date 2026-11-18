@@ -23,13 +23,33 @@
  * source's, which `publish-verify`'s `search-scopes` verifier checks on every
  * published and staged tree.
  *
- * ## What it does not change
+ * ## Pages the theme never laid out
  *
- * `search-data.json` itself stays exactly as the theme writes it — staging
+ * The theme indexes only the pages Jekyll builds. A mounted layer's own HTML,
+ * such as a handbook under `/en/<layer>/`, is written after Jekyll, so
+ * it was never in the index. The site bar marks those pages with
+ * `SEARCH_POST_BUILD_META` (`lib/site-bar.ts`), and {@link splitSite} adds
+ * their sections to `search-data.json`, in the theme's own entry shape,
+ * before it cuts the scopes ({@link withPageEntries}). Re-running it replaces
+ * those entries rather than repeating them, so a borrowed index stays one
+ * copy. Owner, 2026-11-17: *"we've lost some of the search indexing
+ * features"*; measured that day, one handbook site indexed 0 of its handbook's
+ * pages.
+ *
+ * Otherwise `search-data.json` stays as the theme writes it — staging
  * previews borrow it, and the `search-index` verifier judges it. This writes
  * NEXT to it: `assets/js/search/manifest.json` and one
  * `assets/js/search/<scope>.json` per scope, each in the theme's own entry
  * shape so the theme's loader reads any of them unchanged.
+ *
+ * ## A small site is one scope
+ *
+ * Scoping exists for sites whose whole index is too big to load (33 MB on
+ * a folio's catalogue). A site whose whole index is at most
+ * {@link WHOLE_SITE_BUDGET_BYTES} is published as ONE platform scope, so
+ * every page searches everything. Without that, one handbook site (1.4 MB)
+ * searched a 3-entry platform scope on every page, and "interoperability"
+ * found 0 of its 94 matches (measured 2026-11-17).
  *
  * ## Stable entry ids — the cone
  *
@@ -57,8 +77,8 @@
  * @module scripts/search-split
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { basename, join, relative, resolve, sep } from "node:path";
 
 // @ts-expect-error -- lunr ships no types; only `lunr()`, `tokenizer` and `Index.load` are used.
 import lunr from "lunr";
@@ -66,6 +86,7 @@ import lunr from "lunr";
 import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { targetLocales } from "../pipeline/translation-index.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { SEARCH_POST_BUILD_META } from "./lib/site-bar.ts";
 
 /** Where the theme writes the whole index, relative to the site root. */
 export const SOURCE_PATH = "assets/js/search-data.json";
@@ -177,6 +198,21 @@ export const PLATFORM = "_platform";
  * from there.
  */
 export const SECTION_BUDGET_BYTES = 512 * 1024;
+
+/**
+ * A site whose whole index is at most this many bytes is published as ONE
+ * platform scope holding every entry, so no page searches a part of it.
+ *
+ * **Basis: measured.** First-search script cost runs at ~0.33 s per MB of
+ * scope (#1988, see {@link SECTION_BUDGET_BYTES}), and a scope over
+ * {@link PREBUILT_TOKEN_BUDGET} tokens is loaded prebuilt, 5–8× faster. So a
+ * whole index of 4 MiB costs about 1.3 s to build, or a fraction of that
+ * prebuilt: comparable to the scoped search it replaces on a small site, and
+ * it finds every match. The failure it fixes was measured 2026-11-17: the
+ * index of a handbook site, 1.4 MB, split, left every handbook page searching a
+ * 3-entry platform scope.
+ */
+export const WHOLE_SITE_BUDGET_BYTES = 4 * 1024 * 1024;
 
 /**
  * The scope a page belongs to, from its site-relative URL (the theme's
@@ -362,11 +398,16 @@ export function render(
   sectionBudget: number = SECTION_BUDGET_BYTES,
   remote: readonly RemoteScope[] = [],
   prebuiltBudget: number = PREBUILT_TOKEN_BUDGET,
+  wholeSiteBudget: number = 0,
 ): Map<string, string> {
   const index = JSON.parse(sourceText) as Record<string, SearchEntry>;
   const files = new Map<string, string>();
   const scopes: ManifestScope[] = [];
-  const parts = [...split(index, instances, locales, sectionBudget).values()].sort((a, b) => a.scope.id.localeCompare(b.scope.id));
+  // A small site is one scope: every page searches all of it.
+  const whole = Buffer.byteLength(sourceText) <= wholeSiteBudget;
+  const parts = whole
+    ? [{ scope: { id: PLATFORM, kind: "platform" as const }, entries: index }]
+    : [...split(index, instances, locales, sectionBudget).values()].sort((a, b) => a.scope.id.localeCompare(b.scope.id));
   const keys = stableKeys(index);
   for (const part of parts) {
     const scope = part.scope;
@@ -431,10 +472,158 @@ export function harnessRootIn(repo: string): string {
   return resolve(HARNESS_ROOT);
 }
 
+/** Elements whose text is chrome, not the page's content. */
+const SKIP_SELECTORS = [
+  "script", "style", "noscript", "template", "svg", "nav", "header", "footer", "button", "select",
+  "#main-header", ".fa-page-bar", ".fa-nav", "[aria-hidden=true]", "[hidden]",
+];
+
+/** One section of a page as read: the heading's id (none for the page's top), its title, its text. */
+interface PageSection {
+  id?: string;
+  title: string;
+  text: string[];
+}
+
+const squash = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/**
+ * The page's sections, in the theme's entry shape: one entry for the page,
+ * then one per `h1`–`h3` that has an `id`, its `relUrl` the page's with
+ * `#<id>`. `doc` is the page's title, as the theme gives it. Text inside the
+ * page's chrome (the rail, the top bar, scripts) is left out, and so is
+ * everything outside `<main>` when the page has one. Read with HTMLRewriter,
+ * not a regex.
+ */
+export function pageEntries(html: string, relUrl: string, baseUrl = ""): SearchEntry[] {
+  const sections: PageSection[] = [{ title: "", text: [] }];
+  let docTitle = "";
+  let inTitle = false;
+  let skip = 0;
+  let heading: PageSection | undefined;
+  const hasMain = /<main[\s>]/i.test(html);
+  let inMain = 0;
+  const rw = new HTMLRewriter()
+    .on("title", {
+      element(el) {
+        inTitle = true;
+        el.onEndTag(() => { inTitle = false; });
+      },
+      text(t) { docTitle += t.text; },
+    })
+    .on("main", {
+      element(el) {
+        inMain++;
+        el.onEndTag(() => { inMain--; });
+      },
+    })
+    .on(SKIP_SELECTORS.join(", "), {
+      element(el) {
+        if (el.selfClosing) return;
+        skip++;
+        el.onEndTag(() => { skip--; });
+      },
+    })
+    .on("h1, h2, h3", {
+      element(el) {
+        if (skip > 0 || (hasMain && inMain === 0)) return;
+        const top = sections[0]!;
+        if (sections.length === 1 && !top.title && !squash(top.text.join(" "))) {
+          // The page's first heading, before any text: it titles the page's own entry.
+          heading = top;
+        } else {
+          // A later heading starts a section only when it can be linked to.
+          const id = el.getAttribute("id");
+          if (!id) return;
+          heading = { id, title: "", text: [] };
+          sections.push(heading);
+        }
+        el.onEndTag(() => { heading = undefined; });
+      },
+    })
+    .on("body", {
+      text(t) {
+        if (inTitle || skip > 0 || (hasMain && inMain === 0)) return;
+        if (heading) heading.title += t.text;
+        else sections[sections.length - 1]!.text.push(t.text);
+      },
+    });
+  rw.transform(html);
+  const doc = squash(docTitle).split(/\s+[|–—]\s+/)[0] || squash(sections[0]!.title) || relUrl;
+  const out: SearchEntry[] = [];
+  for (const s of sections) {
+    const content = squash(s.text.join(" "));
+    const title = squash(s.title) || doc;
+    if (!content && s !== sections[0]) continue;
+    const rel = s.id ? `${relUrl}#${s.id}` : relUrl;
+    out.push({ doc, title, content, url: `${baseUrl}${rel}`, relUrl: rel });
+  }
+  return out;
+}
+
+/** The site-relative URL of a built page, as the theme writes one: `x/index.html` is `/x/`. */
+export function relUrlOfPage(site: string, file: string): string {
+  const rel = relative(site, file).split(sep).join("/");
+  return "/" + rel.replace(/(^|\/)index\.html$/, "$1");
+}
+
+/**
+ * Every page of the built site that asks to be indexed after the build
+ * ({@link SEARCH_POST_BUILD_META}), in path order, with its `relUrl`.
+ * `assets/` holds no pages and is not walked.
+ */
+export function postBuildPages(site: string): { relUrl: string; html: string }[] {
+  const out: { relUrl: string; html: string }[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir).sort()) {
+      const p = join(dir, name);
+      const st = statSync(p);
+      if (st.isDirectory()) {
+        if (dir === site && name === "assets") continue;
+        walk(p);
+      } else if (name.endsWith(".html")) {
+        const html = readFileSync(p, "utf-8");
+        if (html.includes(SEARCH_POST_BUILD_META)) out.push({ relUrl: relUrlOfPage(site, p), html });
+      }
+    }
+  };
+  walk(site);
+  return out;
+}
+
+/**
+ * The theme's index with every given page's sections in it. An entry already
+ * there for one of those pages (from an earlier run, or a borrowed index) is
+ * replaced, not repeated. New entries take the theme's running-number keys
+ * after the highest one; the theme's own entries keep their keys and order.
+ * The base URL is read off the theme's own entries (`url` minus `relUrl`).
+ */
+export function withPageEntries(sourceText: string, pages: readonly { relUrl: string; html: string }[]): string {
+  if (pages.length === 0) return sourceText;
+  const index = JSON.parse(sourceText) as Record<string, SearchEntry>;
+  const own = new Set(pages.map((p) => p.relUrl));
+  let baseUrl = "";
+  for (const e of Object.values(index)) {
+    if (typeof e.url === "string" && typeof e.relUrl === "string" && e.url.endsWith(e.relUrl)) {
+      baseUrl = e.url.slice(0, e.url.length - e.relUrl.length);
+      break;
+    }
+  }
+  const out: Record<string, SearchEntry> = {};
+  let next = 0;
+  for (const [k, e] of Object.entries(index)) {
+    if (typeof e.relUrl === "string" && own.has(e.relUrl.split("#")[0]!)) continue;
+    out[k] = e;
+    if (/^\d+$/.test(k)) next = Math.max(next, Number(k) + 1);
+  }
+  for (const p of pages) for (const e of pageEntries(p.html, p.relUrl, baseUrl)) out[String(next++)] = e;
+  return JSON.stringify(out);
+}
+
 /** What {@link splitSite} did to one built site. */
 export interface SplitOutcome {
   manifest: SearchManifest;
-  /** Every file the split owns, by site-relative path. */
+  /** Every file the split owns, by site-relative path: the scopes, the manifest, and the index it added pages to. */
   files: Map<string, string>;
   /** With `check`: how many of them are missing or differ on disk. */
   stale: string[];
@@ -447,17 +636,27 @@ export interface SplitOutcome {
  * this file happens to sit. `undefined` when the site has no theme index to
  * split. With `check`, nothing is written and the stale files are returned.
  */
-export function splitSite(site: string, repo: string, opts: { check?: boolean; harnessRoot?: string } = {}): SplitOutcome | undefined {
+export function splitSite(
+  site: string,
+  repo: string,
+  opts: { check?: boolean; harnessRoot?: string; wholeSiteBudget?: number } = {},
+): SplitOutcome | undefined {
   const source = join(site, SOURCE_PATH);
   if (!existsSync(source)) return undefined;
   const harness = opts.harnessRoot ?? harnessRootIn(repo);
-  const files = render(
-    readFileSync(source, "utf-8"),
+  // The layers' own pages, which the theme never indexed, go in first.
+  const sourceText = withPageEntries(readFileSync(source, "utf-8"), postBuildPages(site));
+  const files = new Map<string, string>([[SOURCE_PATH, sourceText]]);
+  const scoped = render(
+    sourceText,
     declaredInstanceNames(repo),
     new Set(targetLocales(harness)),
     SECTION_BUDGET_BYTES,
     publishedLookups(site),
+    PREBUILT_TOKEN_BUDGET,
+    opts.wholeSiteBudget ?? WHOLE_SITE_BUDGET_BYTES,
   );
+  for (const [rel, body] of scoped) files.set(rel, body);
   const stale: string[] = [];
   for (const [rel, body] of files) {
     const p = join(site, rel);
