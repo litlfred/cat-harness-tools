@@ -967,6 +967,42 @@ function publishKgSearch(site: string, root: string): void {
   console.log(`knowledge-graph search: ${copied} client file(s) beside the kg slice → slices/search.html?slice=kg`);
 }
 
+/**
+ * The linked-data files every instance site publishes beside its pages (IRI
+ * fix 1A, d; owner 2026-11-18): the layer's JSON-LD `@context` at
+ * `<iriBase>ns/context/v1.jsonld`, which every document it emits names, and
+ * its vocabulary at `<iriBase>v<major>/ns` where it mints terms of its own.
+ *
+ * Until then only a repository with a `layer-publish-context.yml` caller
+ * served its context (two of fifteen at the 2026-11-18 scan), so most instances' documents
+ * named a 404. Both come from `publish-instance-context.ts`, which skips,
+ * with a warning, a layer with nothing to publish (no `iriBase`, no
+ * documents, no terms of its own).
+ */
+export function linkedDataSteps(tools: string, instance: string, site: string): Array<{ label: string; argv: string[] }> {
+  const script = join(tools, "publish-instance-context.ts");
+  return [
+    { label: "JSON-LD context", argv: ["run", script, "build", "--root", ".", "--instance", instance, "--site", site] },
+    // `--keep-existing`: a richer `v<major>/ns` an earlier step wrote (core's
+    // glossary namespace document) is not overwritten.
+    { label: "vocabulary (ns)", argv: ["run", script, "vocab", "--root", ".", "--instance", instance, "--out-dir", site, "--keep-existing"] },
+  ];
+}
+
+/**
+ * Run `bun <argv>` as a step whose failure is a finding, not a refusal: it is
+ * reported as an error annotation and the build goes on, so one layer's
+ * unresolved prefix does not take its whole site down. No shell: the argv is
+ * passed as it is. Returns whether it passed.
+ */
+export function softRun(label: string, argv: readonly string[], cwd: string, spawn = spawnSync): boolean {
+  console.log(`▶ ${label}`);
+  const r = spawn("bun", [...argv], { cwd, stdio: "inherit", env: process.env });
+  if (r.status === 0) return true;
+  console.log(`::error::${label} failed (exit ${r.status}): bun ${argv.join(" ")} — the site is published without it`);
+  return false;
+}
+
 function run(label: string, cmd: string, cwd: string, env: Record<string, string> = {}): void {
   console.log(`▶ ${label}`);
   const r = spawnSync("bash", ["-c", cmd], { cwd, stdio: "inherit", env: { ...process.env, ...env } });
@@ -1324,6 +1360,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // (owner, 2026-11-18: "make the site build publish review.json wherever translations
     // exist"). After the mounted docs, so a review page they bring is linked.
     run("translation review", `bun run ${TOOLS}/publish-translation-review.ts --root . --site ${s}`, root);
+    // Every declared layer's site: its JSON-LD context and vocabulary (IRI fix 1A, d).
+    if (declared) for (const st of linkedDataSteps(TOOLS, o.instance, site)) softRun(st.label, st.argv, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");
     else if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow ${shellQuote(`https://cdn.jsdelivr.net/gh/${gh.owner}/`)} --allow ${shellQuote(`https://raw.githubusercontent.com/${gh.owner}/`)}`, root);

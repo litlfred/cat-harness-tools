@@ -130,7 +130,7 @@ import {
 import { decide, readTip } from "./staging-push-gate.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
-import { buildInstanceSite, recipeFromConfig, siteFields, siteScopeOf, type SiteRecipe } from "./build-instance-site.ts";
+import { buildInstanceSite, linkedDataSteps, recipeFromConfig, siteFields, siteScopeOf, softRun, type SiteRecipe } from "./build-instance-site.ts";
 import { makeRecord, RECORD_FILE } from "./preview-record.ts";
 import { findReport, injectSite } from "./preview-qa.ts";
 import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
@@ -887,6 +887,12 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   if (!builtSomething(site)) throw new Error(`the build produced no site in ${site} — refusing to deploy`);
 
   run(repo, "bun", ["run", script("rail-standalone-pages.ts"), "--site", site, "--built", "cat-harness", "--foreign-site", "--home-label", name]);
+  // The layer's JSON-LD context and vocabulary, as every declared site publishes
+  // them (IRI fix 1A, d): a folio built from a workflow file gets them too.
+  const layer = declaredLayerName(repo);
+  if (layer !== undefined) {
+    for (const st of linkedDataSteps(dirname(script("publish-instance-context.ts")), layer, site)) softRun(st.label, st.argv, repo);
+  }
 
   if (target === "preview") {
     git(repo, ["fetch", "-q", "origin", base]);
@@ -938,6 +944,13 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
  * smart-ra has no publishing workflow at all (bean n3h9), so reading its
  * workflows found only `fhirbuild.yml` and took the folio for an IG.
  */
+/** The name of the layer `repo` declares at its root, or `undefined` when it declares none. */
+export function declaredLayerName(repo: string): string | undefined {
+  const root = resolve(repo);
+  const file = findDeclarationFile(root);
+  return file === undefined ? undefined : siteFields(readFileSync(join(root, file), "utf-8"), join(root, file)).name;
+}
+
 export function declaredRecipe(repo: string): { instance: string; recipe: SiteRecipe } | undefined {
   const root = resolve(repo);
   const file = findDeclarationFile(root);

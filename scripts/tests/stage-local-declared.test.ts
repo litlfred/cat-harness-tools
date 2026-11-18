@@ -8,12 +8,12 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { recipeFromConfig } from "../build-instance-site.ts";
-import { declaredRecipe, stageDeclared } from "../stage-local.ts";
+import { declaredLayerName, declaredRecipe, stageDeclared } from "../stage-local.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -95,5 +95,26 @@ describe("stageDeclared --plan", () => {
     const d = checkout({ site: { build: RECIPE } });
     gitRepo(d, "main");
     await expect(stageDeclared({ repo: d, artifact: "/tmp/x", log: () => {} }, { instance: "demo", recipe: RECIPE })).rejects.toThrow(/--artifact/);
+  });
+});
+
+describe("declaredLayerName — whose context a folio built from a workflow publishes (IRI fix 1A, d)", () => {
+  test("the layer declared at the checkout's root, recipe or not", () => {
+    expect(declaredLayerName(checkout(undefined))).toBe("demo");
+    expect(declaredLayerName(checkout({ site: { build: RECIPE } }))).toBe("demo");
+  });
+
+  test("a checkout declaring no layer has none, so no context step runs", () => {
+    const d = mkdtempSync(join(tmpdir(), "stage-undeclared-"));
+    made.push(d);
+    expect(declaredLayerName(d)).toBeUndefined();
+  });
+
+  test("the folio path runs the same linked-data steps after the rail", () => {
+    const src = readFileSync(join(import.meta.dir, "..", "stage-local.ts"), "utf-8");
+    const rail = src.indexOf('script("rail-standalone-pages.ts")');
+    const steps = src.indexOf("linkedDataSteps(dirname(script(\"publish-instance-context.ts\")), layer, site)");
+    expect(rail).toBeGreaterThan(0);
+    expect(steps).toBeGreaterThan(rail);
   });
 });

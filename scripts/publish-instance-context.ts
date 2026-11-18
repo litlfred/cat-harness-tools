@@ -519,6 +519,34 @@ export async function publishFile(api: ApiRequest, o: PublishOptions): Promise<P
   }
 }
 
+/**
+ * Write a built vocabulary's files under `outDir`. With `keepExisting`, a path
+ * where anything already sits (a file, or a directory where the vocabulary
+ * would write an extensionless file) is left alone and returned in `kept`,
+ * and the workflow's `.paths` list is not written.
+ */
+export function writeVocabularyFiles(
+  outDir: string,
+  outcome: { paths: readonly string[]; termPages: Record<string, string>; html: string; content: string },
+  keepExisting = false,
+): { written: string[]; kept: string[] } {
+  const written: string[] = [];
+  const kept: string[] = [];
+  for (const p of outcome.paths) {
+    const dest = join(outDir, p);
+    if (keepExisting && existsSync(dest)) {
+      kept.push(p);
+      continue;
+    }
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, outcome.termPages[p] ?? (p.endsWith(".html") ? outcome.html : outcome.content));
+    written.push(p);
+  }
+  // The list the workflow publishes, one path per line, so it never restates them.
+  if (!keepExisting) writeFileSync(join(outDir, ".paths"), `${outcome.paths.join("\n")}\n`);
+  return { written, kept };
+}
+
 // ── CLI ──────────────────────────────────────────────────────────
 
 function arg(argv: readonly string[], name: string): string | undefined {
@@ -580,13 +608,13 @@ async function main(argv: readonly string[]): Promise<number> {
       for (const p of outcome.problems) console.error(`::error::${p}`);
       return 1;
     }
-    for (const p of outcome.paths) {
-      const dest = join(outDir, p);
-      mkdirSync(dirname(dest), { recursive: true });
-      writeFileSync(dest, outcome.termPages[p] ?? (p.endsWith(".html") ? outcome.html : outcome.content));
-    }
-    // The list the workflow publishes, one path per line, so it never restates them.
-    writeFileSync(join(outDir, ".paths"), `${outcome.paths.join("\n")}\n`);
+    // `--keep-existing`: writing into a site being built, where another step
+    // (core's glossary namespace document) may already have written a richer
+    // `v<major>/ns`. Nothing there is overwritten, and no `.paths` list is left
+    // in the site (IRI fix 1A, d).
+    const keepExisting = argv.includes("--keep-existing");
+    const { kept } = writeVocabularyFiles(outDir, outcome, keepExisting);
+    for (const p of kept) console.log(`vocabulary: ${p} is already in the site; kept, not overwritten`);
     const pageCount = Object.keys(outcome.termPages).length;
     console.log(`built ${outcome.instance}'s vocabulary: ${outcome.terms} term(s), ${pageCount} term page(s); to be served at ${outcome.url} (${outcome.paths.filter((p) => outcome.termPages[p] === undefined).join(", ")})`);
     return 0;

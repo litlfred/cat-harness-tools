@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildOne, contextUrl, publishFile, termPages, vocabularyHtml, vocabularyPaths, type ApiRequest } from "../../publish-instance-context.ts";
+import { buildOne, contextUrl, publishFile, termPages, vocabularyHtml, vocabularyPaths, writeVocabularyFiles, type ApiRequest } from "../../publish-instance-context.ts";
 import { PLACEHOLDER_HTML } from "../../pages-bootstrap.ts";
 
 const root = mkdtempSync(join(tmpdir(), "publish-instance-context-"));
@@ -307,5 +307,31 @@ describe("build --site", () => {
     expect(r.exitCode).toBe(0);
     const ctx = JSON.parse(readFileSync(join(site, CTX_PATH), "utf-8")) as { "@context": Record<string, unknown> };
     expect(ctx["@context"].skos).toBe("http://www.w3.org/2004/02/skos/core#");
+  });
+});
+
+describe("writeVocabularyFiles — into a site being built (IRI fix 1A, d)", () => {
+  const outcome = { paths: ["v0/ns", "v0/ns.html", "v0/ns/term/a.html"], termPages: { "v0/ns/term/a.html": "<a>" }, html: "<html>", content: "{}" };
+
+  test("by default every path is written, with the workflow's .paths list", () => {
+    const d = mkdtempSync(join(tmpdir(), "vocab-all-"));
+    const r = writeVocabularyFiles(d, { ...outcome, paths: ["v0/ns.jsonld", "v0/ns.html"] });
+    expect(r).toEqual({ written: ["v0/ns.jsonld", "v0/ns.html"], kept: [] });
+    expect(readFileSync(join(d, ".paths"), "utf-8")).toBe("v0/ns.jsonld\nv0/ns.html\n");
+    rmSync(d, { recursive: true, force: true });
+  });
+
+  test("--keep-existing leaves a richer document, and a directory where a file would go, alone", () => {
+    const d = mkdtempSync(join(tmpdir(), "vocab-keep-"));
+    // Core's glossary namespace document: the directory form, `v0/ns/index.html`.
+    mkdirSync(join(d, "v0", "ns"), { recursive: true });
+    writeFileSync(join(d, "v0", "ns", "index.html"), "core");
+    writeFileSync(join(d, "v0", "ns.html"), "core page");
+    const r = writeVocabularyFiles(d, outcome, true);
+    expect(r).toEqual({ written: ["v0/ns/term/a.html"], kept: ["v0/ns", "v0/ns.html"] });
+    expect(readFileSync(join(d, "v0", "ns.html"), "utf-8")).toBe("core page");
+    expect(readFileSync(join(d, "v0", "ns", "term", "a.html"), "utf-8")).toBe("<a>");
+    expect(() => readFileSync(join(d, ".paths"))).toThrow();
+    rmSync(d, { recursive: true, force: true });
   });
 });

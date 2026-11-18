@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, isGraphData, writeBuildQa, BUILD_QA_REPORT, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages } from "../../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, isGraphData, writeBuildQa, BUILD_QA_REPORT, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages, linkedDataSteps, softRun } from "../../build-instance-site.ts";
 import type { DeclaredArtefact } from "../../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -416,5 +416,41 @@ describe("every site build publishes its knowledge-graph search (owner, 2026-11-
     expect(fn).toContain("--with-published-payloads");
     expect(fn).toContain("the site publishes no KG search");
     expect(fn).not.toContain("throw ");
+  });
+});
+
+describe("build-instance-site — every layer's site serves its JSON-LD context and vocabulary (IRI fix 1A, d)", () => {
+  test("the steps build the context into the site and the vocabulary beside it, never over a richer one", () => {
+    const steps = linkedDataSteps("cat-harness-tools/scripts", "dth-pc", "/tmp/site");
+    expect(steps.map((s) => s.label)).toEqual(["JSON-LD context", "vocabulary (ns)"]);
+    expect(steps[0]!.argv).toEqual(["run", "cat-harness-tools/scripts/publish-instance-context.ts", "build", "--root", ".", "--instance", "dth-pc", "--site", "/tmp/site"]);
+    expect(steps[1]!.argv).toEqual(["run", "cat-harness-tools/scripts/publish-instance-context.ts", "vocab", "--root", ".", "--instance", "dth-pc", "--out-dir", "/tmp/site", "--keep-existing"]);
+  });
+
+  test("an instance name or site path is one argument, never shell", () => {
+    expect(linkedDataSteps("t", "a;rm -rf /", "s p")[0]!.argv).toContain("a;rm -rf /");
+    expect(linkedDataSteps("t", "a", "s p")[0]!.argv).toContain("s p");
+  });
+
+  test("softRun spawns bun with the argv, no shell; a failure is an error annotation and the build goes on", () => {
+    const logs: string[] = [];
+    const calls: unknown[][] = [];
+    const orig = console.log;
+    console.log = (m: string) => void logs.push(m);
+    try {
+      const fail = ((cmd: string, args: string[]) => (calls.push([cmd, args]), { status: 1 })) as unknown as typeof spawnSync;
+      const pass = (() => ({ status: 0 })) as unknown as typeof spawnSync;
+      expect(softRun("JSON-LD context", ["run", "x.ts"], ".", fail)).toBe(false);
+      expect(softRun("JSON-LD context", ["run", "x.ts"], ".", pass)).toBe(true);
+    } finally {
+      console.log = orig;
+    }
+    expect(calls[0]).toEqual(["bun", ["run", "x.ts"]]);
+    expect(logs.some((l) => l.startsWith("::error::JSON-LD context failed (exit 1)"))).toBe(true);
+  });
+
+  test("the build runs the steps for every declared layer, whatever its recipe", () => {
+    const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
+    expect(src).toContain("if (declared) for (const st of linkedDataSteps(TOOLS, o.instance, site)) softRun(st.label, st.argv, root);");
   });
 });
