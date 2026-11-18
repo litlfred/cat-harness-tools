@@ -257,6 +257,14 @@ test("kg: the whole-repo slice finds a skill node, and its instruction body is t
   expect(body).toContain("beans");
 });
 
+test("kg: a query in the address (?q=) runs on arrival — the site search panel links here with it (owner, 2026-11-18)", async ({ page }) => {
+  await page.goto(`${BASE}/slices/search.html?slice=kg&q=${encodeURIComponent('"todo manager"')}`);
+  await expect(page.locator("html")).toHaveAttribute("data-slice-ready", /.+/, { timeout: 60_000 });
+  await expect(page.locator("#q")).toHaveValue('"todo manager"');
+  await expect(page.locator("#out li").first()).toBeVisible();
+  await expect(page.locator("#state")).toContainText("full-text");
+});
+
 // ── content addressing (bean `wixl`) ─────────────────────────────────────
 
 type Manifest = { slice: string; file: string; sha256: string } & Record<string, unknown>;

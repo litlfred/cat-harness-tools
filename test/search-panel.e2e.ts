@@ -79,7 +79,7 @@ const MANIFEST = {
   layers: ["handbook", "library"],
 };
 
-async function load(page: Page, path = "/en/handbook/") {
+async function load(page: Page, path = "/en/handbook/", manifest: Record<string, unknown> = MANIFEST) {
   const JTD = await renderedJtd();
   const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>p</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -91,7 +91,7 @@ async function load(page: Page, path = "/en/handbook/") {
 <div class="main-content"><h1>Page</h1><p>Text.</p></div></div></div>
 <script>${UI}<\/script></body></html>`;
   const serve: Record<string, unknown> = {
-    "/assets/js/search/manifest.json": MANIFEST,
+    "/assets/js/search/manifest.json": manifest,
     "/assets/js/search/_platform.json": INDEX,
     "/assets/js/search-data.json": INDEX,
   };
@@ -202,4 +202,27 @@ test("the dropdown's 'Show all' control opens the same panel", async ({ page }) 
   await all.click();
   await expect(panel(page)).toBeVisible();
   await expect(rows(page)).toHaveCount(50);
+});
+
+// Owner, 2026-11-18, "KG slice only, linked": a site that publishes its
+// knowledge-graph search names it in the manifest (`kgSearch`); the panel links
+// it with the reader's query and loads nothing of it itself.
+test("the panel links the site's knowledge-graph search with the query, and loads none of it", async ({ page }) => {
+  const asked: string[] = [];
+  page.on("request", (r) => { if (/slices|sqlite/.test(r.url())) asked.push(r.url()); });
+  await load(page, "/en/handbook/", { ...MANIFEST, kgSearch: "slices/search.html?slice=kg" });
+  await search(page, "health records");
+  await page.keyboard.press("Enter");
+  const kg = page.locator(".fa-search-panel-kg");
+  await expect(kg).toHaveText("Search the knowledge graph for \u201chealth records\u201d \u2192");
+  expect(await kg.getAttribute("href")).toBe("/site/slices/search.html?slice=kg&q=health%20records");
+  expect(asked).toEqual([]);
+});
+
+test("no kgSearch in the manifest, no link", async ({ page }) => {
+  await load(page);
+  await search(page, "health");
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".fa-search-panel")).toBeVisible();
+  await expect(page.locator(".fa-search-panel-kg")).toHaveCount(0);
 });

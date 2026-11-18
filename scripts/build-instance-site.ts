@@ -94,6 +94,7 @@ import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { checkInlineScripts } from "./check-inline-scripts.ts";
 import { checkAnchors } from "./check-anchors.ts";
 import { shellQuote } from "./run-script.ts";
+import { overlayPath } from "./lib/layer-output.ts";
 import { chromeLayers, writeForwardingPages } from "./compose-docs.ts";
 import { ensurePublishBranch } from "./lib/publish-branch.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
@@ -913,6 +914,59 @@ export function buildChrome(
   return { ran, skipped, findings };
 }
 
+/**
+ * The site's knowledge-graph search: the `kg` slice of this checkout as one
+ * SQLite file (`gen-slice-sqlite.ts`), its node bodies as content-addressed
+ * payloads, and the harness's search page and SQLite client beside them.
+ * Nothing here loads on a page view: the page downloads the slice only when a
+ * reader opens it, from the search panel's link.
+ *
+ * Until 2026-11-18 only folio-assistant's own deploy built it; a layer's site
+ * had none (owner: "it seems like we've lost some of the search indexing
+ * features and layered knowledge graph").
+ *
+ * A slice that cannot be built is SAID and skipped, never a refused publish:
+ * the site's own search does not depend on it, and without the page the panel
+ * shows no link (`publishedKgSearch`).
+ */
+function publishKgSearch(site: string, root: string): void {
+  console.log("▶ knowledge-graph search");
+  const out = join(site, "assets", "slices");
+  const r = spawnSync(
+    "bash",
+    ["-c", `bun run ${TOOLS}/gen-slice-sqlite.ts --slice kg --out ${shellQuote(out)} --payload-out ${shellQuote(join(site, "payload", "sha256"))} --with-published-payloads`],
+    { cwd: root, stdio: "inherit" },
+  );
+  if (r.status !== 0 || !existsSync(join(out, "kg.sqlite3.json"))) {
+    console.log(`knowledge-graph search: the kg slice was not built (exit ${r.status}); the site publishes no KG search`);
+    return;
+  }
+  const harness = join(root, "cat-harness");
+  const vendor = "assets/js/vendor/sqlite-wasm";
+  const vendorDir = overlayPath(join(harness, siteFileFor(harness, `${vendor}/index.mjs`), ".."));
+  const files = [
+    "slices/search.html",
+    "assets/js/slice-sqlite.js",
+    "assets/js/slice-sqlite-worker.js",
+    ...(existsSync(vendorDir) ? readdirSync(vendorDir).sort().map((f) => `${vendor}/${f}`) : []),
+  ];
+  let copied = 0;
+  for (const f of files) {
+    const src = overlayPath(join(harness, siteFileFor(harness, f)));
+    const dst = join(site, f);
+    if (existsSync(dst)) continue; // a page the content or another step wrote stays
+    if (!existsSync(src)) {
+      console.log(`knowledge-graph search: the harness has no ${f}; the site publishes no KG search page`);
+      rmSync(join(site, "slices", "search.html"), { force: true });
+      return;
+    }
+    mkdirSync(join(dst, ".."), { recursive: true });
+    copyFileSync(src, dst);
+    copied++;
+  }
+  console.log(`knowledge-graph search: ${copied} client file(s) beside the kg slice → slices/search.html?slice=kg`);
+}
+
 function run(label: string, cmd: string, cwd: string, env: Record<string, string> = {}): void {
   console.log(`▶ ${label}`);
   const r = spawnSync("bash", ["-c", cmd], { cwd, stdio: "inherit", env: { ...process.env, ...env } });
@@ -1276,6 +1330,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("suggest")) run("suggest editor", `bun run ${TOOLS}/suggest-editor.ts --site ${s}`, root);
     if (has.has("lang")) run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
+    // Every site: the knowledge-graph search (owner, 2026-11-18: "KG slice only,
+    // linked"; and "lazy load the search indices"). Before the rail, so its page
+    // gets the site's chrome; the search panel links it (search-split's `kgSearch`).
+    publishKgSearch(site, root);
     run("rail on every page", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --theme-source ${shellQuote(docs)} --foreign-site --home-label ${shellQuote(title)} --instance ${shellQuote(o.instance)}${o.identity ? " --landing" : ""}`, root);
     for (const st of o.finalSteps ?? []) {
       const c = step("final", st);

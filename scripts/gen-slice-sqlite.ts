@@ -40,6 +40,8 @@
  * - With `--payload-out <dir>`: every deploy-written payload of the slices
  *   built, at `<dir>/<hex>` plus its `<hex>.json` sidecar, written by
  *   `gen-subgraph-jsonld`'s own `renderPayloadFiles`.
+ *   With `--with-published-payloads` as well, the `published` slices' payloads
+ *   too (the `kg` slice's), for a site that does not copy the committed tree.
  *
  * ## The database is content-addressed; the manifest is not
  *
@@ -1221,7 +1223,11 @@ if (import.meta.main) {
     if (m.overBudget) console.warn(`  ! ${def.slice}: ${m.bytes} bytes is over the ${SIZE_BUDGET_BYTES}-byte budget — a decision, not a default`);
     if (m.duplicateIds.length) console.warn(`  ! ${def.slice}: keys declared by more than one source row: ${m.duplicateIds.join(", ")}`);
     for (const f of m.findings) console.warn(`  ! ${def.slice}: ${f}`);
-    if (payloadOut && def.payloads === "deploy") {
+    // `--with-published-payloads`: a site that does not publish the committed
+    // payload tree (a layer's site, built by build-instance-site) gets this
+    // slice's `published` payloads written beside it too, so a result's body
+    // opens there (owner, 2026-11-18: KG search on every site).
+    if (payloadOut && (def.payloads === "deploy" || args.includes("--with-published-payloads"))) {
       const n = writePayloads(data.payloads, resolve(payloadOut));
       console.log(`  · ${def.slice}: ${n} payload(s) → ${resolve(payloadOut)}`);
     }
