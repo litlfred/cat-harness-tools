@@ -215,7 +215,8 @@ test("a link destination is percent-encoded per segment, parentheses included", 
  * Subdirectory rows (`SubgraphInput.subdirs`): what a row says is read from
  * the directory's own declaration file — the one its kind names as
  * `declarationFile` — and only from entries that are NOT `subgraph: true`.
- * Anything undeclared keeps the file count: absent stays absent.
+ * Anything undeclared is read from the subdirectory itself by the writer —
+ * here, the kinds of file it holds — and never counted.
  */
 describe("subdirectory rows — described from the declaration, or saying nothing does (no count, bean ba9e)", async () => {
   const r = mkdtempSync(join(tmpdir(), "subgraph-subdirs-"));
@@ -253,14 +254,17 @@ describe("subdirectory rows — described from the declaration, or saying nothin
     expect(readme).toContain("| [`parts/`](parts/) | The parts of the plan. | |");
   });
 
+  // Undeclared rows are read from the subdirectory itself by the writer
+  // (bootstrap-tools `describe-dir.ts`, owner 2026-11-18): here only `x.txt`,
+  // so the kinds it holds — derived, marked as such, and never a count.
   test("a promoted (`subgraph: true`) directory describes itself elsewhere; its row borrows nothing", () => {
-    expect(readme).toContain("| [`promoted/`](promoted/) | _nothing declares what this holds_ | |");
+    expect(readme).toContain("| [`promoted/`](promoted/) | _holds `.txt` files_ | |");
     expect(readme).not.toContain("Its own subgraph.");
   });
 
-  test("no description, or no declaration at all, says so — nothing is invented, and nothing is counted", () => {
-    expect(readme).toContain("| [`nodesc/`](nodesc/) | _nothing declares what this holds_ | |");
-    expect(readme).toContain("| [`undeclared/`](undeclared/) | _nothing declares what this holds_ | |");
+  test("no description, or no declaration at all, is read from what it holds — nothing is invented, and nothing is counted", () => {
+    expect(readme).toContain("| [`nodesc/`](nodesc/) | _holds `.txt` files_ | |");
+    expect(readme).toContain("| [`undeclared/`](undeclared/) | _holds `.txt` files_ | |");
     expect(readme).not.toContain("1 file");
     expect(readme).not.toContain("Not a row of work/.");
   });
