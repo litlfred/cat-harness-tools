@@ -267,6 +267,24 @@ describe("mount:remote over fixture repositories", () => {
     expect(readFileSync(join(root, "base/schemas/util.ts"), "utf-8")).toContain("41");
   });
 
+  test("4a. the run's own instance, swapped in at a PR's head, is excused only when asked; the others are still judged", () => {
+    // A layer's PR checks swap the caller's own instance in over its pinned
+    // mount (2026-11-19, separation:cutover's \`mounts\` row).
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    writeFileSync(join(root, "base/schemas/util.ts"), "export const answer = 41;\n");
+    const excused = checkRemote({ instanceRoot: root, excuse: new Set(["base"]) });
+    expect(excused.outcomes.find((o) => o.instance === "base")!.state).not.toBe("missing");
+    expect(excused.outcomes.find((o) => o.instance === "base")!.detail).toContain("own instance");
+    expect(excused.state).toBe(checkRemote({ instanceRoot: root, excuse: new Set(["base"]) }).state);
+    expect(excused.state).not.toBe("missing");
+    // Another instance's edit is still a finding, excuse or not.
+    writeFileSync(join(root, "core/scripts/run.ts"), "export const doubled = 0;\n");
+    expect(checkRemote({ instanceRoot: root, excuse: new Set(["base"]) }).state).toBe("missing");
+    // And with no excuse, the swapped-in instance reads modified as before.
+    expect(checkRemote({ instanceRoot: root }).outcomes.find((o) => o.instance === "base")!.detail).toContain("modified");
+  });
+
   test("4b. --fresh replaces an edited mount, and only what the lock says this mount put there", () => {
     const root = downstream({});
     mountRemote({ instanceRoot: root, urlFor });

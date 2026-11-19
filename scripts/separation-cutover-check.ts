@@ -255,7 +255,9 @@ export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?:
       findings: [],
     });
   } else {
-    const g = runGate("remote-mount.ts", ["--check"], root);
+    // `--excuse-own`: a layer's PR checks swap the caller's own instance in at
+    // the PR head over its pinned mount, which is not a defect of the mount.
+    const g = runGate("remote-mount.ts", ["--check", "--excuse-own"], root);
     conditions.push({ id: "mounts", state: stateOf(g.status), by: "remote-mount --check", summary: g.status === 0 ? "every declared mount is on disk at its pin" : "a declared mount is missing, modified or undetermined", findings: g.status === 0 ? [] : [g.tail] });
   }
 
