@@ -57,6 +57,7 @@ describe("checkSiteIris", () => {
 
   test("a relative @id under the site's own release base, published at its path, passes", () => {
     const s = site({
+      // declared-path-literal: a key of an in-memory site fixture, the path the subject publishes its context at; no declaration is read here.
       "ns/context/v1.jsonld": { "@context": {} },
       "v0/papers/d/blocks/b1.jsonld": { "@context": [ctx, { "@base": `${BASE}v0/` }], "@id": "papers/d/blocks/b1" },
       "v0/papers/d/blocks/b1.html": "<p>",
@@ -68,6 +69,7 @@ describe("checkSiteIris", () => {
 
   test("the shared folio base is a foreign base: minted here, served nowhere", () => {
     const s = site({
+      // declared-path-literal: a key of an in-memory site fixture, the path the subject publishes its context at; no declaration is read here.
       "ns/context/v1.jsonld": {},
       "d/kg/ch1/b1.jsonld": { "@context": [ctx, { "@base": "https://litlfred.github.io/folio/" }], "@id": "papers/d/blocks/b1" },
     });
@@ -78,6 +80,7 @@ describe("checkSiteIris", () => {
 
   test("an @id under the site that the tree does not hold is unserved", () => {
     const s = site({
+      // declared-path-literal: a key of an in-memory site fixture, the path the subject publishes its context at; no declaration is read here.
       "ns/context/v1.jsonld": {},
       "v0/x.jsonld": { "@context": [ctx, { "@base": `${BASE}v0/` }], "@id": "papers/d/blocks/missing" },
     });
