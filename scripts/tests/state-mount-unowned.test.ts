@@ -18,7 +18,7 @@
  * | origin carries no branch of the namespace | `absent`, and the mount as a whole is `mounted` (the smart-ra case) |
  * | origin carries the branch | it mounts as before |
  * | origin carries OTHER branches of the namespace, not this one | `miss`, a failure: the checkout adopted the namespace (the folio-assistant case; "Tighten it", #249) |
-| origin carries only a PUBLICATION branch of the namespace (commit-keyed QA) | `absent`: CI writes it on every root, so it is not adoption (WHO smart-base#340) |
+| origin carries only a PUBLICATION branch of the namespace (commit-keyed QA) | `absent`: CI writes it on every root, so it is not adoption (a FHIR IG judged with no base) |
  * | the root declares the path | the root's declaration wins, and ITS miss is still a failure |
  *
  * Real repositories, as in `state-mount-shared-id.test.ts`: the outcome turns on
@@ -153,7 +153,7 @@ describe("a repository-scoped graph a mounted instance declares and the root doe
     expect(report(r)).toContain("FAILED");
   });
 
-  test("its branch missing while the origin keeps only a PUBLICATION branch of its namespace: still ABSENT (WHO smart-base#340)", () => {
+  test("its branch missing while the origin keeps only a PUBLICATION branch of its namespace: still ABSENT (a FHIR IG judged with no base)", () => {
     const f = index({ originCarriesQa: true });
     expect(publicationBranches(f.work)).toEqual(new Set([QA_BRANCH]));
     const r = mountState({ repoRoot: f.work });

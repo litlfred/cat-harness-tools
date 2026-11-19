@@ -48,7 +48,7 @@
  * ## A root with no block is not applicable, not "could not determine"
  *
  * The refusal is for a root that HAS blocks and whose verdicts were not read.
- * A root that holds no block at all (a FHIR IG site such as WHO smart-base,
+ * A root that holds no block at all (a FHIR IG site,
  * 2026-11-19, where this exited 2 even after `qa:fetch`) has no block-QA
  * producer: `qa-sweep` has nothing to judge there, so no verdict will ever be
  * written and no fetch can change the answer. The same holds for a content

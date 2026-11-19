@@ -87,7 +87,7 @@ describe("translate-user-scenarios — templates per locale, and --check", () =>
       // An empty user-scenario directory: not applicable.
       rmSync(join(root, "user-scenarios", "p1.json"));
       expect(run("--check").status).toBe(78);
-      // No user-scenario directory at all (WHO smart-base#340): not applicable, never exit 2.
+      // No user-scenario directory at all (a FHIR IG judged with no base): not applicable, never exit 2.
       writeFileSync(join(root, "acme.json"), JSON.stringify({ name: "acme", directories: [{ id: "translations", path: "translations/", graphTypologies: ["translation-sources"] }] }));
       const none = run("--check");
       expect(none.status).toBe(78);

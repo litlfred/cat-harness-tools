@@ -4,7 +4,7 @@
  *
  * A root with no diagram, or one that translates into no locale, has nothing
  * to extract or check, and no run can change that. It exited 2 ("could not
- * determine") until 2026-11-19, the class WHO smart-base#340 found in
+ * determine") until 2026-11-19, the class a FHIR IG judged with no base found in
  * `translate-user-scenarios:check`. A root that HAS diagrams and locales is
  * still judged as before (the regen and page tests cover that half).
  *

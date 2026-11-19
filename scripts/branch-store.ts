@@ -1480,7 +1480,7 @@ export function storeOptionsFor(
  * writes `cat/cat-harness/qa-reports` (commit-keyed) on every root that runs
  * the gates, a FHIR IG site included, so counting it made every unowned graph
  * of the namespace a failed mount there instead of absent, and every bean gate
- * exited 2 rather than 78 (WHO smart-base#340, 2026-11-19). Only a branch kept
+ * exited 2 rather than 78 (a FHIR IG judged with no base, 2026-11-19). Only a branch kept
  * at a tip, the way adopted state is, says the checkout keeps the namespace.
  *
  * `unknown` when ls-remote could not answer: never read as "not carried".

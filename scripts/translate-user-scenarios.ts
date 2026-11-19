@@ -23,7 +23,7 @@
  * any), and 78 not applicable (`lib/not-applicable.ts`): the root declares no
  * user-scenario directory, the directory holds no scenario, or the root
  * translates into no locale. Those are facts about the root, not a failure to
- * look: a FHIR IG site with no journeys exited 2 here (WHO smart-base#340,
+ * look: a FHIR IG site with no journeys exited 2 here (
  * 2026-11-19), and no run could ever change the answer.
  *
  * Usage:

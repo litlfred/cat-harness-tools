@@ -121,7 +121,7 @@ describe("check:orphan-verdicts, the CLI", () => {
     });
   });
 
-  it("exits 78, not applicable, in a root that holds no block (WHO smart-base#340)", () => {
+  it("exits 78, not applicable, in a root that holds no block (a FHIR IG judged with no base)", () => {
     inTmp((root) => {
       // A folio directory, so the sweep anchors HERE rather than falling back
       // to the harness layer, and nothing in it is a block.
@@ -140,7 +140,7 @@ describe("check:orphan-verdicts, the CLI", () => {
 });
 
 /**
- * WHO smart-base#340 (2026-11-19): a FHIR IG site has no block at all, so no
+ * A FHIR IG judged with no base (2026-11-19): a FHIR IG site has no block at all, so no
  * block-QA producer, and the sweep exited 2 ("examined 0") even after
  * `qa:fetch`. Not applicable (78) there; the vacuity refusal stays for a root
  * that has blocks.
