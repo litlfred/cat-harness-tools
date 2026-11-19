@@ -13,7 +13,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { configureValueRegistry, type WitnessedValueEntry } from "./value-registry-di";
 import { generateMainTex } from "./generate-main-tex";
-import { markdownToLatex } from "./render-latex";
+import { markdownToLatex, renderChapter } from "./render-latex";
 
 const dir = mkdtempSync(join(tmpdir(), "val-latex-"));
 const witness = join(dir, "demo.witness.json");
@@ -61,7 +61,7 @@ describe(":val in the LaTeX render", () => {
 });
 
 describe("generateMainTex cover page layout", () => {
-  test("places title, abstract, and \\proofstatuslegend inside a single titlepage without page breaks", () => {
+  test("places title, abstract, Lean declaration, \\proofstatuslegend, and CC-BY 4.0 license inside a single titlepage without page breaks", () => {
     const preambleFile = join(dir, "dummy-preamble.tex");
     writeFileSync(preambleFile, "\\documentclass[11pt,a4paper]{report}\n");
     const tex = generateMainTex(
@@ -76,6 +76,7 @@ describe("generateMainTex cover page layout", () => {
         preamblePath: preambleFile,
         chaptersDir: "chapters/",
         chapterSlugs: new Map([[0, "introduction"]]),
+        leanDeclarationLatex: "Every proof in this paper possesses a corresponding Lean 4 formalisation.",
       },
     );
 
@@ -87,22 +88,70 @@ describe("generateMainTex cover page layout", () => {
     expect(titlepageBody).toContain("Test Author");
     expect(titlepageBody).toContain("{\\bfseries Abstract}");
     expect(titlepageBody).toContain("This monograph develops a test categorical framework.");
+    expect(titlepageBody).toContain("{\\bfseries Lean 4 Formalisation and Authorship Declaration}");
+    expect(titlepageBody).toContain("\\label{sec:authors-note}\\label{prose:authors-note}");
+    expect(titlepageBody).toContain("Every proof in this paper possesses a corresponding Lean 4 formalisation.");
     expect(titlepageBody).toContain("\\proofstatuslegend");
+    expect(titlepageBody).toContain("Creative Commons Attribution 4.0 International License");
     expect(titlepageBody).not.toContain("\\begin{abstract}");
     expect(titlepageBody).not.toContain("\\clearpage");
     expect(titlepageBody).not.toContain("\\newpage");
 
-    // Order inside titlepage: title -> abstract -> proofstatuslegend
+    // Order inside titlepage: title -> abstract -> lean declaration -> proofstatuslegend -> CC-BY 4.0
     const titleIdx = titlepageBody.indexOf("Test Monograph Title");
     const abstractIdx = titlepageBody.indexOf("This monograph develops a test categorical framework.");
+    const declIdx = titlepageBody.indexOf("Every proof in this paper possesses a corresponding Lean 4 formalisation.");
     const legendIdx = titlepageBody.indexOf("\\proofstatuslegend");
+    const copyrightIdx = titlepageBody.indexOf("Creative Commons Attribution 4.0 International License");
     expect(titleIdx).toBeGreaterThanOrEqual(0);
     expect(abstractIdx).toBeGreaterThan(titleIdx);
-    expect(legendIdx).toBeGreaterThan(abstractIdx);
+    expect(declIdx).toBeGreaterThan(abstractIdx);
+    expect(legendIdx).toBeGreaterThan(declIdx);
+    expect(copyrightIdx).toBeGreaterThan(legendIdx);
 
-    // Copyright page comes after \end{titlepage}
-    const endTitlepageIdx = tex.indexOf("\\end{titlepage}");
-    const copyrightIdx = tex.indexOf("Creative Commons Attribution 4.0");
-    expect(copyrightIdx).toBeGreaterThan(endTitlepageIdx);
+    // No separate copyright page after \end{titlepage}
+    const afterTitlepage = tex.slice(tex.indexOf("\\end{titlepage}") + "\\end{titlepage}".length);
+    expect(afterTitlepage).not.toContain("Copyright page");
+  });
+
+  test("renderChapter omits sec:authors-note from introduction body because it is hoisted onto Page 1", () => {
+    const chLatex = renderChapter(
+      {
+        tabLabel: "I",
+        title: "Introduction",
+        label: "chap:introduction",
+        sections: [
+          {
+            title: "Overview",
+            label: "sec:introduction-overview",
+            blocks: ["intro"],
+          },
+          {
+            title: "Author's note",
+            label: "sec:authors-note",
+            blocks: ["authors-note"],
+          },
+        ],
+      },
+      new Map([
+        [
+          "intro",
+          {
+            block: { kind: "prose", label: "prose:intro" },
+            mdContent: "Introduction overview body.",
+          },
+        ],
+        [
+          "authors-note",
+          {
+            block: { kind: "prose", label: "prose:authors-note" },
+            mdContent: "Formalisation note body.",
+          },
+        ],
+      ]),
+    );
+    expect(chLatex).toContain("Introduction overview body.");
+    expect(chLatex).not.toContain("Formalisation note body.");
+    expect(chLatex).not.toContain("\\label{sec:authors-note}");
   });
 });
