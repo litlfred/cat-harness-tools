@@ -19,7 +19,7 @@ read as NEW FAILURE). A gate run-gates.py skipped
 base it reads as not run. Writes a Markdown summary to
 $GITHUB_STEP_SUMMARY when set.
 
-NO BASE (`--no-base`; WorldHealthOrganization/smart-base#340): main has no
+NO BASE (`--no-base`; a downstream layer's first harness PR): main has no
 instance at all (the PR brings it in, or main is empty), so base is empty
 and judges nothing. Every gate head ran must pass outright: red is NEW, and
 so is could not determine (2), which a base that merely did not run one gate

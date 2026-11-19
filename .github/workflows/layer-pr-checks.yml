@@ -1072,12 +1072,12 @@ jobs:
           # A PR's merge commit: its first parent is the main it merges into,
           # exactly. Anything else (workflow_dispatch): the default branch's tip.
           #
-          # NO INSTANCE ON MAIN (WorldHealthOrganization/smart-base#340, run
-          # 44489605227): the PR that first brings the instance into a
+          # NO INSTANCE ON MAIN (a downstream base layer's first harness PR,
+          # run 44489605227): the PR that first brings the instance into a
           # repository, an instance newly added beside others, or a main with
           # no commits at all. Main has no `<path-in-repo>/<instance>.json`, so
           # main's side cannot be mounted (the swap stopped with `mv: cannot
-          # stat 'src/smart-base'`, and compare then read `results-base-1
+          # stat 'src/<instance>'`, and compare then read `results-base-1
           # missing`). Main's side is then EMPTY (`absent=true`): nothing is
           # prepared or run for it, and compare judges the PR side on its
           # own, so every test and gate on the head must pass outright and

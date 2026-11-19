@@ -1,9 +1,9 @@
 /**
- * A base without the instance (WorldHealthOrganization/smart-base#340, run
+ * A base without the instance (a downstream base layer's first harness PR, run
  * 44489605227): the PR that first brings an instance into a repository, an
  * instance newly added beside others, or an empty main. Main's side used to
  * be mounted regardless, the swap stopped with `mv: cannot stat
- * 'src/smart-base'`, and "No new failures" then read `results-base-1
+ * 'src/<instance>'`, and "No new failures" then read `results-base-1
  * missing`. Now main's side is EMPTY: nothing is prepared or run for it, and
  * the PR side is judged on its own, so every test and gate on the head must
  * pass outright (a gate's exit 2 included) and nothing is excused as failing
@@ -72,14 +72,14 @@ function caller(mainHasInstance: boolean): string {
   git(src, "init", "-q", "-b", "main");
   writeFileSync(join(src, "README.md"), "main\n");
   if (mainHasInstance) {
-    mkdirSync(join(src, "smart-base"));
-    writeFileSync(join(src, "smart-base", "smart-base.json"), "{}\n");
+    mkdirSync(join(src, "demo-layer"));
+    writeFileSync(join(src, "demo-layer", "demo-layer.json"), "{}\n");
   }
   git(src, "add", "-A");
   git(src, "commit", "-q", "-m", "main");
   git(src, "checkout", "-q", "-b", "pr");
-  mkdirSync(join(src, "smart-base"), { recursive: true });
-  writeFileSync(join(src, "smart-base", "smart-base.json"), '{"pr":true}\n');
+  mkdirSync(join(src, "demo-layer"), { recursive: true });
+  writeFileSync(join(src, "demo-layer", "demo-layer.json"), '{"pr":true}\n');
   git(src, "add", "-A");
   git(src, "commit", "-q", "-m", "pr");
   git(src, "checkout", "-q", "main");
@@ -89,7 +89,7 @@ function caller(mainHasInstance: boolean): string {
 
 describe("the caller's base side finds whether main has the instance", () => {
   const s = step("prepare-base", (x) => x.id === "fa-caller-base");
-  const env = { DEFAULT_BRANCH: "main", DIR: "src", SUBDIR: "smart-base", INSTANCE: "smart-base" };
+  const env = { DEFAULT_BRANCH: "main", DIR: "src", SUBDIR: "demo-layer", INSTANCE: "demo-layer" };
 
   test("main without the instance: absent, and no failure", () => {
     const r = runScript(s.run!, caller(false), env);
@@ -124,9 +124,9 @@ describe("prepare-base prepares nothing for an empty main, and the shards run th
   test("'Is there anything to prepare?' stops at an absent main", () => {
     const s = step("prepare-base", (x) => x.id === "skip-prep");
     const dir = mkdtempSync(join(tmpdir(), "no-instance-skip-"));
-    const r = runScript(s.run!, dir, { ABSENT: "true", PUSH: "false", BASE_HIT: "false", INSTANCE: "smart-base" });
+    const r = runScript(s.run!, dir, { ABSENT: "true", PUSH: "false", BASE_HIT: "false", INSTANCE: "demo-layer" });
     expect(r.outputs.hit).toBe("true");
-    const normal = runScript(s.run!, dir, { ABSENT: "false", PUSH: "false", BASE_HIT: "false", INSTANCE: "smart-base" });
+    const normal = runScript(s.run!, dir, { ABSENT: "false", PUSH: "false", BASE_HIT: "false", INSTANCE: "demo-layer" });
     expect(normal.outputs.hit).toBe("false");
   });
 
