@@ -219,8 +219,11 @@ describe("checkScholarlyDefault — a wrap continuation is not a sentence start"
 
 import {
   checkStatusLeak,
+  checkStatusSectionHeader,
   checkAuthorNotesPollution,
+  scanBlockTitleAndCaption,
 } from "../../../pipeline/qa-checkers-voice.ts";
+import { checkVoiceTitleScholarly } from "../../../pipeline/qa-checkers-extended.ts";
 
 const leak = (line: string) => checkStatusLeak(tmp("leak.md", line)).result;
 const notes = (line: string) => checkAuthorNotesPollution(tmp("notes.md", line)).result;
@@ -364,5 +367,93 @@ describe("checkEditorializing — proof economy is not an opinion (bean 2t41)", 
         tmp("wrap-adv.md", "as = a' and Wi = WiJ ... Wi,ri clearly\nrepresents the ith parallel\n"),
       ).result,
     ).toBe("pass");
+  });
+});
+
+describe("fourth-wall Lean leaks and general first-person prose in paper voice", () => {
+  const md = (line: string, name = "block.md") =>
+    checkScholarlyDefault(tmp(name, line), undefined).result;
+  const leanDoc = (line: string) =>
+    checkScholarlyDefault(undefined, tmp("block.lean", `/-- ${line} -/\ndef f := 0\n`)).result;
+
+  test("fourth-wall Lean prose mentions fail in markdown", () => {
+    expect(md("The Lean carrier packages the pairing over a commutative ring.")).toBe("fail");
+    expect(md("The Lean sibling proves the converse implication.")).toBe("fail");
+    expect(md("Both halves are proved in the Lean module.")).toBe("fail");
+    expect(md("The hexagon identity follows from Mathlib coherence.")).toBe("fail");
+  });
+
+  test("Lean section headers and formalisation status markers fail status checks", () => {
+    expect(checkStatusSectionHeader(tmp("hdr.md", "## Lean structure\n\nBody.\n")).result).toBe(
+      "fail",
+    );
+    expect(leak("The Lean carrier discharges the pairing without sorry-free caveats.")).toBe(
+      "fail",
+    );
+    expect(leak("This implication is proved formally in the companion file.")).toBe("fail");
+  });
+
+  test("backticked Lean FQNs and snake or camel identifiers fail before inline-code stripping", () => {
+    expect(md("By `QOU.QBeta.bar_letter_shift_fixed_iff`, the shift is unique.")).toBe("fail");
+    expect(md("Theorem `dimQK0_eq_evDimQ_chernCharacter` and `su2Character_one` close it.")).toBe(
+      "fail",
+    );
+    expect(md("The hypothesis stays at `CommRing` with `[Add H]`.")).toBe("fail");
+  });
+
+  test("Lean docstrings allow backticked Lean identifiers while rejecting first-person prose", () => {
+    expect(leanDoc("Applies `QOU.QBeta.bar_letter_shift_fixed_iff` over `CommRing`.")).toBe(
+      "pass",
+    );
+    expect(leanDoc("Here we prove the converse over an arbitrary ring.")).toBe("fail");
+  });
+
+  test("general first-person plural and singular pronouns fail in paper markdown", () => {
+    expect(md("From this pairing we obtain a non-degenerate trace.")).toBe("fail");
+    expect(md("The functor preserves our chosen orientation.")).toBe("fail");
+    expect(md("This isomorphism gives us the desired decomposition.")).toBe("fail");
+    expect(md("Now let's verify the counit identity.")).toBe("fail");
+  });
+
+  test("Roman numerals and uppercase US pass without false positives", () => {
+    expect(md("In Part I and Type I models, the US standard coincides with the SI unit.")).toBe(
+      "pass",
+    );
+    expect(md("The two branches lean toward opposite signs in $q > 1$.")).toBe("pass");
+  });
+
+  test("block title and caption raw label prefixes and mechanical table placeholders fail", () => {
+    const tsRaw = tmp(
+      "tbl-raw.ts",
+      'export default table({\n  label: "tbl:x",\n  title: "Data table 2 from rem:linking-relations-table",\n});\n',
+    );
+    expect(scanBlockTitleAndCaption(tsRaw).length).toBeGreaterThanOrEqual(2);
+    expect(checkScholarlyDefault(undefined, undefined, tsRaw).result).toBe("fail");
+    expect(checkVoiceTitleScholarly(tsRaw).result).toBe("fail");
+
+    const tsTableFrom = tmp(
+      "tbl-from.ts",
+      'export default table({\n  label: "tbl:y",\n  title: "Table 3 from def:frobenius-hopf-substrate",\n});\n',
+    );
+    expect(checkScholarlyDefault(undefined, undefined, tsTableFrom).result).toBe("fail");
+    expect(checkVoiceTitleScholarly(tsTableFrom).result).toBe("fail");
+  });
+
+  test("truncated block titles and captions ending in dangling articles or prepositions fail", () => {
+    const tsDangling = tmp(
+      "dangling.ts",
+      'export default table({\n  label: "tbl:z",\n  title: "Data table 1 from ",\n  caption: "Representative elements spanning the periodic table, comparing the ",\n});\n',
+    );
+    expect(scanBlockTitleAndCaption(tsDangling).length).toBeGreaterThanOrEqual(2);
+    expect(checkScholarlyDefault(undefined, undefined, tsDangling).result).toBe("fail");
+    expect(checkVoiceTitleScholarly(tsDangling).result).toBe("fail");
+
+    const tsClean = tmp(
+      "clean-title.ts",
+      'export default table({\n  label: "tbl:clean",\n  title: "Linking relations across the two-strand torus family",\n  caption: "Evaluated on the unframed closure over a commutative ring.",\n});\n',
+    );
+    expect(scanBlockTitleAndCaption(tsClean)).toEqual([]);
+    expect(checkScholarlyDefault(undefined, undefined, tsClean).result).toBe("pass");
+    expect(checkVoiceTitleScholarly(tsClean).result).toBe("pass");
   });
 });

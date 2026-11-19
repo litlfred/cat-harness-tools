@@ -19,19 +19,35 @@ import {
 } from "./liquid-values";
 import { markdownToLatex } from "./render-latex";
 import { renderBlockMarkdown } from "./render-markdown";
+import { configureValueRegistry, type WitnessedValueEntry } from "./value-registry-di";
 
 let repo: string;
 let scope: ValueScope;
 
 beforeAll(() => {
   repo = mkdtempSync(join(tmpdir(), "liquid-values-"));
-  // A folio with a declared `computations` directory holding a witness.
+  // A folio with a declared `computations` directory holding both flat and subdirectory witnesses.
   const demo = join(repo, "demo");
-  mkdirSync(join(demo, "computations"), { recursive: true });
+  mkdirSync(join(demo, "computations", "probes"), { recursive: true });
+  mkdirSync(join(demo, "computations", "qbeta"), { recursive: true });
   writeFileSync(
     join(demo, "computations", "codata-masses.witness.json"),
     JSON.stringify({ commitSha: "abc123", scriptHash: "def456", data: { m_e_MeV: "0.51099895069" } }),
   );
+  writeFileSync(
+    join(demo, "computations", "probes", "electroweak-bring-schwinger-bridge.witness.json"),
+    JSON.stringify({
+      commitSha: "ew123",
+      scriptHash: "ew456",
+      data: { electroweak_vev_fixed_point: { v_pred_GeV: "246.219643562", v_err_ppb: "-29.37" } },
+    }),
+  );
+  writeFileSync(
+    join(demo, "computations", "qbeta", "qbeta-e0-is-derived.witness.json"),
+    JSON.stringify({ commitSha: "qb123", parameters: { c_q: "9.0926794561502453911" } }),
+  );
+  // Also create a flat witness whose stem matches a subdirectory name (`probes.witness.json`)
+  // only in a secondary directory to test flat-first precedence when flat exists.
   mkdirSync(join(demo, "stray"), { recursive: true });
   writeFileSync(join(demo, "stray", "x.witness.json"), JSON.stringify({ data: { v: 1 } }));
   writeDeclaration(demo, {
@@ -79,6 +95,37 @@ describe("addressing", () => {
     expect(resolveKey("site.data.fhir.ig.version", scope).state).toBe("pass-through");
     expect(resolveKey("page.title", scope).state).toBe("not-ours");
   });
+
+  test("subdirectory witnesses under a DECLARED directory (probes/, qbeta/) resolve with provenance", () => {
+    const rProbes = resolveKey(
+      "demo.computations.probes.electroweak-bring-schwinger-bridge.data.electroweak_vev_fixed_point.v_pred_GeV",
+      scope,
+    );
+    expect(rProbes.state).toBe("resolved");
+    if (rProbes.state === "resolved") {
+      expect(rProbes.text).toBe("246.219643562");
+      expect(rProbes.provenance).toEqual({
+        file: "demo/computations/probes/electroweak-bring-schwinger-bridge.witness.json",
+        path: "data.electroweak_vev_fixed_point.v_pred_GeV",
+        commitSha: "ew123",
+        scriptHash: "ew456",
+      });
+    }
+
+    const rQbeta = resolveKey("demo.computations.qbeta.qbeta-e0-is-derived.parameters.c_q", scope);
+    expect(rQbeta.state).toBe("resolved");
+    if (rQbeta.state === "resolved") {
+      expect(rQbeta.text).toBe("9.0926794561502453911");
+      expect(rQbeta.provenance.file).toBe("demo/computations/qbeta/qbeta-e0-is-derived.witness.json");
+      expect(rQbeta.provenance.path).toBe("parameters.c_q");
+    }
+  });
+
+  test("path traversal (.. or empty segments) is strictly rejected", () => {
+    expect(resolveKey("demo.computations...stray.x.data.v", scope).state).toBe("unresolved");
+    expect(resolveKey("demo.computations...codata-masses.data.m_e_MeV", scope).state).toBe("unresolved");
+    expect(resolveKey("demo.computations.probes...codata-masses.data.m_e_MeV", scope).state).toBe("unresolved");
+  });
 });
 
 describe("substitution", () => {
@@ -116,6 +163,35 @@ describe("one value, every target", () => {
     for (const out of [latex, site]) {
       expect(out.match(/0\.510999/g)?.length).toBe(2);
       expect(out).not.toContain("{{");
+    }
+  });
+
+  test(":val[...] directives resolve in renderBlockMarkdown (both prose and inline math) when ValueRegistry is configured", () => {
+    const entry: WitnessedValueEntry = {
+      name: "demo_v_ew",
+      description: "Demo electroweak VEV",
+      symbol: "v_{\\mathrm{EW}}",
+      witnessFile: join(repo, "demo", "computations", "probes", "electroweak-bring-schwinger-bridge.witness.json"),
+      witnessPath: "data.electroweak_vev_fixed_point.v_pred_GeV",
+      defaultPrecision: 6,
+      units: "GeV",
+    };
+    configureValueRegistry({
+      WITNESSED_VALUES: { demo_v_ew: entry },
+      lookupValue: (name: string) => (name === "demo_v_ew" ? entry : undefined),
+      verifiedNames: () => ["demo_v_ew"],
+    });
+    try {
+      const valMd = "In prose :val[demo_v_ew]{precision=6}, and in math $v = :val[demo_v_ew]{precision=6 units=none}$.";
+      const site = renderBlockMarkdown({
+        block: { kind: "remark", label: "rem:val" } as never,
+        mdContent: valMd,
+      } as never);
+      expect(site).not.toContain(":val[");
+      expect(site).toContain("$246.220$\\,GeV");
+      expect(site).toContain("$v = 246.220$");
+    } finally {
+      configureValueRegistry(null);
     }
   });
 });

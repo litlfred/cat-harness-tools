@@ -20,6 +20,7 @@ import { resolve } from "path";
 import { findContentRepoRoot } from "./repo-root";
 import {
   WITNESSED_VALUES,
+  isValueRegistryConfigured,
   lookupValue,
   type WitnessedValueEntry,
   type WitnessedValueFormat,
@@ -294,6 +295,7 @@ export function renderValue(
   attrs: ValAttrs,
   mode: "text" | "math",
 ): string {
+  if (!isValueRegistryConfigured()) return literalFallback(name, attrs);
   const entry = lookupValue(name);
   if (!entry) return literalFallback(name, attrs);
 
@@ -405,6 +407,45 @@ export function substituteValuesInMath(text: string): string {
     const attrs = parseValAttrs(parseInlineAttrs(attrStr ?? ""));
     return renderValue(name, attrs, "math");
   });
+}
+
+/**
+ * Substitute every `:val[…]` occurrence across a Markdown document,
+ * dispatching math regions (`$$…$$`, `\[…\]`, `\(…\)`, `$…$`) to
+ * `mode = "math"` and prose regions outside fenced code blocks to
+ * `mode = "text"`.  Leaves the input untouched when no `:val[` token
+ * is present or when `ValueRegistry` is not configured.
+ */
+const MARKDOWN_CODE_OR_MATH =
+  /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`)|(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$(?!\s)(?:\\.|[^$\n\\])+?\$)/g;
+
+export function substituteValuesInMarkdown(text: string): string {
+  if (!text.includes(":val[") || !isValueRegistryConfigured()) return text;
+  let out = "";
+  let last = 0;
+  const replaceProse = (prose: string): string =>
+    prose.replace(MATH_VAL_PATTERN, (_match, name: string, attrStr?: string) => {
+      const attrs = parseValAttrs(parseInlineAttrs(attrStr ?? ""));
+      return renderValue(name, attrs, "text");
+    });
+  for (const m of text.matchAll(MARKDOWN_CODE_OR_MATH)) {
+    const idx = m.index ?? 0;
+    if (idx > last) {
+      out += replaceProse(text.slice(last, idx));
+    }
+    if (m[1] !== undefined) {
+      // Code fence or inline code: leave untouched
+      out += m[1];
+    } else if (m[2] !== undefined) {
+      // Math region: substitute in math mode
+      out += substituteValuesInMath(m[2]);
+    }
+    last = idx + m[0].length;
+  }
+  if (last < text.length) {
+    out += replaceProse(text.slice(last));
+  }
+  return out;
 }
 
 // ── Directive extraction (for validators / auto-link) ────────────

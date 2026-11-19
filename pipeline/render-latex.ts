@@ -313,7 +313,7 @@ function breakableCode(text: string): string {
 
 // ── Markdown → LaTeX conversion (AST-based) ─────────────────────
 
-/** Shared remark parser layer with math + selective GFM (no autolink).
+/** Shared remark parser instance with math + selective GFM (no autolink).
  *  The full remarkGfm bundle includes gfm-autolink-literal which causes
  *  OOM on dotted Lean identifiers. We load only tables + strikethrough. */
 
@@ -1351,7 +1351,6 @@ export function renderBlock(
   // narrow case where TypeScript narrows the discriminated union
   // to a member that doesn't widen authorNotes back to the BlockBase
   // optional.
-  // input-site: env WITH_AUTHOR_NOTES #9d2b294e — author notes are rendered only when this is 1
   if (process.env.WITH_AUTHOR_NOTES === "1"
       && "authorNotes" in block
       && block.authorNotes?.length) {
@@ -1684,6 +1683,19 @@ export function renderChapter(
   for (const section of chapter.sections) {
     if (!("blocks" in section)) continue;
     const sec = section as Section;
+    // The Lean 4 Formalisation and Authorship Declaration (`sec:authors-note` /
+    // block `authors-note`) is hoisted onto Page 1 inside \begin{titlepage}
+    // by generateMainTex(), together with \label{sec:authors-note} and
+    // \label{prose:authors-note}. Skip emitting it again inside the
+    // introduction chapter so neither the prose nor the labels are duplicated.
+    if (
+      sec.label === "sec:authors-note" &&
+      sec.blocks.length === 1 &&
+      sec.blocks[0] === "authors-note" &&
+      (!Array.isArray(sec.subsections) || sec.subsections.length === 0)
+    ) {
+      continue;
+    }
     for (const rootName of sectionAllBlocks(sec)) {
       const entry = blocks.get(rootName);
       if (!entry) continue;

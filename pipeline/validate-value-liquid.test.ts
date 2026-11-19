@@ -21,8 +21,12 @@ const WITNESS = "demo/computations/masses.witness.json";
 beforeAll(() => {
   repo = mkdtempSync(join(tmpdir(), "validate-liquid-"));
   const demo = join(repo, "demo");
-  mkdirSync(join(demo, "computations"), { recursive: true });
+  mkdirSync(join(demo, "computations", "probes"), { recursive: true });
   writeFileSync(join(demo, "computations", "masses.witness.json"), JSON.stringify({ data: { m: "0.51099895069" } }));
+  writeFileSync(
+    join(demo, "computations", "probes", "ew-bridge.witness.json"),
+    JSON.stringify({ data: { v_GeV: "246.219643562" } }),
+  );
   mkdirSync(join(demo, "library", "codata"), { recursive: true });
   writeFileSync(join(demo, "library", "codata", "values.json"), JSON.stringify({ c: { value: "299792458", uncertainty: null } }));
   writeDeclaration(demo, {
@@ -77,5 +81,18 @@ describe("Liquid references are validated like :val ones", () => {
 
   test("site.* and page.* are Jekyll's, and are left alone", () => {
     expect(run("{{ site.data.fhir.ig.version }} {{ page.title }}")).toEqual([]);
+  });
+
+  test("a subdirectory witness under computations/ validates and auto-links its subdirectory path", () => {
+    const subWitness = "demo/computations/probes/ew-bridge.witness.json";
+    expect(
+      rules("{{ demo.computations.probes.ew-bridge.data.v_GeV | precision: 9 }}", {
+        computation: { witness: subWitness },
+      } as never),
+    ).toEqual([]);
+    const issues = run("{{ demo.computations.probes.ew-bridge.data.v_GeV | precision: 9 }}");
+    expect(issues.map((i) => i.message)).toEqual([
+      `[val-block-computation] block cites a witnessed value but has no \`computation:\` field; implicit witness dep on ${subWitness}`,
+    ]);
   });
 });
