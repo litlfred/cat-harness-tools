@@ -1476,12 +1476,20 @@ export function storeOptionsFor(
  * the DECLARING repository has the branch cannot tell those two apart:
  * litlfred/cat-harness carries it in both cases.
  *
+ * A PUBLICATION branch is not adoption ({@link publicationBranches}). CI
+ * writes `cat/cat-harness/qa-reports` (commit-keyed) on every root that runs
+ * the gates, a FHIR IG site included, so counting it made every unowned graph
+ * of the namespace a failed mount there instead of absent, and every bean gate
+ * exited 2 rather than 78 (a FHIR IG judged with no base, 2026-11-19). Only a branch kept
+ * at a tip, the way adopted state is, says the checkout keeps the namespace.
+ *
  * `unknown` when ls-remote could not answer: never read as "not carried".
  */
 export function namespaceCarried(
   loc: Pick<TipLocation, "branch" | "repository">,
   repoRoot: string,
   store?: BranchStoreOptions,
+  publications?: ReadonlySet<string>,
 ): { state: "carried"; branches: string[] } | { state: "not-carried"; namespace: string } | { state: "unknown"; reason: string } {
   const slash = loc.branch.lastIndexOf("/");
   const namespace = slash > 0 ? loc.branch.slice(0, slash + 1) : loc.branch;
@@ -1489,12 +1497,51 @@ export function namespaceCarried(
   const pattern = slash > 0 ? `refs/heads/${namespace}*` : `refs/heads/${loc.branch}`;
   const ls = s.git(["ls-remote", "--heads", "origin", pattern]);
   if (ls.status !== 0) return { state: "unknown", reason: `ls-remote failed: ${ls.stderr.trim()}` };
-  const branches = ls.stdout
+  let branches = ls.stdout
     .toString()
     .split("\n")
     .map((l) => l.split("\t")[1]?.trim().replace(/^refs\/heads\//, ""))
     .filter((b): b is string => Boolean(b));
+  // Asked only when the remote HAS branches here: a checkout with none (smart-ra)
+  // pays nothing for resolving every declaration.
+  if (branches.length > 0) {
+    const pub = publications ?? publicationBranches(repoRoot);
+    branches = branches.filter((b) => !pub.has(b));
+  }
   return branches.length ? { state: "carried", branches } : { state: "not-carried", namespace };
+}
+
+const publicationCache = new Map<string, ReadonlySet<string>>();
+
+/**
+ * The branches a declaration keeps PUBLISHED output on rather than state: every
+ * declared directory whose branch is keyed by anything but `tip` (`commit`, as
+ * `qa` on `cat/cat-harness/qa-reports`; `route` and `route-family`, as a site).
+ * CI writes them wherever it runs, so their presence on a remote says nothing
+ * about which state namespaces that checkout adopted ({@link namespaceCarried}).
+ * Read from the declarations, never a list of names, and cached per root:
+ * resolving every directory of an index is not free.
+ */
+export function publicationBranches(repoRoot: string): ReadonlySet<string> {
+  const key = resolve(repoRoot);
+  const hit = publicationCache.get(key);
+  if (hit) return hit;
+  const out = new Set<string>();
+  for (const inst of layerRootsIn(repoRoot)) {
+    let overrides: SubgraphSourceOverrides | undefined;
+    const overridesOf = (): SubgraphSourceOverrides => (overrides ??= subgraphSourceOverrides(inst, repoRoot));
+    for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
+      let at: ReturnType<typeof keptAt>;
+      try {
+        at = keptAt(inst, repoRoot, d, overridesOf);
+      } catch {
+        continue; // a source the resolver refuses is reported where it is mounted, not here
+      }
+      if (at && at.keyedBy !== "tip" && at.keyedBy !== "family") out.add(at.branch);
+    }
+  }
+  publicationCache.set(key, out);
+  return out;
 }
 
 /**
