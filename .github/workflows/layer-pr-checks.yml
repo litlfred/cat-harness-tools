@@ -107,6 +107,9 @@
 # (a layer's PR on 2026-11-17: the record of 06:19Z, the answer of 11:29Z,
 # whose record was saved after the PR pinned); judged against it, the PR was
 # charged with what the lower layers fixed in between.
+# The branch-kept graphs it mounted are kept and compared the same way
+# (`state-digest.py`): WHO dth-pc#3 was judged against an answer stored before
+# a beans branch was copied in, and charged with that branch's instance.
 # Re-running ALL jobs (a second attempt) recomputes main exactly, as before.
 # `reuse-stored-main: false` turns the reuse off.
 #
@@ -1806,6 +1809,9 @@ jobs:
       # The lower layers (`name=sha` words) main's side is mounted with, kept
       # in from.json beside main's answer (stored-pins.py).
       lower: ${{ steps.base-key.outputs.lower }}
+      # The digest of the branch-kept graphs main's side mounts
+      # (state-digest.py), kept in from.json beside main's answer.
+      state: ${{ steps.base-key.outputs.state }}
       cone: ${{ steps.base-key.outputs.cone }}
       shards: ${{ steps.shards.outputs.list }}
       # Whether this job built main's side for its shards. The `run` job reads
@@ -1919,8 +1925,13 @@ jobs:
           # since main was judged is never charged to the PR. A miss costs
           # runner time only; the base side runs beside the head side. A tip
           # that cannot be read is a miss, never a hit.
-          # The tips this run pinned (the pin step), which both sides mount.
-          state="$(sha256sum < "$RUNNER_TEMP/pin/state.json" | cut -d' ' -f1)"
+          # The tips both sides mount: the pin step's, with what state-pin.sh
+          # serves from the live read (a branch the pin does not name, a beans
+          # branch that moved). The pin file alone missed both: WHO dth-pc#3
+          # (run 44489690657) shared main's answer across a beans branch
+          # copied in after it, and was charged with that branch's instance.
+          state_digest="$(python3 ci/.github/scripts/layer-pr-checks/state-digest.py "$RUNNER_TEMP/pin/state.json" "$RUNNER_TEMP/pin/state-live.json")"
+          state="$state_digest"
           for repo in $([ "$MODE" = "layer" ] && echo ${HARNESS_OWNER}/folio-assistant) "$GITHUB_REPOSITORY"; do
             python3 -c 'import json,sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1])) else 1)' "$RUNNER_TEMP/pin/state.json" "$repo" \
               || state="$state $repo=unreadable-$(date +%s%N)"
@@ -1945,6 +1956,9 @@ jobs:
             # The lower layers this side mounts, kept beside main's answer
             # (from.json) and checked before a stored answer is used.
             echo "lower=${lower# }"
+            # The branch-kept graphs this side mounts, kept beside main's
+            # answer too (from.json, stored-pins.py).
+            echo "state=$state_digest"
           } >> "$GITHUB_OUTPUT"
           # The CI cone's records of the same main (cat-harness-tools#398). A
           # PR restores the newest under the prefix, not this exact key: a
@@ -2000,9 +2014,10 @@ jobs:
           DIR: ${{ runner.temp }}/base-results
           LOWER: ${{ steps.base-key.outputs.lower }}
           INDEX: ${{ steps.pins.outputs.index }}
+          STATE: ${{ steps.base-key.outputs.state }}
         run: |
           set -euo pipefail
-          python3 ci/.github/scripts/layer-pr-checks/stored-pins.py "$DIR/from.json" "$LOWER" "$INDEX" | tee -a "$GITHUB_OUTPUT"
+          python3 ci/.github/scripts/layer-pr-checks/stored-pins.py "$DIR/from.json" "$LOWER" "$INDEX" "$STATE" | tee -a "$GITHUB_OUTPUT"
       # A PR only: a push computes main's side whatever is cached.
       - name: Hand main's answer to the compare job
         id: base-answer
@@ -2705,6 +2720,7 @@ jobs:
           PIN_AT: ${{ needs.prepare-base.outputs.layers-at }}
           INDEX: ${{ needs.prepare-base.outputs.index }}
           LOWER: ${{ needs.prepare-base.outputs.lower }}
+          STATE: ${{ needs.prepare-base.outputs.state }}
           PREVIEW: ${{ github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true' }}
         run: |
           set -euo pipefail
@@ -2734,6 +2750,9 @@ jobs:
               # The lower layers main's side mounted: a PR uses this answer
               # only when it mounts the same (stored-pins.py).
               "lower": os.environ.get("LOWER", ""),
+              # The branch-kept graphs it mounted (state-digest.py): the same
+              # rule, for the state branches (stored-pins.py).
+              "state": os.environ.get("STATE", ""),
               "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
           }, open(sys.argv[1], "w"), indent=1)
           PY
