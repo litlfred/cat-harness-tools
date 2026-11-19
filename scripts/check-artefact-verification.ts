@@ -214,8 +214,7 @@ export function report(checks: ArtefactCheck[], d: Declaration, unchecked: strin
  *   that mounts only the layers it needs. A check declared by a layer it does
  *   not mount (`check:figures`, `check:l1-coverage`, another IG's
  *   `<ig>:pages:check`) is absent here because its declaring layer is, which
- *   says nothing about whether the declaration is stale (WHO smart-base#340,
- *   2026-11-19: ten such entries read stale on a FHIR IG judged with no base).
+ *   says nothing about whether the declaration is stale (a FHIR IG judged with no base, 2026-11-19: ten such entries read stale).
  *
  * The folio-assistant index, the harness root this declaration describes,
  * is judged exactly as before.

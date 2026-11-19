@@ -42,14 +42,13 @@ export function landingMountedNotOwned(checkout: string, landing: string | undef
  * the run names its caller's own layers (`CAT_GATE_OWN_INSTANCES`,
  * `gate-own.ts`) and the landing is not among them.
  *
- * WHO smart-base#340 (2026-11-19). In layer mode the PR checks compose the
- * folio-assistant index (`fa/`), whose `site.landing` is
- * `folio-assistant-core`, and mount the caller (smart-base) inside it. The
- * gate then compared folio-assistant-core's committed `stickies.json` with
- * what this tools pin generates and failed every smart-base PR, though
- * smart-base declares no sticky and commits nothing there. A layer's
- * committed files are judged by its own CI (owner ruling 2026-11-05, "Move the
- * checks"). Unset (a local run, the index's own gates), judged as before.
+ * A FHIR IG judged with no base (2026-11-19). In layer mode the PR checks
+ * compose the platform index, whose `site.landing` is one of its own layers,
+ * and mount the caller inside it. The gate then compared that layer's
+ * committed `stickies.json` with what this tools pin generates and failed
+ * every PR of the caller, though the caller declares no sticky and commits
+ * nothing there. A layer's committed files are judged by its own CI (owner
+ * ruling 2026-11-05, "Move the checks"). Unset (a local run, the index's own gates), judged as before.
  */
 export function landingNotTheCallers(
   landing: string | undefined,

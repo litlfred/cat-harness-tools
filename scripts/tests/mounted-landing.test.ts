@@ -46,21 +46,21 @@ describe("landingMountedNotOwned", () => {
   });
 });
 
-// WHO smart-base#340: in layer mode the checks compose the folio-assistant
-// index, whose landing (folio-assistant-core) is not the caller's.
+// A FHIR IG judged with no base: in layer mode the checks compose the
+// platform index, whose landing is one of its own layers, not the caller's.
 describe("landingNotTheCallers", () => {
   const own = (v: string) => ({ CAT_GATE_OWN_INSTANCES: v });
   test("a run naming its own layers, the landing not among them: not applicable", () => {
-    expect(landingNotTheCallers("folio-assistant-core", own("smart-base"))).toContain("judged by its own CI");
+    expect(landingNotTheCallers("index-landing", own("the-caller"))).toContain("judged by its own CI");
   });
   test("the landing is the caller's own: judged", () => {
-    expect(landingNotTheCallers("smart-base", own("smart-base,smart-trust"))).toBeUndefined();
+    expect(landingNotTheCallers("the-caller", own("the-caller,its-sibling"))).toBeUndefined();
   });
   test("a run naming no own layers (local, the index's own gates): judged as before", () => {
-    expect(landingNotTheCallers("folio-assistant-core", {})).toBeUndefined();
-    expect(landingNotTheCallers("folio-assistant-core", own(" , "))).toBeUndefined();
+    expect(landingNotTheCallers("index-landing", {})).toBeUndefined();
+    expect(landingNotTheCallers("index-landing", own(" , "))).toBeUndefined();
   });
   test("no instance landing: nothing to excuse", () => {
-    expect(landingNotTheCallers(undefined, own("smart-base"))).toBeUndefined();
+    expect(landingNotTheCallers(undefined, own("the-caller"))).toBeUndefined();
   });
 });

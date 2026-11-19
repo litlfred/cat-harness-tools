@@ -113,7 +113,7 @@ describe("a checkout holding part of the declared table", () => {
     expect(r.undeclared).toEqual(["new:check"]);
   });
 
-  // WHO smart-base#340: a composed CONTENT root mounts only the layers it
+  // A FHIR IG judged with no base: a composed CONTENT root mounts only the layers it
   // needs, so a check whose declaring layer it lacks is absent, not stale.
   test("which roots hold a partial table: an own declaration, or a content root; the harness index does not", () => {
     const content = mkdtempSync(join(tmpdir(), "artefact-partial-"));
