@@ -65,8 +65,8 @@
  * `BRANCH_STORE_DIR`), never in the checkout's object store: a `--filter`
  * fetch turns the repository it runs in into a partial clone, and a reader
  * must not do that to a contributor's checkout. The checkout's
- * `http.*.extraheader` (CI's token) is carried in the ENVIRONMENT
- * (`GIT_CONFIG_COUNT`), never in argv.
+ * `http.*.extraheader` (CI's token) is carried in the ENVIRONMENT, once and in place
+ * of any global copy (`GIT_CONFIG_COUNT`, `lib/git-auth-env.ts`), never in argv.
  *
  * {@link resolveTipLocation} maps a declared directory to its branch and path.
  *
@@ -100,6 +100,7 @@ import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { projectedRead } from "../schemas/sdlc/read-projections.ts";
 import { githubUrlFor, type UrlFor } from "./remote-tree.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
+import { authEnvFrom } from "./lib/git-auth-env.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -507,24 +508,6 @@ function gitTopLevel(cwd = process.cwd()): string {
   const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf-8" });
   if (r.status !== 0) throw new BranchStoreUsageError(`not inside a git checkout: ${cwd}`);
   return r.stdout.trim();
-}
-
-/** The checkout's own `http.*.extraheader` lines, carried in env (never argv). */
-function authEnvFrom(repoRoot: string): Record<string, string> {
-  // input-site: store #d6d10161 — configures a branch-store read; the read itself goes through TreeStore.git(), which is traced
-  const r = spawnSync("git", ["config", "--get-regexp", "^http\\..*extraheader$"], { cwd: repoRoot, encoding: "utf-8" });
-  if (r.status !== 0 || !r.stdout.trim()) return {};
-  const env: Record<string, string> = {};
-  const lines = r.stdout.trim().split("\n");
-  // input-site: store #d641fe25 — configures a branch-store read; the read itself goes through TreeStore.git(), which is traced
-  const base = Number(process.env.GIT_CONFIG_COUNT ?? 0) || 0;
-  lines.forEach((line, i) => {
-    const sp = line.indexOf(" ");
-    env[`GIT_CONFIG_KEY_${base + i}`] = line.slice(0, sp);
-    env[`GIT_CONFIG_VALUE_${base + i}`] = line.slice(sp + 1);
-  });
-  env.GIT_CONFIG_COUNT = String(base + lines.length);
-  return env;
 }
 
 /** Split and check a branch-relative path. Absolute, `..`, and empty segments are usage errors. */
