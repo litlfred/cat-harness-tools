@@ -11,7 +11,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
@@ -40,7 +40,8 @@ function runStep(
   gitBody?: string,
   createFails?: string,
   labels: { have?: string[]; createRefused?: boolean } = { have: ["needs-repin"] },
-): { code: number; calls: string[]; summary: string } {
+  repo?: string,
+): { code: number; calls: string[]; summary: string; stderr: string } {
   const dir = mkdtempSync(join(tmpdir(), "standing-repin-"));
   const log = join(dir, "calls.log");
   const stub = (name: string, body: string) => {
@@ -48,7 +49,8 @@ function runStep(
     writeFileSync(p, `#!/usr/bin/env bash\necho "${name} $*" >> "${log}"\n${body}\n`);
     chmodSync(p, 0o755);
   };
-  stub("git", gitBody ?? `case "$1" in status) echo " M index.lock.json";; diff) echo index.lock.json;; esac`);
+  // With `repo`, the step runs in that real repository with the real git.
+  if (!repo) stub("git", gitBody ?? `case "$1" in status) echo " M index.lock.json";; diff) echo index.lock.json;; esac`);
   const listed = existing ? `{"number":${existing},"headRefName":"repin/standing-2026-11-01"}` : "";
   stub(
     "gh",
@@ -77,14 +79,31 @@ function runStep(
     // The step's own literal env (the label name), as the workflow sets it.
     ...Object.fromEntries(Object.entries(s.env ?? {}).filter(([, v]) => !String(v).includes("${{"))),
   };
-  const r = spawnSync("bash", ["-c", s.run!], { cwd: dir, env, encoding: "utf8" });
+  if (repo) Object.assign(env, gitEnv);
+  const r = spawnSync("bash", ["-c", s.run!], { cwd: repo ?? dir, env, encoding: "utf8" });
   let calls: string[] = [];
   try {
     calls = readFileSync(log, "utf8").trim().split("\n");
   } catch {
     calls = [];
   }
-  return { code: r.status ?? -1, calls, summary: readFileSync(summary, "utf8") };
+  return { code: r.status ?? -1, calls, summary: readFileSync(summary, "utf8"), stderr: r.stderr };
+}
+
+/** A git that reads no user or system config, with a fixed identity. */
+const gitEnv: Record<string, string> = {
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_AUTHOR_NAME: "t",
+  GIT_AUTHOR_EMAIL: "t@example.invalid",
+  GIT_COMMITTER_NAME: "t",
+  GIT_COMMITTER_EMAIL: "t@example.invalid",
+};
+
+function git(cwd: string, ...args: string[]): string {
+  const r = spawnSync("git", args, { cwd, env: { ...(process.env as Record<string, string>), ...gitEnv }, encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+  return r.stdout.trim();
 }
 
 const ghCalls = (calls: readonly string[]) => calls.filter((c) => c.startsWith("gh pr merge") || c.startsWith("gh pr edit"));
@@ -164,7 +183,7 @@ describe("standing repin moves the workflow pins with the lock when it may (cat-
     const r = runStep("schedule", undefined, false, refusingGit(true));
     expect(r.code).toBe(0);
     expect(r.calls.filter((c) => c.startsWith("git push"))).toHaveLength(2);
-    expect(r.calls).toContain("git checkout -q HEAD~1 -- .github/workflows");
+    expect(r.calls).toContain("git reset -q HEAD~1 -- .github/workflows");
     expect(r.calls).toContain("git commit -q --amend --no-edit");
     expect(r.summary).toContain("Workflow pins NOT moved");
     expect(ghCalls(r.calls)).toEqual(["gh pr edit 42 --add-label needs-repin", "gh pr merge 42 --disable-auto"]);
@@ -173,8 +192,66 @@ describe("standing repin moves the workflow pins with the lock when it may (cat-
   test("a refused push that carried no workflow edit fails the run, with nothing dropped", () => {
     const r = runStep("schedule", undefined, false, refusingGit(false));
     expect(r.code).not.toBe(0);
-    expect(r.calls.some((c) => c.startsWith("git checkout -q HEAD~1"))).toBe(false);
+    expect(r.calls.some((c) => c.startsWith("git reset -q HEAD~1"))).toBe(false);
     expect(r.calls.some((c) => c.startsWith("gh pr create"))).toBe(false);
+  });
+});
+
+/**
+ * The same refusal against real git: a bare remote whose pre-receive hook
+ * refuses any pushed commit that changes .github/workflows, as GitHub
+ * refuses a credential without the `workflows` permission. The re-pin both
+ * edits a workflow and ADDS one: `checkout HEAD~1 -- .github/workflows` kept
+ * the added file, so the retry was refused again (a downstream standing
+ * repin).
+ */
+describe("standing repin's retry without the workflow pins, against real git", () => {
+  test("a re-pin that edits ci.yml and adds a workflow is pushed with only index.lock.json changed", () => {
+    const root = mkdtempSync(join(tmpdir(), "standing-repin-git-"));
+    const remote = join(root, "remote.git");
+    const work = join(root, "work");
+    git(root, "init", "-q", "--bare", "-b", "main", remote);
+    const hook = join(remote, "hooks", "pre-receive");
+    writeFileSync(
+      hook,
+      [
+        "#!/usr/bin/env bash",
+        "while read -r old new ref; do",
+        '  [ "$new" = 0000000000000000000000000000000000000000 ] && continue',
+        '  for c in $(git rev-list "$new" --not --all); do',
+        '    if git diff-tree --no-commit-id --name-only -r --root "$c" | grep -q "^\\.github/workflows/"; then',
+        '      echo "refusing to allow a token without workflows permission to change .github/workflows" >&2; exit 1',
+        "    fi",
+        "  done",
+        "done",
+      ].join("\n") + "\n",
+    );
+    chmodSync(hook, 0o755);
+    git(root, "init", "-q", "-b", "main", work);
+    mkdirSync(join(work, ".github", "workflows"), { recursive: true });
+    writeFileSync(join(work, ".github", "workflows", "ci.yml"), "uses: x/y@v1\n");
+    writeFileSync(join(work, "index.lock.json"), '{"pin":"a"}\n');
+    git(work, "add", "-A");
+    git(work, "commit", "-q", "-m", "base");
+    git(work, "remote", "add", "origin", remote);
+    // The initial history goes in before the hook may judge it.
+    chmodSync(hook, 0o644);
+    git(work, "push", "-q", "origin", "main");
+    chmodSync(hook, 0o755);
+
+    // The re-pin: the lock moves, ci.yml's pin moves, and a workflow is added.
+    writeFileSync(join(work, "index.lock.json"), '{"pin":"b"}\n');
+    writeFileSync(join(work, ".github", "workflows", "ci.yml"), "uses: x/y@v2\n");
+    writeFileSync(join(work, ".github", "workflows", "merge-guard-trigger.yml"), "on: push\n");
+
+    const r = runStep("schedule", undefined, false, undefined, undefined, undefined, work);
+    expect(r.code).toBe(0);
+    expect(r.summary).toContain("Workflow pins NOT moved");
+    const branch = git(remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/repin/");
+    expect(branch).toMatch(/^repin\/standing-/);
+    expect(git(remote, "diff", "--name-only", "main", branch)).toBe("index.lock.json");
+    // The working tree is the amended commit: no stray workflow edits remain.
+    expect(git(work, "status", "--porcelain")).toBe("");
   });
 });
 
