@@ -224,8 +224,16 @@ jobs:
           if ! git push -q --force origin "HEAD:refs/heads/$branch"; then
             if git diff --quiet HEAD~1 HEAD -- .github/workflows; then exit 1; fi
             echo "::warning::the push with the workflow pins was refused (no \`workflows\` permission?): pushing without them; the \`uses:\` calls trail index.lock.json until an agent session runs \`bun run cat workflow-pins\`"
-            git checkout -q HEAD~1 -- .github/workflows
+            # Reset the index of the whole directory to the parent: a
+            # `checkout HEAD~1 -- .github/workflows` restores the files the
+            # parent has but keeps a workflow the re-pin ADDED, so the
+            # amended commit still touched workflows and was refused again
+            # (smart-base, run 44604706819). Then bring the working tree to
+            # the amended commit: modified files back, added ones removed.
+            git reset -q HEAD~1 -- .github/workflows
             git commit -q --amend --no-edit
+            git checkout -q -- .github/workflows
+            git clean -qfd -- .github/workflows
             git push -q --force origin "HEAD:refs/heads/$branch"
             echo "Workflow pins NOT moved: the credential cannot push .github/workflows. Pass a \`repin-token\` with the \`workflows\` permission." >> "$GITHUB_STEP_SUMMARY"
           fi
