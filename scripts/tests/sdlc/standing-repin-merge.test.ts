@@ -202,8 +202,8 @@ describe("standing repin moves the workflow pins with the lock when it may (cat-
  * refuses any pushed commit that changes .github/workflows, as GitHub
  * refuses a credential without the `workflows` permission. The re-pin both
  * edits a workflow and ADDS one: `checkout HEAD~1 -- .github/workflows` kept
- * the added file, so the retry was refused again (smart-base, run
- * 44604706819).
+ * the added file, so the retry was refused again (a downstream standing
+ * repin).
  */
 describe("standing repin's retry without the workflow pins, against real git", () => {
   test("a re-pin that edits ci.yml and adds a workflow is pushed with only index.lock.json changed", () => {

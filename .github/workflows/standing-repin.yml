@@ -228,7 +228,7 @@ jobs:
             # `checkout HEAD~1 -- .github/workflows` restores the files the
             # parent has but keeps a workflow the re-pin ADDED, so the
             # amended commit still touched workflows and was refused again
-            # (smart-base, run 44604706819). Then bring the working tree to
+            # (a downstream standing repin). Then bring the working tree to
             # the amended commit: modified files back, added ones removed.
             git reset -q HEAD~1 -- .github/workflows
             git commit -q --amend --no-edit
