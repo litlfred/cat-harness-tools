@@ -14,7 +14,11 @@ import { glanceSlots, moduleSlots, scheduleGlanceHtml } from "../journeys/schedu
 import type { JourneyCorpus, WorkshopEntry } from "../journeys/read.ts";
 import { WorkshopCanvasSchema, WorkshopSchema, type Workshop, type WorkshopCanvas } from "../../schemas/process/workshop.ts";
 
-const lib = createRequire(import.meta.url)("../journeys/assets/canvas-pdf.js") as { build: (model: unknown, get: (k: string) => string | null) => Uint8Array };
+const lib = createRequire(import.meta.url)("../journeys/assets/canvas-pdf.js") as {
+  build: (model: unknown, get: (k: string) => string | null, drawings?: { title: string; w: number; h: number; hex: string }[]) => Uint8Array;
+  localNames: (app: unknown, get: (k: string) => string | null) => Record<string, string>;
+  hrefSlug: (href: string) => string;
+};
 
 const canvas: WorkshopCanvas = WorkshopCanvasSchema.parse({
   title: "Country Canvas",
@@ -208,5 +212,55 @@ describe("the schedule at a glance", () => {
     expect(html).not.toContain("Stack");
     expect(html).toContain('<a class="jv-glance-full" href="#the-days">The two days: full timetable</a>');
     expect(html).toContain("data-jv-glance-now hidden");
+  });
+});
+
+describe("the summary reads each canvas answer by name (owner, 2026-11-19)", () => {
+  const items = canvasSummaryItems("ws", canvas).flatMap((x) => x.items);
+  test("a choice shows the option chosen, under its section, card and field; ticks gather under their row", () => {
+    expect(items.find((i) => i.name === "ws:cv:s1:tp:t1:rating")).toMatchObject({ label: "The journey · 1 Vaccinated", type: "choice", each: true });
+    expect(items.find((i) => i.name === "ws:cv:s1:tp:t1:today")).toMatchObject({ label: "The journey · 1 Vaccinated · In our country today", type: "text" });
+    expect(items.find((i) => i.name === "ws:cv:s1:blocks:a:epa")).toMatchObject({ label: "Provider systems · E / P / A", each: true });
+    expect(items.find((i) => i.name === "ws:cv:s1:blocks:a:basis:law")).toMatchObject({ label: "Law", type: "check", group: "Provider systems · Formal basis" });
+    expect(items.find((i) => i.name === "ws:cv:s1:blocks:a:urgency")).toMatchObject({ label: "Provider systems", each: true });
+    expect(items.every((i) => !i.label.startsWith(" ·") && !i.label.startsWith("·"))).toBe(true);
+  });
+});
+
+describe("the PDF's appendix: our systems, the architecture, the drawings, under the table's own names (owner, 2026-11-19)", () => {
+  const appendix = {
+    systems: [
+      { name: "Patient record (EHR)", slug: "patient-record-ehr", have: "ws:am:patient-record-ehr:have", local: "ws:am:patient-record-ehr:name" },
+      { name: "VHL viewer", slug: "vhl-viewer", have: "ws:am:vhl-viewer:have", local: "ws:am:vhl-viewer:name" },
+    ],
+    panel: { title: "Architecture", countries: ["Taifafeki", "Onesa"], rows: [{ layer: "Point of service", cells: [[{ name: "Patient record (EHR)", slug: "patient-record-ehr" }], [{ name: "VHL viewer", slug: "vhl-viewer" }]] }] },
+    figures: [{ kind: "archimate", title: "Systems", src: "x.svg" }],
+  };
+  const kept: Record<string, string> = { "ws:am:patient-record-ehr:name": "TaifaCare EHR", "ws:am:patient-record-ehr:have": "1" };
+  const get = (k: string) => kept[k] ?? null;
+  // A 1×1 JPEG, as the browser's canvas writes it.
+  const jpeg = "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffc400b5100002010303020403050504040000017d01020300041105122131410613516107227114328191a1082342b1c11552d1f02433627282090a161718191a25262728292a3435363738393a434445464748494a535455565758595a636465666768696a737475767778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffda0008010100003f00fbd3ffd9";
+  const model = { ...canvasModel("ws", canvas, []), appendix };
+  const pdf = new TextDecoder("latin1").decode(lib.build(model, get, [{ title: "ArchiMate view: Systems", w: 1, h: 1, hex: jpeg }]));
+  const hex = (x: string) => `<FEFF${[...x].map((c) => c.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")).join("")}>`;
+
+  test("the table's names, by element; an element page's address gives its slug", () => {
+    expect(lib.localNames(appendix, get)).toEqual({ "patient-record-ehr": "TaifaCare EHR" });
+    expect(lib.hrefSlug("../../../en/x/archimate/0.1.0/element/patient-record-ehr/")).toBe("patient-record-ehr");
+  });
+  test("our systems as fields, filled in: the tick and the name kept under How it works' keys", () => {
+    expect(pdf).toContain("(Our systems) Tj");
+    expect(pdf).toMatch(new RegExp(`/T ${hex("ws:am:patient-record-ehr:name")}[^\n]*/V ${hex("TaifaCare EHR")}`));
+    expect(pdf).toMatch(new RegExp(`/T ${hex("ws:am:patient-record-ehr:have")}[^\n]*/V /Yes`));
+  });
+  test("the architecture panel with the table's name in place of the reference one", () => {
+    expect(pdf).toContain("(TaifaCare EHR) Tj");
+    expect(pdf).toContain("(VHL viewer) Tj");
+  });
+  test("each drawing on a page of its own, as a JPEG image", () => {
+    expect(pdf).toContain("/Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode]");
+    expect(pdf).toMatch(/\/XObject << \/Im1 \d+ 0 R >>/);
+    expect(pdf).toContain("/Im1 Do Q");
+    expect(pdf).toContain("(ArchiMate view: Systems) Tj");
   });
 });
