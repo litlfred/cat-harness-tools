@@ -341,3 +341,16 @@ Feature: Voice QA checkers keep their exemptions narrow
     Given markdown lines containing "Part I", "Type I", "US" and the verb "lean"
     When checkScholarlyDefault runs on each
     Then each result is "pass"
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::block_title_and_caption_raw_label_prefixes_and_mechanical_table_placeholders_fail
+  Scenario: Block title and caption raw label prefixes and mechanical table placeholders fail
+    Given block manifests with title "Data table 2 from rem:linking-relations-table" or "Table 3 from def:frobenius-hopf-substrate"
+    When checkScholarlyDefault and checkVoiceTitleScholarly run
+    Then each result is "fail"
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::truncated_block_titles_and_captions_ending_in_dangling_articles_or_prepositions_fail
+  Scenario: Truncated block titles and captions ending in dangling articles or prepositions fail
+    Given block manifests whose title or caption ends in a dangling "from " or "the "
+    When checkScholarlyDefault and checkVoiceTitleScholarly run
+    Then each result is "fail"
+    And a complete scholarly title and caption pass

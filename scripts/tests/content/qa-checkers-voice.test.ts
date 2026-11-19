@@ -221,7 +221,9 @@ import {
   checkStatusLeak,
   checkStatusSectionHeader,
   checkAuthorNotesPollution,
+  scanBlockTitleAndCaption,
 } from "../../../pipeline/qa-checkers-voice.ts";
+import { checkVoiceTitleScholarly } from "../../../pipeline/qa-checkers-extended.ts";
 
 const leak = (line: string) => checkStatusLeak(tmp("leak.md", line)).result;
 const notes = (line: string) => checkAuthorNotesPollution(tmp("notes.md", line)).result;
@@ -418,5 +420,40 @@ describe("fourth-wall Lean leaks and general first-person prose in paper voice",
       "pass",
     );
     expect(md("The two branches lean toward opposite signs in $q > 1$.")).toBe("pass");
+  });
+
+  test("block title and caption raw label prefixes and mechanical table placeholders fail", () => {
+    const tsRaw = tmp(
+      "tbl-raw.ts",
+      'export default table({\n  label: "tbl:x",\n  title: "Data table 2 from rem:linking-relations-table",\n});\n',
+    );
+    expect(scanBlockTitleAndCaption(tsRaw).length).toBeGreaterThanOrEqual(2);
+    expect(checkScholarlyDefault(undefined, undefined, tsRaw).result).toBe("fail");
+    expect(checkVoiceTitleScholarly(tsRaw).result).toBe("fail");
+
+    const tsTableFrom = tmp(
+      "tbl-from.ts",
+      'export default table({\n  label: "tbl:y",\n  title: "Table 3 from def:frobenius-hopf-substrate",\n});\n',
+    );
+    expect(checkScholarlyDefault(undefined, undefined, tsTableFrom).result).toBe("fail");
+    expect(checkVoiceTitleScholarly(tsTableFrom).result).toBe("fail");
+  });
+
+  test("truncated block titles and captions ending in dangling articles or prepositions fail", () => {
+    const tsDangling = tmp(
+      "dangling.ts",
+      'export default table({\n  label: "tbl:z",\n  title: "Data table 1 from ",\n  caption: "Representative elements spanning the periodic table, comparing the ",\n});\n',
+    );
+    expect(scanBlockTitleAndCaption(tsDangling).length).toBeGreaterThanOrEqual(2);
+    expect(checkScholarlyDefault(undefined, undefined, tsDangling).result).toBe("fail");
+    expect(checkVoiceTitleScholarly(tsDangling).result).toBe("fail");
+
+    const tsClean = tmp(
+      "clean-title.ts",
+      'export default table({\n  label: "tbl:clean",\n  title: "Linking relations across the two-strand torus family",\n  caption: "Evaluated on the unframed closure over a commutative ring.",\n});\n',
+    );
+    expect(scanBlockTitleAndCaption(tsClean)).toEqual([]);
+    expect(checkScholarlyDefault(undefined, undefined, tsClean).result).toBe("pass");
+    expect(checkVoiceTitleScholarly(tsClean).result).toBe("pass");
   });
 });

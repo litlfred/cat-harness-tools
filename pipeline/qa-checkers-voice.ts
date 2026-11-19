@@ -851,14 +851,79 @@ function isReferenceIndexMd(mdPath: string): boolean {
   return base === "definition-index.md" || base.startsWith("glossary-");
 }
 
+/**
+ * Block `.ts` manifest `title` and `caption` checks for paper-profile scholarly
+ * voice:
+ * 1. Raw LaTeX/Folio label prefixes (`rem:foo`, `def:bar`, `prop:…`, `thm:…`, etc.).
+ * 2. Mechanical table-extraction placeholders (`Data table …`, `Table N from …`).
+ * 3. Truncated titles/captions ending in dangling articles or prepositions
+ *    (`… is a`, `… from`, `… the`, `… of`, `… in`, `… to`, `… for`, `… with`).
+ */
+const TS_TITLE_OR_CAPTION_FIELD_RE =
+  /\b(title|caption):\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/g;
+const TITLE_RAW_LABEL_RE =
+  /\b(?:rem|def|prop|thm|lem|cor|conj|alg|ex|sec|ch|app|tbl|fig):[a-zA-Z0-9_-]*/;
+const TITLE_MECH_PLACEHOLDER_RE = /\bData\s+table\b|\bTable\s+\d+\s+from\b/i;
+const TITLE_DANGLING_TAIL_RE =
+  /\s+(?:a|[Aa]n|[Tt]he|[Ff]rom|[Oo]f|[Ii]n|[Tt]o|[Ff]or|[Ww]ith|[Ii]s\s+a)\s*$/;
+
+export function scanBlockTitleAndCaption(tsPath: string): CheckerHit[] {
+  const { src: tsSrc } = readSource(tsPath);
+  if (!tsSrc) return [];
+  const hits: CheckerHit[] = [];
+  for (const m of tsSrc.matchAll(TS_TITLE_OR_CAPTION_FIELD_RE)) {
+    const field = m[1] ?? "title";
+    const val = m[2] ?? m[3] ?? "";
+    if (!val) continue;
+    const lineNo = tsSrc.slice(0, m.index ?? 0).split("\n").length;
+    const rawLabel = val.match(TITLE_RAW_LABEL_RE);
+    if (rawLabel) {
+      hits.push({
+        file: tsPath,
+        line: lineNo,
+        text: `${field}-raw-label (${rawLabel[0]}): "${val.slice(0, 140)}"`,
+      });
+    }
+    const mech = val.match(TITLE_MECH_PLACEHOLDER_RE);
+    if (mech) {
+      hits.push({
+        file: tsPath,
+        line: lineNo,
+        text: `${field}-mechanical-placeholder (${mech[0]}): "${val.slice(0, 140)}"`,
+      });
+    }
+    const tail = val.match(TITLE_DANGLING_TAIL_RE);
+    if (tail) {
+      hits.push({
+        file: tsPath,
+        line: lineNo,
+        text: `${field}-dangling-tail ("${tail[0].trim()}"): "${val.slice(0, 140)}"`,
+      });
+    }
+  }
+  return hits;
+}
+
 export function checkScholarlyDefault(
   mdPath: string | undefined,
   leanPath: string | undefined,
+  tsPath?: string | undefined,
 ): CheckerResult {
   const lines = mdPath ? readSource(mdPath).lines : [];
-  if (lines.length === 0 && !leanPath) return { result: "pass", hits: [] };
+  const resolvedTsPath =
+    tsPath ??
+    (mdPath?.endsWith(".md") && existsSync(mdPath.slice(0, -3) + ".ts")
+      ? mdPath.slice(0, -3) + ".ts"
+      : undefined);
+  if (lines.length === 0 && !leanPath && !resolvedTsPath) {
+    return { result: "pass", hits: [] };
+  }
 
   const hits: CheckerHit[] = [];
+
+  if (resolvedTsPath && !(mdPath && isReferenceIndexMd(mdPath))) {
+    hits.push(...scanBlockTitleAndCaption(resolvedTsPath));
+  }
 
   // Scan .md. Fenced code blocks (```) and multi-line display math ($$)
   // are skipped; inline backtick spans are scanned for fourth-wall Lean
@@ -1218,7 +1283,7 @@ export const VOICE_AUTOMATED_CHECKERS: Record<
   "voice-ai-slop": (p) =>
     p.md ? checkAiSlop(p.md) : { result: "pass", hits: [] },
   "voice-scholarly-default": (p) =>
-    p.md || p.lean
-      ? checkScholarlyDefault(p.md, p.lean)
+    p.md || p.lean || p.ts
+      ? checkScholarlyDefault(p.md, p.lean, p.ts)
       : { result: "pass", hits: [] },
 };
