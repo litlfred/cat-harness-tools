@@ -27,6 +27,7 @@
  */
 
 import { readFileSync, existsSync } from "fs";
+import { basename } from "path";
 import type { CheckerPaths } from "../schemas/sdlc/block-qa.ts";
 
 export interface CheckerHit {
@@ -93,7 +94,7 @@ function scan(
 // Work-tracker / implementation-status markers that never belong in the
 // manuscript — in ANY block kind, conjectures included.
 const STATUS_LEAK_RE =
-  /(\*\*Done\*\*|\*\*Completed\*\*|\*\*Pending\*?\*?|\*\*Blocked\*?\*?|\*\*Deferred\*?\*?|\*\*In progress\*?\*?|\*\*Punted\*?\*?|\(TODO\)|\(TBD\)|\(TBA\)|\(WIP\)|\(stub\)|\(placeholder\)|\bTODO:|\bFIXME:|\bXXX:|\bHACK:|\bWIP\b|\bTO-DO\b|\bTBD\b|\bplaceholder\b|\b(?:stub(?:bed)?|punt(?:ed|ing)?)\s+(?:for\s+now|until|pending)|\bneeds\s+(?:work|fixing|attention|review|filling\s+in)|\bkick\s+the\s+can|\bnot\s+yet\s+(?:implemented|written|filled\s+in|wired)|\bdeferred\s+via\s+sorry\b)/i;
+  /(\*\*Done\*\*|\*\*Completed\*\*|\*\*Pending\*?\*?|\*\*Blocked\*?\*?|\*\*Deferred\*?\*?|\*\*In progress\*?\*?|\*\*Punted\*?\*?|\(TODO\)|\(TBD\)|\(TBA\)|\(WIP\)|\(stub\)|\(placeholder\)|\bTODO:|\bFIXME:|\bXXX:|\bHACK:|\bWIP\b|\bTO-DO\b|\bTBD\b|\bplaceholder\b|\b(?:stub(?:bed)?|punt(?:ed|ing)?)\s+(?:for\s+now|until|pending)|\bneeds\s+(?:work|fixing|attention|review|filling\s+in)|\bkick\s+the\s+can|\bnot\s+yet\s+(?:implemented|written|filled\s+in|wired)|\bdeferred\s+via\s+sorry\b|\bsorry[- ]free\b|\baxiom[- ]free\b|#print\s+axioms|\bLean\s+(?:carrier|sibling|backing)\b|\bproved\s+in\s+(?:the\s+)?Lean\b|\bproved\s+formally\b|\bformally\s+proved\b|\bformali[sz]ed\s+in\s+Lean\b)/i;
 
 // Derivation-status / open-status speech ("would prove the …", "pending
 // the derivation", "exact closure remains open", "near-match to a
@@ -774,6 +775,82 @@ function startsSentence(prev: string | undefined): boolean {
   return /(?:[.:!?]|\$\$|-\/)["'`)\]]*$/.test(t);
 }
 
+/**
+ * General first-person plural and singular pronouns in scholarly paper prose
+ * (`voice-scholarly-default`, scoped to `profiles: ["paper"]`).
+ *
+ * - `FIRST_PERSON_SCHOLARLY_CI_RE`: case-insensitive `we`, `we're`, `we've`,
+ *   `we'll`, `our`, `ours`, `let's`, `my`, `mine`.
+ * - `FIRST_PERSON_US_CS_RE`: case-sensitive lowercase `\bus\b` so uppercase
+ *   country initialism `US` does not false-positive.
+ * - `FIRST_PERSON_I_CS_RE`: case-sensitive `I` bound to a contraction or verb
+ *   so Roman numerals (`Part I`, `Type I`, `I.`) do not false-positive.
+ */
+const FIRST_PERSON_SCHOLARLY_CI_RE =
+  /\b(?:we|we're|we've|we'll|we'd|our|ours|ourselves|let's|my|mine|myself)\b/i;
+const FIRST_PERSON_US_CS_RE = /\bus\b/;
+const FIRST_PERSON_I_CS_RE =
+  /\bI(?:'m|'ve|'ll|'d|\s+(?:am|was|have|had|will|would|can|could|shall|should|do|did|think|believe|show|prove|define|use|choose|chose|take|took|write|wrote|note|observe|claim|argue|expect|find|found|see|saw))\b/;
+
+function hasFirstPersonProse(line: string): boolean {
+  return (
+    FIRST_PERSON_SCHOLARLY_CI_RE.test(line) ||
+    FIRST_PERSON_US_CS_RE.test(line) ||
+    FIRST_PERSON_I_CS_RE.test(line)
+  );
+}
+
+/**
+ * Fourth-wall Lean / Mathlib prose mentions (Class L1) in reader-facing `.md`
+ * blocks of a `paper` folio, where the rendered `∀` badge and `.ts` `lean:`
+ * field carry the formalisation link.
+ */
+const LEAN_PROSE_CS_RE = /\bLean(?:'s)?\b/;
+const LEAN_PROSE_CI_RE =
+  /^#{1,6}\s*Lean\b|\*\*Lean\.?\*\*|\bLean\s+(?:4\b|carrier|sibling|backing|file|module|proof|theorem|lemma|definition|declaration|structure|formalisation|formalization|implementation|companion|namespace|typeclass|code|source|verify|verification)\b|\bin\s+Lean(?:\s+4)?\b|\bMathlib\b|\bproved\s+formally\b|\bformally\s+proved\b|\bproved\s+in\s+(?:the\s+)?Lean\b|\bformali[sz]ed\s+in\b|\bdischarges?\s+the\s+axiom\b/i;
+
+/**
+ * Pre-strip inline backtick detector (Class L2) for Lean FQNs, `.lean` files,
+ * raw block IDs (`def:foo`), Lean typeclass/type expressions (`CommRing`,
+ * `[Add H]`, `HochschildZero R A`), and Lean snake_case / camelCase theorem
+ * or definition names (`dimQK0_eq_…`, `su2Character_one`) in `.md` prose.
+ */
+const BACKTICK_TOKEN_RE = /`([^`\n]+)`/g;
+const LEAN_IDENT_FQN_RE =
+  /^(?:qou:)?(?:QOU|Mathlib|Real|Nat|Int|Rat|Finset|Matrix|Polynomial|Complex|CategoryTheory|Algebra|Ring|LinearAlgebra)\.[A-Za-z0-9_.']+$/;
+const LEAN_IDENT_FILE_RE = /^[A-Za-z0-9_./-]+\.lean$/;
+const LEAN_IDENT_RAW_BLOCK_RE =
+  /^(?:def|thm|prop|lem|cor|conj|rem|ex|sec|chap|app|tab):[a-z0-9-]+$/;
+const LEAN_IDENT_DECL_OR_TYPE_RE =
+  /^(?:CommRing|Field|LinearOrderedField|IsQGeneric|Fintype|DecidableEq|Nonempty|Unique|\[[A-Z][A-Za-z0-9_ ]+\]|[A-Z][a-zA-Z0-9]+(?:\s+[A-Za-z0-9_]+)+|Is[A-Z][a-zA-Z0-9]+|[a-z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)+|[a-z][a-z0-9]+(?:[A-Z][a-z0-9]+)+)$/;
+const LEAN_IDENT_NON_LEAN_EXT_RE =
+  /\.(?:py|json|ts|js|md|tex|sh|yml|yaml|toml|csv|svg|png)$/i;
+const LEAN_IDENT_EXEMPT_TOKENS = new Set([
+  "plain",
+  "KnKp",
+  "Kp3",
+  "nuc11_interleaved",
+  "nuc11_gen_grouped",
+  "true",
+  "false",
+]);
+
+export function classifyLeanIdentBacktick(rawToken: string): string | null {
+  const tok = rawToken.trim();
+  if (!tok || LEAN_IDENT_EXEMPT_TOKENS.has(tok)) return null;
+  if (LEAN_IDENT_FQN_RE.test(tok)) return "lean-fqn";
+  if (LEAN_IDENT_FILE_RE.test(tok)) return "lean-file-ref";
+  if (LEAN_IDENT_NON_LEAN_EXT_RE.test(tok)) return null;
+  if (LEAN_IDENT_RAW_BLOCK_RE.test(tok)) return "raw-block-id";
+  if (LEAN_IDENT_DECL_OR_TYPE_RE.test(tok)) return "lean-decl-or-type";
+  return null;
+}
+
+function isReferenceIndexMd(mdPath: string): boolean {
+  const base = basename(mdPath);
+  return base === "definition-index.md" || base.startsWith("glossary-");
+}
+
 export function checkScholarlyDefault(
   mdPath: string | undefined,
   leanPath: string | undefined,
@@ -783,65 +860,104 @@ export function checkScholarlyDefault(
 
   const hits: CheckerHit[] = [];
 
-  // Scan .md. Fenced code blocks (```) are skipped via `inFence`;
-  // inline backtick spans are stripped per-line so technical terms
-  // / identifiers in code don't trigger false positives. HTML-style
-  // `<!-- ... -->` comments are intentionally NOT stripped — they
-  // render as visible text in the markdown pipeline.
+  // Scan .md. Fenced code blocks (```) and multi-line display math ($$)
+  // are skipped; inline backtick spans are scanned for fourth-wall Lean
+  // identifiers BEFORE `stripInlineCode` removes them for prose checks.
   if (mdPath) {
+    const skipFourthWall = isReferenceIndexMd(mdPath);
     let inFence = false;
+    let inDisplayMath = false;
     lines.forEach((l, i) => {
-      if (/^```/.test(l.trim())) {
+      const trimmed = l.trim();
+      if (/^```/.test(trimmed)) {
         inFence = !inFence;
         return;
       }
       if (inFence) return;
-      const cleanedLine = stripInlineCode(l);
+      if (trimmed === "$$") {
+        inDisplayMath = !inDisplayMath;
+        return;
+      }
+      if (inDisplayMath) return;
+
+      const lineNoMathOrUrls = l
+        .replace(/\{\{[^}]*\}\}/g, " ")
+        .replace(/\$\$[^$]*\$\$/g, " ")
+        .replace(/\$[^$]*\$/g, " ")
+        .replace(/\]\([^)]*\)/g, "]");
+
+      if (!skipFourthWall) {
+        for (const m of lineNoMathOrUrls.matchAll(BACKTICK_TOKEN_RE)) {
+          const kind = classifyLeanIdentBacktick(m[1] ?? "");
+          if (kind !== null) {
+            hits.push({
+              file: mdPath,
+              line: i + 1,
+              text: `lean-ident-in-prose (${kind}): \`${(m[1] ?? "").trim()}\``,
+            });
+          }
+        }
+      }
+
+      const cleanedLine = stripInlineCode(lineNoMathOrUrls)
+        .replace(/<[^>\s]+>/g, "")
+        .replace(/:(?:refterm|defterm)\[([^\]]*)\]\{#[^}]*\}/g, "$1");
+
+      if (
+        !skipFourthWall &&
+        (LEAN_PROSE_CI_RE.test(cleanedLine) || LEAN_PROSE_CS_RE.test(cleanedLine))
+      ) {
+        hits.push({
+          file: mdPath,
+          line: i + 1,
+          text: `lean-prose-leak: ${trimmed.slice(0, 200)}`,
+        });
+      }
+
+      let lineMatchedVoice = false;
       if (SECOND_PERSON_RE.test(cleanedLine)) {
-        hits.push({ file: mdPath, line: i + 1, text: l.trim().slice(0, 200) });
+        hits.push({ file: mdPath, line: i + 1, text: trimmed.slice(0, 200) });
+        lineMatchedVoice = true;
       }
       if (
         LECTURER_OPENER_RE.test(cleanedLine) &&
         startsSentence(i > 0 ? lines[i - 1] : undefined)
       ) {
-        hits.push({ file: mdPath, line: i + 1, text: l.trim().slice(0, 200) });
+        hits.push({ file: mdPath, line: i + 1, text: trimmed.slice(0, 200) });
+        lineMatchedVoice = true;
       }
       if (PAPER_PAST_TENSE_RE.test(cleanedLine)) {
-        hits.push({ file: mdPath, line: i + 1, text: l.trim().slice(0, 200) });
+        hits.push({ file: mdPath, line: i + 1, text: trimmed.slice(0, 200) });
+        lineMatchedVoice = true;
+      }
+      if (!lineMatchedVoice && hasFirstPersonProse(cleanedLine)) {
+        hits.push({ file: mdPath, line: i + 1, text: trimmed.slice(0, 200) });
       }
     });
   }
 
   // Also scan Lean docstrings — proof bodies share the scholarly
-  // standard. Extract /-! ... -/ module docs and /-- ... -/ decl
-  // docstrings as line-tracked spans so we can cite the actual
-  // offending line + quote (not just `line: 1`).
+  // third-person standard (excluding fourth-wall Lean checks, since
+  // `.lean` docstrings legitimately name Lean declarations and types).
   if (leanPath) {
     const { src: leanSrc } = readSource(leanPath);
     if (leanSrc) {
       for (const span of extractLeanDocstrings(leanSrc)) {
-        // span.startLine is 1-based; span.body has the raw text.
-        // Iterate INTERNAL docstring lines so we cite the exact
-        // offender. The three RE's use the same matchers as the
-        // .md scan above (incl. PAPER_PAST_TENSE_RE — missing
-        // from the previous version).
         const docLines = span.body.split("\n");
         docLines.forEach((dl, j) => {
-          const cleanedLine = stripInlineCode(dl);
+          const cleanedLine = stripInlineCode(dl)
+            .replace(/\$\$[^$]*\$\$/g, " ")
+            .replace(/\$[^$]*\$/g, " ");
           const lineNo = span.startLine + j;
-          // SECOND_PERSON_RE is case-insensitive, not anchored — fine.
+          let lineMatchedVoice = false;
           if (SECOND_PERSON_RE.test(cleanedLine)) {
             hits.push({
               file: leanPath,
               line: lineNo,
               text: dl.trim().slice(0, 200) || "(empty)",
             });
+            lineMatchedVoice = true;
           }
-          // LECTURER_OPENER_RE uses `^` so it must match line-start.
-          // Per-line iteration applies the anchor naturally; the prior
-          // whole-doc-string scan needed the `m` flag. `startsSentence`
-          // then rejects wrap continuations, which line-start alone
-          // cannot tell apart from real sentence starts.
           if (
             LECTURER_OPENER_RE.test(cleanedLine) &&
             startsSentence(j > 0 ? docLines[j - 1] : undefined)
@@ -851,8 +967,17 @@ export function checkScholarlyDefault(
               line: lineNo,
               text: dl.trim().slice(0, 200) || "(empty)",
             });
+            lineMatchedVoice = true;
           }
           if (PAPER_PAST_TENSE_RE.test(cleanedLine)) {
+            hits.push({
+              file: leanPath,
+              line: lineNo,
+              text: dl.trim().slice(0, 200) || "(empty)",
+            });
+            lineMatchedVoice = true;
+          }
+          if (!lineMatchedVoice && hasFirstPersonProse(cleanedLine)) {
             hits.push({
               file: leanPath,
               line: lineNo,
@@ -1024,7 +1149,8 @@ export function checkAuthorNotesPollution(mdPath: string): CheckerResult {
 // Legitimate scholarly sections ("Open problems", "Discussion",
 // "Limitations", "Outlook") are NOT flagged. Skips fenced code blocks.
 const STATUS_SECTION_HEADER_RE =
-  /^#{1,6}\s+(?=.*\b(?:status|todo|to-?do|pending|roadmap|punch\s*list|next\s+steps?|(?:work\s+remaining|remaining\s+work|outstanding\s+work)|implementation\s+plan)\b).*/i;
+  /^#{1,6}\s+(?=.*\b(?:status|todo|to-?do|pending|roadmap|punch\s*list|next\s+steps?|(?:work\s+remaining|remaining\s+work|outstanding\s+work)|implementation\s+plan|lean\s+(?:structure|backing|carrier|sibling|file|module|formalisation|formalization))\b).*/i;
+const LEAN_SECTION_HEADER_CS_RE = /^#{1,6}\s+Lean\b/;
 
 export function checkStatusSectionHeader(mdPath: string): CheckerResult {
   const { lines } = readSource(mdPath);
@@ -1037,7 +1163,7 @@ export function checkStatusSectionHeader(mdPath: string): CheckerResult {
       continue;
     }
     if (inFence) continue;
-    if (STATUS_SECTION_HEADER_RE.test(l))
+    if (STATUS_SECTION_HEADER_RE.test(l) || LEAN_SECTION_HEADER_CS_RE.test(l))
       hits.push({
         file: mdPath,
         line: i + 1,
