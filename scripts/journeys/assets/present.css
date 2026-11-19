@@ -1156,7 +1156,7 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-cv-lay-row > .jp-cv-body { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; }
 .jp-cv-lay-row > .jp-cv-body > .jp-cv-blanks { flex-basis: 100%; }
 .jp-cv-caps { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; color: var(--cv-muted); }
-.jp-cv-lay-aside { display: grid; grid-template-columns: minmax(200px, 26%) minmax(0, 1fr); border: 1px solid var(--cv-line); }
+.jp-cv-lay-aside { display: grid; grid-template-columns: minmax(160px, 21%) minmax(0, 1fr); border: 1px solid var(--cv-line); }
 .jp-cv-aside { padding: 10px; border-right: 1px solid var(--cv-line); }
 .jp-cv-aside .jp-cv-st { font-size: 17px; font-weight: 400; }
 .jp-cv-main { min-width: 0; }
@@ -1196,6 +1196,9 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-cv-t td.jp-cv-c-label { color: #52606d; }
 .jp-cv-t .jp-cv-w-narrow { width: 1%; white-space: nowrap; }
 .jp-cv-t .jp-cv-w-wide { width: 30%; }
+.jp-cv-tone-gap .jp-cv-t thead th { font-size: 12px; padding: 3px 5px; }
+.jp-cv-tone-gap .jp-cv-t td { padding: 3px 5px; }
+.jp-cv-head-l > .jp-cv-mods { margin-left: 6px; vertical-align: middle; }
 .jp-cv-t .jp-cv-opts { margin: 0; gap: 2px 14px; }
 .jp-cv-t td.jp-cv-c-choice .jp-cv-opts { flex-wrap: nowrap; }
 .jp-cv-t td.jp-cv-c-choice .jp-cv-opt, .jp-cv-t td.jp-cv-c-ticks .jp-cv-opt { white-space: nowrap; }
@@ -1203,7 +1206,7 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-cv-t-nohead tbody th { font-weight: 400; white-space: nowrap; }
 .jp-cv-t-nohead td.jp-cv-c-choice .jp-cv-opts { flex-wrap: wrap; }
 .jp-cv-grp th { background: #eef4f6; color: var(--cv-head); font-size: 12px; font-weight: 700; text-transform: none; }
-.jp-cv-cell { width: 100%; min-width: 8em; background: transparent; border: 0; font: inherit; font-size: 13px; padding: 2px 0; }
+.jp-cv-cell { width: 100%; min-width: 4em; background: transparent; border: 0; font: inherit; font-size: 13px; padding: 2px 0; }
 .jp-cv-cards-cols .jp-cv-cardrow { display: grid; grid-template-columns: repeat(var(--cv-n), minmax(0, 1fr)); border: 1px solid var(--cv-line); }
 .jp-cv-arrows .jp-cv-cardrow { grid-template-columns: repeat(var(--cv-n), minmax(0, 1fr) auto) ; border: 0; gap: 0 10px; align-items: stretch; }
 .jp-cv-arrows .jp-cv-cardrow > .jp-cv-card { border: 1px solid var(--cv-line); }

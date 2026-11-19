@@ -519,7 +519,7 @@ export function canvasFormHtml(
         .join("");
       const mast = c.masthead ? `<p class="jp-cv-mast"><b>${e(c.masthead.title)}</b>${c.masthead.subtitle ? `<span>${e(c.masthead.subtitle)}</span>` : ""}</p>` : "";
       return `<article class="jp-cv-sheet jp-cv-${(c.size ?? "A3").toLowerCase()}" id="canvas-${e(s.id)}" data-jp-cv-sheet="${e(s.id)}"${s.modules?.length ? ` data-jp-cv-modules="${e(s.modules.join(" "))}"` : ""}>
-<header class="jp-cv-head"><div class="jp-cv-head-l"><span class="jp-cv-kick">${e(kicker)}</span><h3>${e(s.title)}</h3>${s.intro ? `<p>${mdLite(s.intro)}</p>` : ""}</div>${mast || header ? `<div class="jp-cv-head-r">${mast}${header ? `<div class="jp-cv-hdr">${header}</div>` : ""}</div>` : ""}</header>
+<header class="jp-cv-head"><div class="jp-cv-head-l"><span class="jp-cv-kick">${e(kicker)}</span>${s.modules?.length ? ` <span class="jp-cv-mods">${s.modules.map(moduleLink).join("")}</span>` : ""}<h3>${e(s.title)}</h3>${s.intro ? `<p>${mdLite(s.intro)}</p>` : ""}</div>${mast || header ? `<div class="jp-cv-head-r">${mast}${header ? `<div class="jp-cv-hdr">${header}</div>` : ""}</div>` : ""}</header>
 <div class="jp-cv-secs">${s.sections.map((x) => sectionHtml(d, s, x, moduleLink)).join("")}</div>
 ${annex.length ? `<section class="jp-cv-annex"><h4>Annex: the journey’s questions for this sheet</h4><ol>${annex.map((q) => `<li>${o.stepLink(q)}<div><span>${e(q.text)}</span>${o.answerBox(q.key, q.text)}</div></li>`).join("")}</ol></section>` : ""}${s.footer ? `\n<footer class="jp-cv-foot">${mdLite(s.footer)}</footer>` : ""}
 </article>`;

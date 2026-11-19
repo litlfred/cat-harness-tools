@@ -92,7 +92,7 @@ describe("the canvas as its printed pages", () => {
   const html = canvasFormHtml("ws", canvas, [], { stepLink: () => "", answerBox: () => "", moduleLink: (id) => `<a class="jp-mod">${id}</a>` });
 
   test("a sheet: its band, title, intro, masthead, header write-ins sharing the cover's key, and footer", () => {
-    expect(html).toContain('<span class="jp-cv-kick">Day 1 · Module 1 · Sheet 1 of 2</span><h3>Our Journey</h3><p>How it works <b>today</b>.</p>');
+    expect(html).toContain('<span class="jp-cv-kick">Day 1 · Module 1 · Sheet 1 of 2</span> <span class="jp-cv-mods"><a class="jp-mod">M1</a><a class="jp-mod">M2</a></span><h3>Our Journey</h3><p>How it works <b>today</b>.</p>');
     expect(html).toContain('<p class="jp-cv-mast"><b>A workshop</b><span>Day 1 and Day 2</span></p>');
     expect(html.match(/name="ws:cv:cover:country"/g)?.length).toBe(2);
     expect(html).toContain('<footer class="jp-cv-foot">Based on the fixture.</footer>');
