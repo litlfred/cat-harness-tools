@@ -2,7 +2,7 @@
  * Every writer of a `qa-results/v1` sidecar in the harness's results tree is
  * claimed by a `QA_WRITERS` entry (`scripts/qa-refresh.ts`).
  *
- * Why (2026-11-19, core#853, smart-base#447 and #448): the writer form of
+ * Why (2026-11-19, three content PRs blocked intermittently): the writer form of
  * `check:library-qa` wrote `cat-harness/test/results/library-entry-qa.qa-results.json`
  * in a gate shard; later in the same shard `uml:overview:check` ran
  * `qa:refresh`, which refused the file — "no declared writer claims …
@@ -125,7 +125,7 @@ describe("every qa-results writer is claimed by QA_WRITERS", () => {
     }
   });
 
-  test("check:library-qa's sidecar is claimed by its writer (core#853)", () => {
+  test("check:library-qa's sidecar is claimed by its writer (the 2026-11-19 shard failure)", () => {
     expect(claimants(`${RESULTS}/library-entry-qa.qa-results.json`)).toEqual(["check:library-qa"]);
   });
 });

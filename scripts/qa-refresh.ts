@@ -253,7 +253,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
       ["kg:export", "kg-export"],
       // Its writer form wrote `library-entry-qa.qa-results.json` in a gate shard
       // before `uml:overview:check` ran qa:refresh, which then refused the file
-      // as unclaimed (core#853, smart-base#447/#448, 2026-11-19).
+      // as unclaimed (three PRs blocked intermittently, 2026-11-19).
       ["check:library-qa", "library-entry-qa"],
     ] as const
   ).map(([script, stem]): QaWriter => ({
