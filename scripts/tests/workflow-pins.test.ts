@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { judgeFile, mergeGuardTrigger, MERGE_GUARD_TRIGGER_FILE, MERGE_GUARD_TRIGGER_NAME, MERGE_GUARD_TRIGGER_TEXT } from "../workflow-pins.ts";
+import { HEAD_EVENT, judgeFile, mergeGuardTrigger, MERGE_GUARD_TRIGGER_FILE, MERGE_GUARD_TRIGGER_NAME, MERGE_GUARD_TRIGGER_TEXT } from "../workflow-pins.ts";
 
 const TOOLS = "a".repeat(40);
 const refs = new Map([["cat-harness-tools", TOOLS]]);
@@ -114,14 +114,33 @@ describe("workflow-pins: a layer-pr-checks caller starts on `labeled`", () => {
     "",
   ].join("\n");
 
-  test("--write adds `labeled`, the no-op label group and the job's if; a second pass is clean", () => {
+  test("--write adds `labeled`, the no-op label group, the head-event cancel and the job's if; a second pass is clean", () => {
     const { findings, text } = judge(CALLER);
-    expect(findings).toHaveLength(3);
+    expect(findings).toHaveLength(4);
     expect(findings.every((f) => f.want !== null && !f.trailing)).toBe(true);
     expect(text).toContain("    types: [opened, synchronize, reopened, ready_for_review, labeled]\n");
     expect(text).toContain("group: harness-pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id) || github.ref }}");
     expect(text).toContain("  checks:\n    if: github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview'\n    uses:");
     expect(judge(text).findings).toHaveLength(0);
+  });
+
+  // smart-immunizations#168, smart-base#340 (2026-11-18): the `release`
+  // label started the full tier, then `ready_for_review` (same head) joined the
+  // PR's group and, cancelling on every pull_request event, cancelled it.
+  test("only an event that moves the head or starts a tier cancels the run in flight", () => {
+    const { text } = judge(CALLER);
+    expect(text).toContain(`  cancel-in-progress: \${{ github.event_name != 'pull_request' || ${HEAD_EVENT} }}\n`);
+    const pr = judge(CALLER.replace("cancel-in-progress: true", "cancel-in-progress: ${{ github.event_name == 'pull_request' }}")).text;
+    expect(pr).toContain(`  cancel-in-progress: \${{ github.event_name == 'pull_request' && ${HEAD_EVENT} }}\n`);
+    // The events that leave the head where it is are not in the clause; a new head still cancels.
+    for (const a of ["ready_for_review", "unlabeled", "edited", "converted_to_draft"]) expect(HEAD_EVENT).not.toContain(`'${a}'`);
+    for (const a of ["opened", "synchronize", "reopened", "labeled", "closed"]) expect(HEAD_EVENT).toContain(`github.event.action == '${a}'`);
+  });
+
+  test("cancel-in-progress: false is left alone; another shape is reported for a hand fix", () => {
+    expect(judge(CALLER.replace("cancel-in-progress: true", "cancel-in-progress: false")).findings).toHaveLength(2);
+    const odd = judge(CALLER.replace("cancel-in-progress: true", "cancel-in-progress: ${{ github.actor != 'bot' }}")).findings;
+    expect(odd.find((f) => f.have.startsWith("cancel-in-progress:"))?.want).toBeNull();
   });
 
   test("a pull_request with no types gets a types line", () => {

@@ -126,7 +126,11 @@ concurrency:
   group: pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id) || (github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref) }}
   # A push to main is never cancelled while it runs; a newer push waiting
   # behind it replaces an older waiting one, so the newest main is recorded.
-  cancel-in-progress: ${{ github.event_name != 'push' }}
+  # On a PR only an event that moves the head, starts the full tier (`release`)
+  # or closes the PR cancels the run in flight; `ready_for_review` and the
+  # like wait behind it, so they never cancel a full tier the `release` label
+  # started on the same head (layer-pr-checks.yml's `concurrency`).
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'labeled' || github.event.action == 'closed') }}
 
 jobs:
   pin:

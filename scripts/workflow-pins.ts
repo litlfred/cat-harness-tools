@@ -31,12 +31,15 @@
  *
  * A workflow that calls `layer-pr-checks.yml` on `pull_request` must list
  * `labeled` in its types, key its concurrency group so a no-op label never
- * cancels the real run, and skip its calling job on any label but `release`
- * or `preview` (the caller snippet in layer-pr-checks.yml's header). Without
+ * cancels the real run, cancel in progress only on an event that moves the
+ * head or starts a tier ({@link HEAD_EVENT}: a `ready_for_review` cancelled
+ * the `release` label's full tier on smart-immunizations#168), and skip its
+ * calling job on any label but `release` or `preview` (the caller snippet in
+ * layer-pr-checks.yml's header). Without
  * `labeled`, adding `release` starts nothing and every run reads the labels
  * the PR had when it was opened or pushed: the dth-* callers ran the fast tier
  * (`full=false`) on every PR, so no gate ever ran on them (2026-11-16).
- * `--write` adds all three to the usual caller shape; any other shape is
+ * `--write` adds all four to the usual caller shape; any other shape is
  * reported for a hand fix.
  *
  * A caller of `layer-merge-guard.yml` runs only from the default branch: no
@@ -295,6 +298,15 @@ export function judgeFile(
 /** The labels that start a layer-pr-checks run; any other label is a no-op there. */
 const NOOP_LABEL = "(github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview')";
 const JOB_IF = "github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview'";
+/**
+ * The pull-request events that may cancel a run in flight: those that move the
+ * head, start a tier (`labeled`: a no-op label has its own group) or close the
+ * PR. `ready_for_review`, `unlabeled`, `edited` and `converted_to_draft` leave
+ * the head where it is, so they wait behind the running run instead of
+ * cancelling the full tier the `release` label started on it (the
+ * `ready_for_review` of smart-immunizations#168 and smart-base#340).
+ */
+export const HEAD_EVENT = "(github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'labeled' || github.event.action == 'closed')";
 const CALLS_CHECKS = /^\s*(-\s+)?uses:\s*\S*\/layer-pr-checks\.yml(@|\s|$)/;
 const indentOf = (l: string) => l.length - l.trimStart().length;
 
@@ -359,6 +371,21 @@ export function labeledTrigger(lines: string[], rel: string): Finding[] {
       if (!cancels) break;
       const want = g ? `${g[1]}${g[2]}${g[3]}\${{ ${NOOP_LABEL} && format('noop-label-{0}', github.run_id) || github.ref }}${g[4]}` : null;
       findings.push({ file: rel, line: i + 1, have: lines[i].trim(), want: want?.trim() ?? null, why: "a `labeled` run for any label but `release` or `preview` must get its own concurrency group, or it cancels the PR's real run" });
+      if (want) lines[i] = want;
+      break;
+    }
+    // Its cancel-in-progress: cancelling on every pull_request event lets a
+    // `ready_for_review` cancel the full tier the `release` label started.
+    for (let i = conc + 1; i < lines.length && (lines[i].trim() === "" || indentOf(lines[i]) > 0); i++) {
+      const c = live(i) ? lines[i].match(/^(\s*cancel-in-progress:\s*)(.*?)\s*(#.*)?$/) : null;
+      if (!c || c[2] === "false" || c[2].includes("github.event.action == 'synchronize'")) continue;
+      const v = c[2].replace(/^["']|["']$/g, "");
+      const expr =
+        v === "true" ? `github.event_name != 'pull_request' || ${HEAD_EVENT}`
+        : /^\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}$/.test(v) ? `github.event_name == 'pull_request' && ${HEAD_EVENT}`
+        : null;
+      const want = expr ? `${c[1]}\${{ ${expr} }}${c[3] ? ` ${c[3]}` : ""}` : null;
+      findings.push({ file: rel, line: i + 1, have: lines[i].trim(), want: want?.trim() ?? null, why: `only an event that moves the head or starts a tier may cancel the run in flight, or a \`ready_for_review\` cancels the full tier the \`release\` label started: cancel on \`${HEAD_EVENT}\` only` });
       if (want) lines[i] = want;
       break;
     }
