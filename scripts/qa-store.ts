@@ -53,7 +53,8 @@
  * checkout's own object store: a `--filter` fetch turns the repository it runs
  * in into a partial clone by rewriting its config, and a reader must not do
  * that to a contributor's checkout. CI's checkout token (`http.*.extraheader`)
- * is carried across in the ENVIRONMENT (`GIT_CONFIG_COUNT`), never in argv.
+ * is carried across in the ENVIRONMENT, once and in place of any global copy
+ * (`GIT_CONFIG_COUNT`, `lib/git-auth-env.ts`), never in argv.
  *
  * Usage:
  *   bun run cat qa:fetch [--ref main|<sha>|main/<sha>|pr/<n>|pr/<n>/<sha>] [--into DIR] [--prefix P]
@@ -81,6 +82,7 @@ import "../schemas/kg/folio-graph-typology.js";
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { TreeStore } from "./branch-store.js";
+import { authEnvFrom } from "./lib/git-auth-env.ts";
 import { inputSiteReached, qaRefLine, quietly } from "../schemas/sdlc/input-trace.ts";
 import { mountedInstancesCached, outputTwinOf, overlayDirs, writePathOf } from "./lib/layer-output.ts";
 
@@ -385,24 +387,6 @@ class Store extends TreeStore {
     // name the remote has, else the first (#1801 merged onto #1982).
     super(dir, remote, candidates, authEnv, { identity: QA_BOT, refNamespace: "qa-store", log });
   }
-}
-
-/** The checkout's own `http.*.extraheader` lines, carried in env (never argv). */
-function authEnvFrom(repoRoot: string): Record<string, string> {
-  // input-site: store #d6d10161 — configures or performs a qa-reports store read; every by-ref read is reported by snapshot(), every other git call by TreeStore.git()
-  const r = spawnSync("git", ["config", "--get-regexp", "^http\\..*extraheader$"], { cwd: repoRoot, encoding: "utf-8" });
-  if (r.status !== 0 || !r.stdout.trim()) return {};
-  const env: Record<string, string> = {};
-  const lines = r.stdout.trim().split("\n");
-  // input-site: store #d641fe25 — configures or performs a qa-reports store read; every by-ref read is reported by snapshot(), every other git call by TreeStore.git()
-  const base = Number(process.env.GIT_CONFIG_COUNT ?? 0) || 0;
-  lines.forEach((line, i) => {
-    const sp = line.indexOf(" ");
-    env[`GIT_CONFIG_KEY_${base + i}`] = line.slice(0, sp);
-    env[`GIT_CONFIG_VALUE_${base + i}`] = line.slice(sp + 1);
-  });
-  env.GIT_CONFIG_COUNT = String(base + lines.length);
-  return env;
 }
 
 const stores = new Map<string, Store>();
