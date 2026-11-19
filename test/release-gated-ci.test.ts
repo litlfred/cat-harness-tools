@@ -29,8 +29,8 @@ const RELEASE_OR_PREVIEW_LABEL = "(github.event.action != 'labeled' || github.ev
 const NOOP_GROUP_LAYER = "(github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id)";
 
 // Only an event that moves the head, starts a tier or closes the PR cancels the
-// run in flight: the `ready_for_review` of smart-immunizations#168 and
-// smart-base#340 cancelled the full tier the `release` label had started on the
+// run in flight: the `ready_for_review` on two downstream layers' PRs
+// (2026-11-18) cancelled the full tier the `release` label had started on the
 // same head. The same clause as the caller's (workflow-pins.ts).
 const cancelsOn = (expr: string, action: string, event = "pull_request") =>
   // Evaluate the expression for one event: the clause is plain `==`/`!=`/`&&`/`||`.

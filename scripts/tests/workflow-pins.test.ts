@@ -124,7 +124,7 @@ describe("workflow-pins: a layer-pr-checks caller starts on `labeled`", () => {
     expect(judge(text).findings).toHaveLength(0);
   });
 
-  // smart-immunizations#168, smart-base#340 (2026-11-18): the `release`
+  // Two downstream layers' PRs (2026-11-18): the `release`
   // label started the full tier, then `ready_for_review` (same head) joined the
   // PR's group and, cancelling on every pull_request event, cancelled it.
   test("only an event that moves the head or starts a tier cancels the run in flight", () => {

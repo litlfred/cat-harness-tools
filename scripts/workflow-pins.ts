@@ -33,7 +33,7 @@
  * `labeled` in its types, key its concurrency group so a no-op label never
  * cancels the real run, cancel in progress only on an event that moves the
  * head or starts a tier ({@link HEAD_EVENT}: a `ready_for_review` cancelled
- * the `release` label's full tier on smart-immunizations#168), and skip its
+ * the `release` label's full tier on downstream PRs, 2026-11-18), and skip its
  * calling job on any label but `release` or `preview` (the caller snippet in
  * layer-pr-checks.yml's header). Without
  * `labeled`, adding `release` starts nothing and every run reads the labels
@@ -304,7 +304,7 @@ const JOB_IF = "github.event.action != 'labeled' || github.event.label.name == '
  * PR. `ready_for_review`, `unlabeled`, `edited` and `converted_to_draft` leave
  * the head where it is, so they wait behind the running run instead of
  * cancelling the full tier the `release` label started on it (the
- * `ready_for_review` of smart-immunizations#168 and smart-base#340).
+ * `ready_for_review` on two downstream layers' PRs, 2026-11-18).
  */
 export const HEAD_EVENT = "(github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'labeled' || github.event.action == 'closed')";
 const CALLS_CHECKS = /^\s*(-\s+)?uses:\s*\S*\/layer-pr-checks\.yml(@|\s|$)/;

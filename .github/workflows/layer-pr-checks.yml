@@ -441,7 +441,7 @@ permissions:
 # that leaves the head where it is (`ready_for_review`, `unlabeled`, `edited`,
 # `converted_to_draft`) waits behind the running run instead, so it never
 # cancels a full tier the `release` label started on the same head: the
-# `ready_for_review` of smart-immunizations#168 and smart-base#340 did. Once
+# `ready_for_review` on two downstream layers' PRs did (2026-11-18). Once
 # that run passes, the waiting `ready_for_review` run reuses its verdict
 # ("Already judged?", below). A new head commit still cancels stale runs.
 concurrency:
