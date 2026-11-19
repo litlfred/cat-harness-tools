@@ -56,7 +56,7 @@ describe("extractUserScenario — the words a person reads, and nothing a machin
 });
 
 describe("translate-user-scenarios — templates per locale, and --check", () => {
-  test("--check fails on a missing template, --extract writes it, then --check passes; no user-scenario directory exits 2", () => {
+  test("--check fails on a missing template, --extract writes it, then --check passes; a root without the content is not applicable (78)", () => {
     const root = mkdtempSync(join(tmpdir(), "user-scenario-pot-"));
     try {
       writeFileSync(
@@ -78,8 +78,22 @@ describe("translate-user-scenarios — templates per locale, and --check", () =>
       const pot = readFileSync(join(root, "translations", "fr", "user-scenarios", "p1.pot"), "utf-8");
       expect(pot).toContain('msgctxt "step.narrative"\nmsgid "Kamal sees the counsellor."');
       expect(run("--check").status).toBe(0);
+      // No locale the root translates into: not applicable (78), not a failure to look.
+      rmSync(join(root, "translations", "fr"), { recursive: true, force: true });
+      const noLocale = run("--check");
+      expect(noLocale.status).toBe(78);
+      expect(noLocale.stdout).toContain("no locale");
+      mkdirSync(join(root, "translations", "fr"), { recursive: true });
+      // An empty user-scenario directory: not applicable.
+      rmSync(join(root, "user-scenarios", "p1.json"));
+      expect(run("--check").status).toBe(78);
+      // No user-scenario directory at all (WHO smart-base#340): not applicable, never exit 2.
       writeFileSync(join(root, "acme.json"), JSON.stringify({ name: "acme", directories: [{ id: "translations", path: "translations/", graphTypologies: ["translation-sources"] }] }));
-      expect(run("--check").status).toBe(2);
+      const none = run("--check");
+      expect(none.status).toBe(78);
+      expect(none.stdout).toContain("declares no user-scenario directory");
+      // A bad invocation is still 2.
+      expect(run().status).toBe(2);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

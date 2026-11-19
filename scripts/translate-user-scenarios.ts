@@ -18,8 +18,13 @@
  * its translations root), so adding the first template is `--extract`, not a
  * failure of every locale at once.
  *
- * Exit codes: 0 current, 1 stale, missing or orphaned, 2 nothing to examine
- * (no declared user-scenario directory, no scenario in it, or no locale).
+ * Exit codes: 0 current, 1 stale, missing or orphaned, 2 a bad invocation or
+ * scenarios that yield no template at all (the extractor found no field in
+ * any), and 78 not applicable (`lib/not-applicable.ts`): the root declares no
+ * user-scenario directory, the directory holds no scenario, or the root
+ * translates into no locale. Those are facts about the root, not a failure to
+ * look: a FHIR IG site with no journeys exited 2 here (WHO smart-base#340,
+ * 2026-11-19), and no run could ever change the answer.
  *
  * Usage:
  *   bun run cat translate-user-scenarios --instance . --extract
@@ -33,6 +38,7 @@ import { directoryForGraph, localeDirIn, translationsHomeFor } from "../schemas/
 import { formatPot, potWithoutTimestamp } from "../pipeline/pot-extract.js";
 import { extractUserScenario } from "../pipeline/pot-for-user-scenarios.js";
 import { knownLocales } from "./kg-locale-export.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /** The subdirectory of a locale that holds these templates. */
 export const SCENARIO_TEMPLATE_DIR = "user-scenarios";
@@ -66,6 +72,18 @@ export function planScenarioTemplates(root: string): { plan: ScenarioTemplatePla
   return { plan, scenarios: files.length, locales };
 }
 
+/**
+ * Why the check does not apply to `root`, or `undefined` when it does: no
+ * declared user-scenario directory, no scenario in it, or no locale the root
+ * translates into. Pure over {@link planScenarioTemplates}'s answer.
+ */
+export function notApplicableReason(root: string, r: ReturnType<typeof planScenarioTemplates>): string | undefined {
+  if (r === undefined) return `${root} declares no user-scenario directory, so there is no journey to translate`;
+  if (r.scenarios === 0) return `the declared user-scenario directory holds no scenario, so there is nothing to translate`;
+  if (r.locales.length === 0) return `${r.scenarios} scenario(s), but the root translates into no locale (no directory under its translations root)`;
+  return undefined;
+}
+
 function main(argv: readonly string[]): number {
   const i = argv.indexOf("--instance");
   const root = resolve(i === -1 ? "." : argv[i + 1]!);
@@ -76,12 +94,12 @@ function main(argv: readonly string[]): number {
     return 2;
   }
   const r = planScenarioTemplates(root);
-  if (r === undefined) {
-    console.error(`translate-user-scenarios: ${root} declares no user-scenario directory — nothing to examine (exit 2)`);
-    return 2;
-  }
-  if (r.locales.length === 0 || r.plan.length === 0) {
-    console.error(`translate-user-scenarios: ${r.scenarios} scenario(s), ${r.locales.length} locale(s) — nothing to examine (exit 2)`);
+  const na = notApplicableReason(root, r);
+  if (na !== undefined) exitNotApplicable("translate-user-scenarios", na);
+  if (r === undefined || r.plan.length === 0) {
+    // Scenarios and locales both exist, and not one field was extracted: the
+    // extractor and the files disagree, which is "could not determine".
+    console.error(`translate-user-scenarios: ${r?.scenarios ?? 0} scenario(s), ${r?.locales.length ?? 0} locale(s), and no field extracted from any — nothing could be examined (exit 2)`);
     return 2;
   }
   const want = new Set(r.plan.map((p) => p.pot));

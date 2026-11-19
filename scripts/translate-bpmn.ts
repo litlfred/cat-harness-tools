@@ -25,7 +25,8 @@
  * differs is STALE; one that cannot be READ is reported as such and fails,
  * never as a pass. A run in which NO locale gates, so that no template was
  * examined at all, exits 2 rather than 0 (exit codes: 0 fresh, 1
- * stale/missing/orphaned, 2 nothing examined or nothing to do).
+ * stale/missing/orphaned, 2 nothing examined or nothing to do, 78 not
+ * applicable: the root has no diagram, or translates into no locale).
  *
  * ## What it gates on, and what it only reports
  *
@@ -55,6 +56,7 @@ import { extractBpmn, injectBpmn } from "../pipeline/bpmn-translate.js";
 import { formatPot, potWithoutTimestamp } from "../pipeline/pot-extract.js";
 import { parsePo } from "../pipeline/po-inject.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /**
  * The layer whose diagrams are extracted — this one, or `--instance <root>`.
@@ -124,10 +126,9 @@ if (wantInject && !locale) {
 // The skill says so: `swimlane-glossary` §"Run it once per instance — never
 // widen the scan" (widening re-opens the `7u3g` leak).
 const diagrams = workflowFiles(root, corpusScopeFor(root)).filter((f) => f.endsWith(".bpmn"));
-if (diagrams.length === 0) {
-  console.error("No .bpmn files in any declared knowledge-graph directory.");
-  process.exit(2);
-}
+// A root with no diagram has nothing to translate, and no run changes that:
+// not applicable (78, `lib/not-applicable.ts`), never "could not determine".
+if (diagrams.length === 0) exitNotApplicable("translate-bpmn", `${root} has no .bpmn file in any declared knowledge-graph directory, so there is no workflow template to extract or check`);
 
 /**
  * The declared home of `.pot` / `.po` sources, read rather than written down.
@@ -236,10 +237,7 @@ function knownLocales(): string[] {
 
 if (wantCheck) {
   const targets = locale ? [locale] : knownLocales();
-  if (targets.length === 0) {
-    console.error("No locales found under translations/ and none given with --locale.");
-    process.exit(2);
-  }
+  if (targets.length === 0) exitNotApplicable("translate-bpmn", "the root translates into no locale (none under its translations root) and none was given with --locale");
   console.log(`Checking ${diagrams.length} diagram(s) against: ${targets.join(", ")}\n`);
 
   // A locale GATES once it carries at least one workflow template; before
@@ -423,10 +421,7 @@ if (wantCheck) {
 
 if (wantExtract) {
   const targets = locale ? [locale] : knownLocales();
-  if (targets.length === 0) {
-    console.error("No locales found under translations/ and none given with --locale.");
-    process.exit(2);
-  }
+  if (targets.length === 0) exitNotApplicable("translate-bpmn", "the root translates into no locale (none under its translations root) and none was given with --locale");
   console.log(`Extracting ${diagrams.length} diagram(s) for: ${targets.join(", ")}\n`);
   let total = 0;
   for (const file of diagrams) {

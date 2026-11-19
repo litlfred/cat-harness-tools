@@ -18,6 +18,7 @@
  * | origin carries no branch of the namespace | `absent`, and the mount as a whole is `mounted` (the smart-ra case) |
  * | origin carries the branch | it mounts as before |
  * | origin carries OTHER branches of the namespace, not this one | `miss`, a failure: the checkout adopted the namespace (the folio-assistant case; "Tighten it", #249) |
+| origin carries only a PUBLICATION branch of the namespace (commit-keyed QA) | `absent`: CI writes it on every root, so it is not adoption (WHO smart-base#340) |
  * | the root declares the path | the root's declaration wins, and ITS miss is still a failure |
  *
  * Real repositories, as in `state-mount-shared-id.test.ts`: the outcome turns on
@@ -31,7 +32,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { absenceAt, contentAt, mountedIds, normaliseOrigin, tipLocations } from "../branch-store.ts";
+import { absenceAt, contentAt, mountedIds, normaliseOrigin, publicationBranches, tipLocations } from "../branch-store.ts";
 import { graphReadPath } from "../graph-read.ts";
 import { mountState, report } from "../state-mount.ts";
 
@@ -64,6 +65,7 @@ function seed(base: string, bare: string, branch: string, files: Record<string, 
 const MARKS_BRANCH = "cat/lower/issue-marks";
 const ROOT_MARKS_BRANCH = "cat/root/issue-marks";
 const BEANS_BRANCH = "cat/root/beans";
+const QA_BRANCH = "cat/lower/qa-reports";
 
 interface Opts {
   /** Seed the lower layer's `issue-marks` branch on the checkout's origin. */
@@ -73,6 +75,8 @@ interface Opts {
   /** The root declares `issue-marks/` itself, on its own branch (seeded only if `rootMarksSeeded`). */
   rootDeclaresMarks?: boolean;
   rootMarksSeeded?: boolean;
+  /** The lower layer declares a commit-keyed `qa` on `cat/lower/qa-reports`, and the origin carries that branch (CI's QA corpus). */
+  originCarriesQa?: boolean;
 }
 
 /**
@@ -88,6 +92,7 @@ function index(o: Opts = {}) {
   seed(base, origin, BEANS_BRANCH, { "manifest.json": MANIFEST, "beans/a.md": "A\n" });
   if (o.originCarriesMarks) seed(base, origin, MARKS_BRANCH, { "manifest.json": MANIFEST, "issue-marks/1.json": "{}\n" });
   if (o.originCarriesSibling) seed(base, origin, "cat/lower/todos", { "manifest.json": MANIFEST, "todos/t.md": "T\n" });
+  if (o.originCarriesQa) seed(base, origin, QA_BRANCH, { "index.json": "{}\n" });
   if (o.rootMarksSeeded) seed(base, origin, ROOT_MARKS_BRANCH, { "manifest.json": MANIFEST, "issue-marks/2.json": "{}\n" });
 
   const work = join(base, "work");
@@ -104,7 +109,10 @@ function index(o: Opts = {}) {
     JSON.stringify({
       $schema: "cat-harness-declaration/1.0.0",
       name: "lower",
-      directories: [{ id: "issue-marks", path: "issue-marks/", scope: "repository", graphTypologies: ["issue-marks"], storage: { branch: MARKS_BRANCH, keyedBy: "tip" } }],
+      directories: [
+        { id: "issue-marks", path: "issue-marks/", scope: "repository", graphTypologies: ["issue-marks"], storage: { branch: MARKS_BRANCH, keyedBy: "tip" } },
+        ...(o.originCarriesQa ? [{ id: "qa", path: "test/results/", graphTypologies: ["qa"], storage: { branch: QA_BRANCH, keyedBy: "commit" } }] : []),
+      ],
     }),
   );
   git(work, "add", "root.json");
@@ -143,6 +151,24 @@ describe("a repository-scoped graph a mounted instance declares and the root doe
     expect(g?.reason).toContain("cat/lower/todos");
     expect(r.state).toBe("partial");
     expect(report(r)).toContain("FAILED");
+  });
+
+  test("its branch missing while the origin keeps only a PUBLICATION branch of its namespace: still ABSENT (WHO smart-base#340)", () => {
+    const f = index({ originCarriesQa: true });
+    expect(publicationBranches(f.work)).toEqual(new Set([QA_BRANCH]));
+    const r = mountState({ repoRoot: f.work });
+    expect(r.graphs.find((g) => g.id === "issue-marks")?.state).toBe("absent");
+    expect(r.state).toBe("mounted");
+    expect(report(r)).not.toContain("FAILED");
+  });
+
+  test("a publication branch beside an ADOPTED one does not excuse the miss", () => {
+    const f = index({ originCarriesQa: true, originCarriesSibling: true });
+    const r = mountState({ repoRoot: f.work });
+    const g = r.graphs.find((x) => x.id === "issue-marks");
+    expect(g?.state).toBe("miss");
+    expect(g?.reason).toContain("cat/lower/todos");
+    expect(g?.reason).not.toContain(QA_BRANCH);
   });
 
   test("its branch on the checkout's origin mounts as before", () => {
