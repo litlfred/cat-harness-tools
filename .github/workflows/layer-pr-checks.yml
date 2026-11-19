@@ -258,14 +258,17 @@
 # (keyed by the run id), so it never cancels the PR's real run. A caller that
 # adds `labeled` should also skip its `checks` job on such an event and key
 # its OWN concurrency group the same way (a caller-level group keyed by
-# `github.ref` with cancel-in-progress would still cancel the real run):
+# `github.ref` with cancel-in-progress would still cancel the real run), and
+# cancel only on an event that moves the head or starts a tier, as this
+# workflow's own `concurrency` does (a `ready_for_review` that cancels would
+# cancel the full tier the `release` label started on the same head):
 #
 #   on:
 #     pull_request:
 #       types: [opened, synchronize, reopened, ready_for_review, labeled]
 #   concurrency:
 #     group: harness-pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id) || github.ref }}
-#     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+#     cancel-in-progress: ${{ github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'labeled' || github.event.action == 'closed') }}
 #   jobs:
 #     checks:
 #       if: github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview'
@@ -432,9 +435,18 @@ permissions:
 # 42917495047, 2026-11-10) and mailed "Some jobs were not successful".
 # A `labeled` run for any label but `release` is a no-op, in a group of its
 # own: in the PR's group it would cancel the PR's real run.
+# Only an event that moves the head or starts a tier cancels the run in
+# flight: `opened`, `synchronize`, `reopened`, a `release`/`preview` label
+# (`labeled`; any other label is in its own group above) and `closed`. An event
+# that leaves the head where it is (`ready_for_review`, `unlabeled`, `edited`,
+# `converted_to_draft`) waits behind the running run instead, so it never
+# cancels a full tier the `release` label started on the same head: the
+# `ready_for_review` on two downstream layers' PRs did (2026-11-18). Once
+# that run passes, the waiting `ready_for_review` run reuses its verdict
+# ("Already judged?", below). A new head commit still cancels stale runs.
 concurrency:
   group: layer-pr-checks-${{ github.repository }}-${{ (github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id) || github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.event_name == 'push' && github.sha || 'run') }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'labeled' || github.event.action == 'closed') }}
 
 # The instance, once: the input when given, else (layer mode) the calling
 # repository's name, which is the instance's name for every layer.
