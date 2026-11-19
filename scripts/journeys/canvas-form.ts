@@ -77,6 +77,26 @@ export interface CanvasModel {
   size: "A3" | "A4";
   workshop: string;
   sheets: CanvasModelSheet[];
+  /** What the PDF appends after the sheets (owner, 2026-11-19): the table's systems, the architecture, the views and the processes. */
+  appendix?: CanvasAppendix;
+}
+
+/** A box the appendix draws: its name, and (an application component the table may name) its key's slug. */
+export interface CanvasAppendixBox {
+  name: string;
+  slug?: string;
+}
+/**
+ * The PDF's appendix, after the sheets: the application components the table
+ * marked on How it works (`have` and `local` are the keys of its tick and its
+ * own name), the architecture panel, then each ArchiMate view and BPMN
+ * process as a drawing, fetched from `src` (relative to the page) and drawn
+ * with every component the table named under its own name.
+ */
+export interface CanvasAppendix {
+  systems: { name: string; slug: string; have: string; local: string }[];
+  panel?: { title: string; countries: string[]; rows: { layer: string; cells: CanvasAppendixBox[][] }[]; shared?: { group: string; members: CanvasAppendixBox[] } };
+  figures: { kind: "archimate" | "bpmn"; title: string; src: string }[];
 }
 
 /** A journey question, with its step and the key its answer is kept under. */
@@ -280,63 +300,74 @@ export interface CanvasSummaryItem {
   name: string;
   type: "text" | "choice" | "check";
   options?: { id: string; label: string }[];
+  /** A check's heading, its ticks listed after it; a choice's heading when it is counted. */
   group?: string;
+  /** A choice shown on its own line with the option chosen, not counted with others. */
+  each?: true;
 }
 
-function summaryItems(ws: string, sheet: string, f: WorkshopCanvasField, group: string, scale: readonly { id: string; label: string }[] | undefined, prefix = ""): CanvasSummaryItem[] {
+/** A label as the summary reads it: a printed caption in capitals in sentence case, without the page's markup. */
+function readable(s: string | undefined): string {
+  const t = plainLite(s ?? "").trim();
+  return t && t === t.toUpperCase() && /[A-Z]/.test(t) ? t.charAt(0) + t.slice(1).toLowerCase() : t;
+}
+const joinPath = (...parts: (string | undefined)[]) => parts.map((x) => (x ?? "").trim()).filter(Boolean).join(" · ");
+
+function summaryItems(ws: string, sheet: string, f: WorkshopCanvasField, ctx: string, scale: readonly { id: string; label: string }[] | undefined): CanvasSummaryItem[] {
   const at = `${sheet}:${f.id}`;
   const k = (ref: string) => canvasKey(ws, `${at}${ref}`);
-  const label = `${prefix}${plainLite(fieldLabel(f))}`;
+  // What the answer is called: its field's caption, or the section (or card) it sits in when it has none.
+  const label = readable(fieldLabel(f)) ? joinPath(ctx.split(" · ").length > 1 ? ctx : undefined, readable(fieldLabel(f))) : ctx;
   switch (f.type) {
     case "text":
-      return f.same ? [] : [{ label, name: k(""), type: "text", group }];
+      return f.same ? [] : [{ label, name: k(""), type: "text" }];
     case "choice":
-      return [{ label, name: k(""), type: "choice", options: f.options, group }];
+      return [{ label, name: k(""), type: "choice", options: f.options, each: true }];
     case "ticks":
-      return f.options.flatMap((o): CanvasSummaryItem[] => [{ label: `${label}: ${o.label}`, name: k(`:${o.id}`), type: "check", group }, ...(o.write ? [{ label: `${label}: ${o.label}`, name: k(`:${o.id}:text`), type: "text" as const, group }] : [])]);
+      return f.options.flatMap((o): CanvasSummaryItem[] => [{ label: o.label, name: k(`:${o.id}`), type: "check", group: label }, ...(o.write ? [{ label: joinPath(label, o.label), name: k(`:${o.id}:text`), type: "text" as const }] : [])]);
     case "grid":
       return f.rows.flatMap((r) => {
+        const row = joinPath(label, readable(r.label));
         const seen = new Set<string>();
         return f.columns.flatMap((cl): CanvasSummaryItem[] => {
-          const where = `${label} · ${plainLite(r.label)} · ${cl.label}`;
           switch (cl.cell) {
             case "label":
               return [];
             case "tick":
-              return [{ label: where, name: k(`:${r.id}:${cl.id}`), type: "check", group }];
+              return [{ label: cl.label, name: k(`:${r.id}:${cl.id}`), type: "check", group: row }];
             case "choice":
-              return [{ label: where, name: k(`:${r.id}:${cl.id}`), type: "choice", options: [...rowOptions(cl, r)], group }];
+              return [{ label: joinPath(row, f.columns.filter((x) => x.cell !== "label").length > 1 ? cl.label : undefined), name: k(`:${r.id}:${cl.id}`), type: "choice", options: [...rowOptions(cl, r)], each: true }];
             case "ticks":
-              return (cl.options ?? []).map((o) => ({ label: `${where}: ${o.label}`, name: k(`:${r.id}:${cl.id}:${o.id}`), type: "check" as const, group }));
+              return (cl.options ?? []).map((o) => ({ label: o.label, name: k(`:${r.id}:${cl.id}:${o.id}`), type: "check" as const, group: joinPath(row, cl.label) }));
             case "option": {
               const g = cl.group ?? cl.id;
               if (seen.has(g)) return [];
               seen.add(g);
-              return [{ label: `${label} · ${plainLite(r.label)}`, name: k(`:${r.id}:${g}`), type: "choice", options: f.columns.filter((x) => x.cell === "option" && (x.group ?? x.id) === g).map((x) => ({ id: x.id, label: x.label })), group }];
+              return [{ label: row, name: k(`:${r.id}:${g}`), type: "choice", options: f.columns.filter((x) => x.cell === "option" && (x.group ?? x.id) === g).map((x) => ({ id: x.id, label: x.label })), each: true }];
             }
             default:
-              return [{ label: where, name: k(`:${r.id}:${cl.id}`), type: "text", group }];
+              return [{ label: joinPath(row, cl.label), name: k(`:${r.id}:${cl.id}`), type: "text" }];
           }
         });
       });
     case "gap":
-      return f.rows.map((r) => ({ label: `${label} · ${r.label}`, name: k(`:${r.id}`), type: "choice" as const, options: [...gapOptions(f, scale)], group }));
+      return f.rows.map((r) => ({ label: joinPath(label, r.label), name: k(`:${r.id}`), type: "choice" as const, options: [...gapOptions(f, scale)], each: true as const }));
     case "blanks":
-      return f.same ? [] : Array.from({ length: canvasBlanks(f.text) }, (_, i) => ({ label: `${label || blankText(f.text)} (${i + 1})`, name: k(`:${i + 1}`), type: "text" as const, group }));
+      return f.same ? [] : Array.from({ length: canvasBlanks(f.text) }, (_, i) => ({ label: `${readable(f.label) || blankText(f.text)} (${i + 1})`, name: k(`:${i + 1}`), type: "text" as const }));
     case "note":
     case "table":
       return [];
     case "cards":
-      return f.items.flatMap((c) => (c.fields ?? []).flatMap((x) => summaryItems(ws, `${at}:${c.id}`, x, group, scale, `${[c.badge, plainLite(c.title)].filter(Boolean).join(" ")} · `)));
+      return f.items.flatMap((c) => (c.fields ?? []).flatMap((x) => summaryItems(ws, `${at}:${c.id}`, x, joinPath(ctx, [c.badge, readable(c.title)].filter(Boolean).join(" ")), scale)));
   }
 }
 
-/** Every key a canvas keeps, with what the lab's summary calls it. */
+/** Every key a canvas keeps, with what the lab's summary calls it: the section (or card), the field, the row and the column. */
 export function canvasSummaryItems(ws: string, c: WorkshopCanvas, scale?: readonly { id: string; label: string }[]): { sheet: WorkshopCanvasSheet; items: CanvasSummaryItem[] }[] {
-  return c.sheets.map((s) => {
-    const group = s.label ?? s.title;
-    return { sheet: s, items: [...headerFields(s), ...s.sections.flatMap((x) => x.fields)].flatMap((f) => summaryItems(ws, s.id, f, group, scale)) };
-  });
+  return c.sheets.map((s) => ({
+    sheet: s,
+    items: [...headerFields(s).flatMap((f) => summaryItems(ws, s.id, f, "", scale)), ...s.sections.flatMap((x) => x.fields.flatMap((f) => summaryItems(ws, s.id, f, readable(x.title), scale)))],
+  }));
 }
 
 // ── the form ──────────────────────────────────────────────────────────────

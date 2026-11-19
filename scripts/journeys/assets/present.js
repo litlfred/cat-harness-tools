@@ -786,6 +786,11 @@
             (ticked[g] = ticked[g] || []).push(it.label);
             return;
           }
+          if (it.type === "choice" && it.each) {
+            dl.appendChild(el("dt", null, it.label));
+            dl.appendChild(el("dd", null, v.text));
+            return;
+          }
           if (it.type === "choice") {
             var gname = it.group || sec.label;
             var c = (counts[gname] = counts[gname] || { opts: it.options, n: {} });
