@@ -32,7 +32,8 @@ import { DAK_ATTR } from "./dak-links.ts";
 import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, TOOL_ID, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
-import { canvasFormHtml, canvasModel, canvasSummaryItems, type AnnexQuestion } from "./canvas-form.ts";
+import { scheduleFor, scheduleGlanceHtml } from "./schedule.ts";
+import { annexOf, canvasFormHtml, canvasModel, canvasSummaryItems, type AnnexQuestion } from "./canvas-form.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import {
   avatar,
@@ -489,6 +490,7 @@ function canvasForm(p: Presentation, a: At, ids?: readonly string[]): string {
     was: canvasWas(p),
     stepLink: (q) => stepChip(a, p.steps.find((s) => s.key === q.stepKey), q.step),
     answerBox: (name, label) => answerBox(name, label, 2),
+    moduleLink: (id) => `<a class="jp-mod" href="${e(`${a.toWorkshop}${moduleSegment(id)}/`)}" title="${e(ws.modules.find((m) => m.id === id)?.title ?? id)}">${e(id)}</a>`,
   })}</div>`;
 }
 
@@ -501,9 +503,15 @@ function canvasPdf(p: Presentation, withModel = true): string {
 }
 
 /** The discussion's head: the gap report's script, the sheets' styles when it carries the Table sheets, and the canvas PDF writer when the workshop has a canvas. */
-function discussHead(p: Presentation, a: At, gap: boolean): { head?: string } {
-  const head = [gap ? `<script src="${a.root}assets/gap-report.js" defer></script>` : "", hasSheets(p) ? `<link rel="stylesheet" href="${a.root}assets/journeys.css">` : "", p.w.workshop.canvas ? `<script src="${a.root}assets/canvas-pdf.js" defer></script>` : ""].filter(Boolean).join("\n");
+function discussHead(p: Presentation, a: At, gap: boolean, glance = false): { head?: string } {
+  const head = [glance ? `<link rel="stylesheet" href="${a.root}assets/calendar.css">` : "", gap ? `<script src="${a.root}assets/gap-report.js" defer></script>` : "", hasSheets(p) ? `<link rel="stylesheet" href="${a.root}assets/journeys.css">` : "", p.w.workshop.canvas ? `<script src="${a.root}assets/canvas-pdf.js" defer></script>` : ""].filter(Boolean).join("\n");
   return head ? { head } : {};
+}
+
+/** The schedule at a glance, at the top of the discussion (owner, 2026-11-19), the full calendar on the workshop's page. */
+function discussGlance(corpus: JourneyCorpus, p: Presentation): string {
+  const sched = scheduleFor(corpus, p.w);
+  return sched ? scheduleGlanceHtml({ corpus, here: p.w, owner: sched.owner, schedule: sched.schedule, toWorkshops: "../../", level: 3, full: "../#the-days" }) : "";
 }
 
 function discussPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): string {
@@ -542,7 +550,8 @@ function discussPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): 
 <div data-jp-gapreport-body></div><p class="jp-small jp-gap-none" data-jp-gap-none>Nothing marked ${e(scales[0]!.options.slice(1).map((o) => o.label.toLowerCase()).join(" or "))} yet. Open a moment in the walkthrough and use its gap strip.</p></section>`
     : "";
   const takeaways = p.steps.filter((s) => s.step.policy);
-  const body = `<section class="jp-dhero"><span class="jp-kicker">${icon("message")} Questions for the room</span><h2>${e(pr.closingQuestion ?? "Closing discussion")}</h2></section>
+  const glance = discussGlance(corpus, p);
+  const body = `${glance}<section class="jp-dhero"><span class="jp-kicker">${icon("message")} Questions for the room</span><h2>${e(pr.closingQuestion ?? "Closing discussion")}</h2></section>
 ${cards ? `<div class="jp-dqs">${cards}</div>` : ""}
 ${ws.promise ? `<section class="jp-promise"><b>The scope promise.</b> ${e(ws.promise)}</section>` : ""}
 ${byModule ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("message", "jp-indigo")} The journey’s questions, module by module</h3><div class="jp-dms">${byModule}</div></section>` : ""}
@@ -551,7 +560,7 @@ ${ws.canvas ? `<section class="jp-card jp-pad jp-cv-wrap" id="canvas"><h3 class=
 ${gap}
 ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}
 ${sheetsPanel(corpus, p)}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussHead(p, a, Boolean(gap)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussHead(p, a, Boolean(gap), Boolean(glance)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
 }
 
 // ── the discussion as a lab ──────────────────────────────────────────────
@@ -690,7 +699,7 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
     if (st.canvas?.length && ws.canvas) {
       for (const g of canvasSummaryItems(ws.id, ws.canvas, scales[0]?.options)) if (st.canvas.includes(g.sheet.id)) items.push(...g.items);
       const qs = journeyQuestions(p);
-      for (const sh of ws.canvas.sheets.filter((x) => st.canvas!.includes(x.id))) for (const q of qs.filter((x) => x.canvas === undefined && (sh.modules ?? []).includes(x.module))) items.push({ label: `${q.step} · ${q.text}`, name: q.key, type: "text" });
+      for (const sh of ws.canvas.sheets.filter((x) => st.canvas!.includes(x.id))) for (const q of annexOf(sh, qs, ws.canvas)) items.push({ label: `${q.step} · ${q.text}`, name: q.key, type: "text" });
       out.push(canvasPdf(p, st.id === lab.steps.find((x) => x.canvas?.length)?.id), canvasForm(p, a, st.canvas));
     }
     if (st.matrix) out.push(matrixHtml(corpus, p, a, mod));
@@ -770,12 +779,13 @@ ${next ? `<div class="jp-lab-nav jp-noprint"><a class="jp-btn-dark" href="#lab-$
     .join("\n");
   const aside = `<aside class="jp-card jp-lab-aside"><h4>Our use case</h4><p data-jp-usecase-show>${e(useCaseText.split("\n")[0] ?? "")}</p><div class="jp-lab-aside-ucs" data-jp-usecase-ticks></div>${ws.promise ? `<p class="jp-small"><b>The scope promise.</b> ${e(ws.promise)}</p>` : ""}</aside>`;
   const credit = lab.credit ? `<p class="jp-lab-credit">${lab.creditHref ? `${e(lab.credit)} ${ext(lab.creditHref, lab.creditLabel ?? lab.name ?? "Source")}` : e(lab.credit)}</p>` : "";
-  const body = `<section class="jp-dhero"><span class="jp-kicker">${icon("message")} ${e(lab.name ?? "Questions for the room")}</span><h2>${e(pr.closingQuestion ?? "Closing discussion")}</h2>${lab.intro ? `<p>${e(lab.intro)}</p>` : ""}</section>
+  const glance = discussGlance(corpus, p);
+  const body = `${glance}<section class="jp-dhero"><span class="jp-kicker">${icon("message")} ${e(lab.name ?? "Questions for the room")}</span><h2>${e(pr.closingQuestion ?? "Closing discussion")}</h2>${lab.intro ? `<p>${e(lab.intro)}</p>` : ""}</section>
 <nav class="jp-lab-tabs" aria-label="Steps">${tabs}</nav>
 <div class="jp-lab" data-jp-lab="${e(ws.id)}"><div class="jp-lab-steps">${sections}</div>${aside}</div>
 ${lab.steps.some((st) => st.summary) ? "" : sheetsPanel(corpus, p)}
 ${credit}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussHead(p, a, Boolean(model)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussHead(p, a, Boolean(model), Boolean(glance)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
 }
 
 // ── the module × journey matrix (JV-05) ───────────────────────────────────

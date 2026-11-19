@@ -244,7 +244,7 @@
     }
 
     function heading(f, w) {
-      var lines = wrap(f.label, 9.5, w, true);
+      var lines = f.label ? wrap(f.label, 9.5, w, true) : [];
       var hint = f.hint ? wrap(f.hint, 8, w) : [];
       return {
         h: lines.length * 12 + hint.length * 10 + 4,
@@ -264,12 +264,18 @@
 
     function field(f, sheet) {
       var hd = heading(f, colW);
+      if (!f.rows.length) {
+        // Words the sheet prints, no answer: the heading alone.
+        room(hd.h + 6, sheet);
+        page.y = hd.draw(x0(), page.y) - 6;
+        return;
+      }
       if (!f.heads) {
-        // A write-in, or a list of options one per line.
+        // A write-in, or a list of options one per line (an option's write-in under it).
         var cells = f.rows[0].cells;
         var text1 = cells.length === 1 && cells[0].kind === "text";
         var bodyH = text1 ? (cells[0].lines || 1) * 12 + 6 : cells.reduce(function (n, c) {
-          return n + wrap(c.label, 9, colW - 16).length * 11 + 3;
+          return n + (c.kind === "text" ? 18 : wrap(c.label, 9, colW - 16).length * 11 + 3);
         }, 0);
         room(hd.h + bodyH + 10, sheet);
         var y = hd.draw(x0(), page.y);
@@ -278,6 +284,11 @@
           y -= bodyH;
         } else {
           cells.forEach(function (c) {
+            if (c.kind === "text") {
+              textField(c, x0() + 14, y - 16, colW - 14, 15);
+              y -= 18;
+              return;
+            }
             var ls = wrap(c.label, 9, colW - 16);
             tickField(c, x0(), y - 10, 9);
             ls.forEach(function (l, i) {
@@ -290,7 +301,10 @@
         return;
       }
       // A grid or a gap strip: row labels down the left, a column per head.
-      var labW = colW * 0.42;
+      // No row-label column when no row has a label (a table whose first column is printed words).
+      var labW = f.rows.some(function (r) {
+        return r.label;
+      }) ? colW * 0.42 : 0;
       var cw = (colW - labW) / f.heads.length;
       var headLines = f.heads.map(function (h) {
         return wrap(h, 7, cw - 4);
@@ -310,8 +324,29 @@
       }
       heads();
       f.rows.forEach(function (r) {
+        if (r.group !== undefined) {
+          // A heading row (a layer of the architecture map).
+          var gl = wrap(r.group, 8, colW - 4);
+          var gh = gl.length * 9 + 4;
+          if (y - gh < MARGIN) {
+            page.y = y;
+            room(gh + headH + 4, sheet);
+            y = page.y;
+            heads();
+          }
+          gl.forEach(function (l, i) {
+            text(x0(), y - 9 - i * 9, 8, true, l, 0.15);
+          });
+          y -= gh;
+          return;
+        }
         var ls = wrap(r.label || "", 8, labW - 4);
-        var rh = Math.max(ls.length * 9 + 4, r.cells[0].kind === "text" ? 16 : 13);
+        var labelLines = r.cells.reduce(function (n, c) {
+          return c.kind === "label" ? Math.max(n, wrap(c.label, 7.5, cw - 4).length) : n;
+        }, 0);
+        var rh = Math.max(ls.length * 9 + 4, labelLines * 8.5 + 4, r.cells.some(function (c) {
+          return c.kind === "text";
+        }) ? 16 : 13);
         if (y - rh < MARGIN) {
           page.y = y;
           room(rh + headH + 4, sheet);
@@ -324,6 +359,9 @@
         r.cells.forEach(function (c, i) {
           var cx = x0() + labW + i * cw;
           if (c.kind === "text") textField(c, cx + 1, y - rh + 1, cw - 2, rh - 2);
+          else if (c.kind === "label") wrap(c.label, 7.5, cw - 4).forEach(function (l, j) {
+            text(cx + 2, y - 8.5 - j * 8.5, 7.5, false, l, 0.25);
+          });
           else tickField(c, cx + (cw - 9) / 2, y - rh / 2 - 4.5, 9);
         });
         page.ops.push("0.85 G 0.4 w " + num(x0()) + " " + num(y - rh) + " m " + num(x0() + colW) + " " + num(y - rh) + " l S");
