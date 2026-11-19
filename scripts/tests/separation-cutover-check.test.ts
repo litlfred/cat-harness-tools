@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CONDITIONS, cutoverExitCode, monorepoPathFindings, ownInstances, type CutoverReport } from "../separation-cutover-check.ts";
+import { CONDITIONS, cutoverExitCode, judgedLayerDirs, monorepoPathFindings, monorepoPathsCondition, ownInstances, type CutoverReport } from "../separation-cutover-check.ts";
 
 const made: string[] = [];
 afterAll(() => {
@@ -79,5 +79,50 @@ describe("ownInstances — what the repository tracks, as opposed to what it mou
     spawnSync("git", ["init", "-q"], { cwd: root });
     spawnSync("git", ["add", "-A"], { cwd: root });
     expect(ownInstances(root).sort()).toEqual(["downstream", "tracked"]);
+  });
+});
+
+// A FHIR IG judged with no base (2026-11-19): in layer mode the checks run from
+// the platform index's root, which IS the monorepo, with the caller a checkout
+// of its own inside it. Only the caller's own layers are judged.
+describe("monorepo-paths judges the run's own layers (CAT_GATE_OWN_PATHS)", () => {
+  const git = (cwd: string, ...a: string[]) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd });
+  function index(): string {
+    const root = mkdtempSync(join(tmpdir(), "cutover-own-"));
+    made.push(root);
+    // The index itself: its own wiring names its own old layout.
+    mkdirSync(join(root, "scripts"), { recursive: true });
+    writeFileSync(join(root, "scripts", "x.ts"), 'const p = "folio-assistant/cat-harness/schemas/x.ts";\n');
+    git(root, "init", "-q");
+    git(root, "add", "-A");
+    // The caller: a separate checkout inside it, clean.
+    const caller = join(root, "the-caller");
+    mkdirSync(join(caller, "scripts"), { recursive: true });
+    writeFileSync(join(caller, "scripts", "y.ts"), "export const y = 1;\n");
+    git(caller, "init", "-q");
+    git(caller, "add", "-A");
+    return root;
+  }
+
+  test("own paths named: the index's own wiring is not judged, and the caller's is", () => {
+    const root = index();
+    const c = monorepoPathsCondition(root, { env: { CAT_GATE_OWN_PATHS: "the-caller" } });
+    expect(c.state).toBe("pass");
+    expect(c.summary).toContain("1 wiring file(s)");
+  });
+
+  test("a finding in the caller's own wiring is still a failure, reported under its directory", () => {
+    const root = index();
+    writeFileSync(join(root, "the-caller", "scripts", "z.ts"), 'const q = "folio-assistant/cat-harness/x.ts";\n');
+    git(join(root, "the-caller"), "add", "-A");
+    const c = monorepoPathsCondition(root, { env: { CAT_GATE_OWN_PATHS: "the-caller" } });
+    expect(c.state).toBe("fail");
+    expect(c.findings[0]).toStartWith("the-caller/scripts/z.ts:1:");
+  });
+
+  test("no own paths named: the whole checkout, as before", () => {
+    const root = index();
+    expect(judgedLayerDirs({})).toEqual(["."]);
+    expect(monorepoPathsCondition(root, { env: {} }).state).toBe("fail");
   });
 });
