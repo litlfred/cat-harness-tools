@@ -12,6 +12,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { configureValueRegistry, type WitnessedValueEntry } from "./value-registry-di";
+import { generateMainTex } from "./generate-main-tex";
 import { markdownToLatex } from "./render-latex";
 
 const dir = mkdtempSync(join(tmpdir(), "val-latex-"));
@@ -56,5 +57,52 @@ describe(":val in the LaTeX render", () => {
   test("attributes still apply in prose (precision = significant digits)", () => {
     expect(markdownToLatex("A :val[inv_alpha]{precision=4} B.")).toContain("$137.0$");
     expect(markdownToLatex("A :val[inv_alpha]{precision=3} B.")).toContain("$137$");
+  });
+});
+
+describe("generateMainTex cover page layout", () => {
+  test("places title, abstract, and \\proofstatuslegend inside a single titlepage without page breaks", () => {
+    const preambleFile = join(dir, "dummy-preamble.tex");
+    writeFileSync(preambleFile, "\\documentclass[11pt,a4paper]{report}\n");
+    const tex = generateMainTex(
+      {
+        title: "Test Monograph Title",
+        authors: ["Test Author"],
+        date: "2026-03-21",
+        abstract: "This monograph develops a test categorical framework.",
+        chapters: [],
+      },
+      {
+        preamblePath: preambleFile,
+        chaptersDir: "chapters/",
+        chapterSlugs: new Map([[0, "introduction"]]),
+      },
+    );
+
+    const titlepageMatch = tex.match(/\\begin\{titlepage\}([\s\S]*?)\\end\{titlepage\}/);
+    expect(titlepageMatch).not.toBeNull();
+    const titlepageBody = titlepageMatch![1];
+
+    expect(titlepageBody).toContain("Test Monograph Title");
+    expect(titlepageBody).toContain("Test Author");
+    expect(titlepageBody).toContain("{\\bfseries Abstract}");
+    expect(titlepageBody).toContain("This monograph develops a test categorical framework.");
+    expect(titlepageBody).toContain("\\proofstatuslegend");
+    expect(titlepageBody).not.toContain("\\begin{abstract}");
+    expect(titlepageBody).not.toContain("\\clearpage");
+    expect(titlepageBody).not.toContain("\\newpage");
+
+    // Order inside titlepage: title -> abstract -> proofstatuslegend
+    const titleIdx = titlepageBody.indexOf("Test Monograph Title");
+    const abstractIdx = titlepageBody.indexOf("This monograph develops a test categorical framework.");
+    const legendIdx = titlepageBody.indexOf("\\proofstatuslegend");
+    expect(titleIdx).toBeGreaterThanOrEqual(0);
+    expect(abstractIdx).toBeGreaterThan(titleIdx);
+    expect(legendIdx).toBeGreaterThan(abstractIdx);
+
+    // Copyright page comes after \end{titlepage}
+    const endTitlepageIdx = tex.indexOf("\\end{titlepage}");
+    const copyrightIdx = tex.indexOf("Creative Commons Attribution 4.0");
+    expect(copyrightIdx).toBeGreaterThan(endTitlepageIdx);
   });
 });

@@ -174,29 +174,47 @@ export function generateMainTex(
   lines.push("\\begin{document}");
   lines.push("");
 
-  // Title page — title, author, date only. Centered, vertically balanced.
-  // The CC license + copyright notice now lives on its own page (front matter
-  // book convention).
+  // Title page — cover header (title, author, date), abstract, and Lean
+  // formalisation key (\proofstatuslegend) on Page 1. Note that report.cls
+  // defines \begin{abstract}...\end{abstract} using \titlepage...\endtitlepage,
+  // which would force page breaks before and after the abstract; an inline
+  // minipage inside titlepage keeps cover, abstract, and key on a single page.
   lines.push("% ── Title page ────────────────────────────────────────────────────────────");
   lines.push("\\begin{titlepage}");
-  lines.push("\\centering");
-  lines.push("\\vspace*{3cm}");
-  lines.push(`{\\LARGE\\bfseries ${escapeLatexMeta(paper.title)}}\\\\[2em]`);
+  lines.push("\\begin{center}");
+  lines.push("\\vspace*{1.2cm}");
+  lines.push(`{\\LARGE\\bfseries ${escapeLatexMeta(paper.title)}}\\\\[1.5em]`);
   if (paper.affiliations?.length) {
     lines.push("\\ifshowaffiliations");
-    lines.push(`  {\\large ${authorName}\\thanks{${escapeLatexMeta(paper.affiliations[0])}}}\\\\[1em]`);
+    lines.push(`  {\\large ${authorName}\\thanks{${escapeLatexMeta(paper.affiliations[0])}}}\\\\[0.75em]`);
     lines.push("\\else");
-    lines.push(`  {\\large ${authorName}}\\\\[1em]`);
+    lines.push(`  {\\large ${authorName}}\\\\[0.75em]`);
     lines.push("\\fi");
   } else {
-    lines.push(`{\\large ${authorName}}\\\\[1em]`);
+    lines.push(`{\\large ${authorName}}\\\\[0.75em]`);
   }
   lines.push(`{\\large ${paper.date ? escapeLatexMeta(paper.date) : "\\today"}}`);
+  lines.push("\\end{center}");
+  if (paper.abstract) {
+    lines.push("");
+    lines.push("% ── Abstract ──────────────────────────────────────────────────────────────");
+    lines.push("\\vspace{1.5em}");
+    lines.push("\\begin{center}");
+    lines.push("{\\bfseries Abstract}\\par\\medskip");
+    lines.push("\\begin{minipage}{0.88\\textwidth}");
+    lines.push("\\small\\noindent\\ignorespaces");
+    lines.push(paper.abstract);
+    lines.push("\\end{minipage}");
+    lines.push("\\end{center}");
+  }
   lines.push("\\vfill");
+  lines.push("\\noindent\\begin{minipage}{\\textwidth}");
+  lines.push("\\small\\proofstatuslegend");
+  lines.push("\\end{minipage}");
   lines.push("\\end{titlepage}");
   lines.push("");
 
-  // Copyright page — CC license notice on its own page.
+  // Copyright page — CC license notice on its own page (verso of cover page).
   lines.push("% ── Copyright page ────────────────────────────────────────────────────────");
   lines.push("\\thispagestyle{empty}");
   lines.push("\\null\\vfill");
@@ -210,19 +228,6 @@ export function generateMainTex(
   lines.push("  and any changes made are indicated.");
   lines.push("}\\end{center}");
   lines.push("\\vfill\\null");
-  lines.push("\\clearpage");
-  lines.push("");
-
-  // Abstract — placed before TOC, book-style.
-  if (paper.abstract) {
-    lines.push("% ── Abstract ──────────────────────────────────────────────────────────────");
-    lines.push("\\begin{abstract}");
-    lines.push(paper.abstract);
-    lines.push("\\end{abstract}");
-    lines.push("");
-  }
-
-  lines.push("\\proofstatuslegend");
   lines.push("\\clearpage");
   lines.push("");
 
