@@ -50,7 +50,7 @@ import {
   type Tile,
   type Visualisation,
 } from "../schemas/kg/cat-harness.js";
-import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor, resolveLandingInstance } from "../schemas/kg/harness-config.js";
+import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor, orderedDependencies, resolveLandingInstance } from "../schemas/kg/harness-config.js";
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.js";
 import { DEFAULT_LOCALE } from "../schemas/content/translation.js";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
@@ -687,6 +687,70 @@ export function covers(v: DeclaredVisualiser, d: ViewedDirectory, owner: string,
 }
 
 /**
+ * The `<sub-graph>` segments under which visualiser `v` may draw directory
+ * `d` of the layer named `owner`, most specific first — `[]` when `v` draws
+ * the full view only. The ONE place this rule lives: {@link viewersOf} reads
+ * it to find a tile's page on disk, and the directory READMEs read it to name
+ * the published page.
+ *
+ * `instance`: the owner's name. `directory`: the directory id — qualified by
+ * its layer first when another harness owns the visualiser, because a
+ * corpus-wide view keeps ids unique that way (`folio-assistant-sci-skills`
+ * beside `skills`). A bare id is taken for another layer's directory only when
+ * the declaring harness does not hold a directory of that id itself: a bare
+ * `skills` is cat-harness's own, `core-skills` can only be core's.
+ * `subgraphUnder` nests either kind of sub-graph: the glossary's per-instance
+ * pages sit at `glossary/instance/<instance>/` (owner, 2026-10-15, "3a") so a
+ * layer name cannot meet an asset-type page.
+ */
+export function subgraphCandidates(v: DeclaredVisualiser, d: ViewedDirectory, owner: string): string[] {
+  const under = (d.graphTypologies ?? []).map((k) => v.subgraphUnder?.[k]).find((u) => u !== undefined);
+  const at = (seg: string): string => (under ? `${under}/${seg}` : seg);
+  const harnessIds = new Set((readRaw(v.harnessRoot)?.directories ?? []).map((x) => x.id));
+  return v.subgraphs === "instance"
+    ? [at(owner)]
+    : v.subgraphs === "directory"
+      ? owner === v.harness
+        ? [at(d.id)]
+        : [at(`${owner}-${d.id}`), ...(harnessIds.has(d.id) ? [] : [at(d.id)])]
+      : [];
+}
+
+/**
+ * Every visualiser that may render a directory of the layer at
+ * `instanceRoot`: those every layer in the checkout declares
+ * ({@link declaredVisualisers}), then those of the layers it is built on
+ * (`orderedDependencies`), once each.
+ *
+ * The second half is what a standalone checkout needs. A content layer's own
+ * checkout holds only its own declaration, while the visualisers covering its
+ * kinds (`library`, `folio`, `beans` …) are declared by the platform layers it
+ * `needs` — so asking the checkout alone answered "nothing renders this" for
+ * every directory of a folio standing on the platform.
+ */
+export function visualisersReaching(repoRoot: string, instanceRoot: string): DeclaredVisualiser[] {
+  const out = [...declaredVisualisers(repoRoot)];
+  const seen = new Set(out.map((v) => `${v.harness}/${v.id}`));
+  let deps: string[] = [];
+  try {
+    deps = orderedDependencies(instanceRoot).map((x) => x.rootPath);
+  } catch {
+    // A cycle is `check:instance-graph`'s finding; the checkout's own answer stands.
+  }
+  for (const root of deps) {
+    const d = readRaw(root);
+    if (d?.name === undefined) continue;
+    for (const v of d.visualisers ?? []) {
+      const key = `${d.name}/${v.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ ...v, harness: d.name, harnessRoot: resolve(root) });
+    }
+  }
+  return out;
+}
+
+/**
  * Every visualisation of a declared directory, normalised: one per declared
  * visualiser that covers it, the page being that visualiser's route.
  *
@@ -728,27 +792,7 @@ export function viewersOf(
     if (!covers(v, d, owner, absDir, repoRoot)) continue;
     site ??= siteOwnerDir(repoRoot);
     const full = pageParts({ harness: v.harness, visualiser: v.id });
-    // The sub-graph a directory's tile opens. `instance`: the owner's name.
-    // `directory`: the directory id — qualified by its layer first when
-    // another harness owns the visualiser, because a corpus-wide view keeps
-    // ids unique that way (`folio-assistant-sci-skills` beside `skills`).
-    const under = (d.graphTypologies ?? []).map((k) => v.subgraphUnder?.[k]).find((u) => u !== undefined);
-    const at = (seg: string): string => (under ? `${under}/${seg}` : seg);
-    // A bare id is taken for another layer's directory only when the
-    // declaring harness does not hold a directory of that id itself: a bare
-    // `skills` is cat-harness's own, `core-skills` can only be core's.
-    const harnessIds = new Set((readRaw(v.harnessRoot)?.directories ?? []).map((x) => x.id));
-    // `subgraphUnder` nests either kind of sub-graph: the glossary's
-    // per-instance pages sit at `glossary/instance/<instance>/` (owner,
-    // 2026-10-15, "3a") so a layer name cannot meet an asset-type page.
-    const subs =
-      v.subgraphs === "instance"
-        ? [at(owner)]
-        : v.subgraphs === "directory"
-          ? owner === v.harness
-            ? [at(d.id)]
-            : [at(`${owner}-${d.id}`), ...(harnessIds.has(d.id) ? [] : [at(d.id)])]
-          : [];
+    const subs = subgraphCandidates(v, d, owner);
     // A sub-graph page counts when it is on disk (over the layer overlay: a
     // mounted layer's pages are at its output root, bean `cat-tools-sm8r`) OR when the declaring harness
     // builds it at publish (`writer` or `builtAtPublish`): a page that is

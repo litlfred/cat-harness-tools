@@ -89,14 +89,14 @@ Feature: Directory READMEs generated from the declaration
   Scenario: A promoted subgraph directory's row borrows nothing
     Given beans.json declares "promoted" with subgraph true and description "Its own subgraph."
     When work's README is planned
-    Then the row for "promoted/" says "_nothing declares what this holds_"
+    Then the row for "promoted/" says "_holds `.txt` files_", read from what it holds
     And the README does not contain "Its own subgraph."
 
-  @test:scripts/tests/kg/subgraph-readmes.test.ts::subdirectory_rows_—_described_from_the_declaration,_or_saying_nothing_does_(no_count,_bean_ba9e)::no_description,_or_no_declaration_at_all,_says_so_—_nothing_is_invented,_and_nothing_is_counted
-  Scenario: An undescribed or undeclared subdirectory says nothing declares it, with no count
+  @test:scripts/tests/kg/subgraph-readmes.test.ts::subdirectory_rows_—_described_from_the_declaration,_or_saying_nothing_does_(no_count,_bean_ba9e)::no_description,_or_no_declaration_at_all,_is_read_from_what_it_holds_—_nothing_is_invented,_and_nothing_is_counted
+  Scenario: An undescribed or undeclared subdirectory is read from what it holds, with no count
     Given beans.json declares "nodesc" with no description and does not declare "undeclared"
     When work's README is planned
-    Then the rows for "nodesc/" and "undeclared/" say "_nothing declares what this holds_"
+    Then the rows for "nodesc/" and "undeclared/" say "_holds `.txt` files_"
     And the README contains no "1 file" count
     And the nested "parts/deep" description "Not a row of work/." does not appear
 
