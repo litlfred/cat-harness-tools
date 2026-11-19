@@ -7,13 +7,13 @@
  * while the page it generated could not run (PR #805).
  */
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { deriveArtefactChecks, deriveUncheckedGenerators, report } from "../check-artefact-verification.ts";
+import { deriveArtefactChecks, deriveUncheckedGenerators, partialScriptTable, report } from "../check-artefact-verification.ts";
 
 function repo(scripts: Record<string, string>, files: Record<string, string> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "artefact-"));
@@ -111,6 +111,23 @@ describe("a checkout holding part of the declared table", () => {
   test("a check present here with no declaration is still a finding", () => {
     const r = report([...checks, { check: "new:check", script: "n.ts", classification: "no-parsing" as const }], d, [], "a rooted checkout");
     expect(r.undeclared).toEqual(["new:check"]);
+  });
+
+  // WHO smart-base#340: a composed CONTENT root mounts only the layers it
+  // needs, so a check whose declaring layer it lacks is absent, not stale.
+  test("which roots hold a partial table: an own declaration, or a content root; the harness index does not", () => {
+    const content = mkdtempSync(join(tmpdir(), "artefact-partial-"));
+    writeFileSync(join(content, "index.config.json"), "{}");
+    expect(partialScriptTable(content)).toContain("content root");
+
+    const own = mkdtempSync(join(tmpdir(), "artefact-partial-"));
+    writeFileSync(join(own, "acme.json"), JSON.stringify({ name: "acme", directories: [] }));
+    expect(partialScriptTable(own)).toContain("acme.json");
+
+    const harness = mkdtempSync(join(tmpdir(), "artefact-partial-"));
+    mkdirSync(join(harness, ".github", "workflows"), { recursive: true });
+    writeFileSync(join(harness, ".github", "workflows", "code-quality-gates.yml"), "name: gates\n");
+    expect(partialScriptTable(harness)).toBeUndefined();
   });
 
   test("without a partial table the same entry is stale, as before", () => {
