@@ -41,6 +41,7 @@ import { extname, join, relative, resolve } from "node:path";
 import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.js";
 
 import { checkDeclarationResolution } from "./check-declaration-resolution.ts";
+import { GATE_OWN_PATHS_ENV } from "./lib/gate-own.ts";
 import { analyse as importDirection } from "./check-import-direction.ts";
 import { analyse as referenceDirection } from "./check-reference-direction.ts";
 
@@ -161,6 +162,35 @@ export function monorepoPathFindings(files: ReadonlyArray<{ path: string; text: 
   return out;
 }
 
+/**
+ * The layer directories whose wiring this run judges, relative to the root:
+ * the caller's own (`CAT_GATE_OWN_PATHS`, `gate-own.ts`), or `["."]` (the
+ * whole checkout) when the run names none.
+ *
+ * A layer's PR checks compose the platform index and run from its root, and
+ * that index IS the monorepo the separation left: listing the root's tracked
+ * files judged the monorepo for naming itself, while the caller, a checkout of
+ * its own placed inside it, was not among them at all (a FHIR IG judged with
+ * no base, 2026-11-19). Each own layer is listed from its own directory.
+ */
+// input-site: env CAT_GATE_OWN_PATHS #cd789a3f — the layer directories judged; the value is the whole of what it contributes
+export function judgedLayerDirs(env: Readonly<Record<string, string | undefined>> = process.env): string[] {
+  const own = (env[GATE_OWN_PATHS_ENV] ?? "").split(",").map((x) => x.trim().replace(/^\.\/+/, "").replace(/\/+$/, "")).filter(Boolean);
+  return own.length > 0 ? [...new Set(own.map((x) => x || "."))] : ["."];
+}
+
+/** Every own layer's wiring files, with paths relative to the root. `undefined` when one cannot be listed. */
+function wiringFiles(root: string, env?: Readonly<Record<string, string | undefined>>): Array<{ path: string; text: string }> | undefined {
+  const out: Array<{ path: string; text: string }> = [];
+  const dirs = judgedLayerDirs(env);
+  for (const d of dirs) {
+    const files = trackedFiles(d === "." ? root : join(root, d));
+    if (files === undefined) return undefined;
+    for (const f of files) out.push(d === "." ? f : { ...f, path: `${d}/${f.path}` });
+  }
+  return out;
+}
+
 function trackedFiles(root: string): Array<{ path: string; text: string }> | undefined {
   const r = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (r.status !== 0) return undefined;
@@ -178,6 +208,24 @@ function trackedFiles(root: string): Array<{ path: string; text: string }> | und
   return out;
 }
 
+/**
+ * The `monorepo-paths` condition over the layers this run judges
+ * ({@link judgedLayerDirs}): each scanned with LAYER-relative paths (the record
+ * prefixes are a layer's) and reported with the layer's directory in front.
+ */
+export function monorepoPathsCondition(root: string, opts: { monorepo?: Monorepo; env?: Readonly<Record<string, string | undefined>> } = {}): ConditionResult {
+  const dirs = judgedLayerDirs(opts.env);
+  const files = wiringFiles(root, opts.env);
+  if (files === undefined) {
+    return { id: "monorepo-paths", state: "could-not-determine", by: "separation:cutover:check", summary: `not a git checkout: the tracked files of ${dirs.join(", ")} could not be listed`, findings: [] };
+  }
+  const found = dirs.flatMap((d) => {
+    const mine = d === "." ? files : files.filter((f) => f.path.startsWith(`${d}/`)).map((f) => ({ ...f, path: f.path.slice(d.length + 1) }));
+    return monorepoPathFindings(mine, opts.monorepo).map((x) => (d === "." ? x : `${d}/${x}`));
+  });
+  return { id: "monorepo-paths", state: found.length ? "fail" : "pass", by: "separation:cutover:check", summary: `${found.length} reference(s) to the monorepo in ${files.length} wiring file(s)`, findings: found };
+}
+
 const TOOLS_ROOT = resolve(import.meta.dir, "..");
 
 function runGate(script: string, args: string[], cwd: string): { status: number; tail: string } {
@@ -189,7 +237,7 @@ function runGate(script: string, args: string[], cwd: string): { status: number;
 const stateOf = (status: number): ConditionState => (status === 0 ? "pass" : status === 1 ? "fail" : "could-not-determine");
 const firstLine = (e: unknown): string => (e as Error).message.split("\n")[0]!;
 
-export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?: Monorepo } = {}): CutoverReport {
+export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?: Monorepo; env?: Readonly<Record<string, string | undefined>> } = {}): CutoverReport {
   const root = resolve(rootArg);
   const decl = findDeclarationFile(root);
   const instance = decl?.replace(/\.json$/, "");
@@ -230,13 +278,7 @@ export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?:
   }
 
   // monorepo-paths
-  const files = trackedFiles(root);
-  if (files === undefined) {
-    conditions.push({ id: "monorepo-paths", state: "could-not-determine", by: "separation:cutover:check", summary: "not a git checkout: the tracked files could not be listed", findings: [] });
-  } else {
-    const found = monorepoPathFindings(files, opts.monorepo);
-    conditions.push({ id: "monorepo-paths", state: found.length ? "fail" : "pass", by: "separation:cutover:check", summary: `${found.length} reference(s) to the monorepo in ${files.length} wiring file(s)`, findings: found });
-  }
+  conditions.push(monorepoPathsCondition(root, opts));
 
   // import-direction
   try {

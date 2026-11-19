@@ -45,3 +45,24 @@ describe("composed operative terms of a mounted layer's record", () => {
     expect(composedTermsNotOursReason(join(root, "cat-harness", "external-schemas"), root)).toBeNull();
   });
 });
+
+// A FHIR IG judged with no base (2026-11-19): in layer mode the checks compose
+// the platform index (a HARNESS root) and name the caller's own layer paths.
+describe("a gate run that names its own layers (CAT_GATE_OWN_PATHS)", () => {
+  const env = { CAT_GATE_OWN_PATHS: "the-caller", CAT_GATE_FOREIGN_PATHS: "cat-harness,cat-harness-tools" };
+
+  test("a harness root, the registry in a layer that is not the caller's: not applicable", () => {
+    const root = tree(true);
+    expect(composedTermsNotOursReason(join(root, "cat-harness", "external-schemas"), root, env)).toContain("CAT_GATE_OWN_PATHS");
+  });
+
+  test("the registry in the caller's own layer: judged", () => {
+    const root = tree(true);
+    expect(composedTermsNotOursReason(join(root, "the-caller", "external-schemas"), root, env)).toBeNull();
+  });
+
+  test("no own paths named (a local run, the index's own gates): judged as before", () => {
+    const root = tree(true);
+    expect(composedTermsNotOursReason(join(root, "cat-harness", "external-schemas"), root, {})).toBeNull();
+  });
+});
