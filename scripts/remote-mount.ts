@@ -1525,7 +1525,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
     const excluded: string[] = [];
     if (plan.mounts.length === 0) return { plan, lockFile, excluded };
     const legacyLock = mountLockPathFor(plan.instanceRoot, plan.downstream);
-    // A refusal never leaves a partial lock (smart-ra, 2026-11-18): the lock
+    // A refusal never leaves a partial lock (a downstream layer, 2026-11-18): the lock
     // was rewritten without the instances the mount refused to re-mount, so
     // a replay of it (`mount-from-lock.ts`, CI) laid down a closure with
     // layers missing. When the trust check, or the plan itself (a fetch, a
@@ -1587,7 +1587,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
       }
       // Any other refusal of an instance the lock holds keeps its entry as it
       // is, as edited bytes do below: the check judges it from disk, and the
-      // lock never silently loses a layer (smart-ra, 2026-11-18).
+      // lock never silently loses a layer (a downstream layer, 2026-11-18).
       const keepPrior = (): string => {
         if (!before || untouched.has(p.instance) || locked.some((l) => l.instance === p.instance)) return "";
         locked.push(before);

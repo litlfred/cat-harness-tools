@@ -789,7 +789,7 @@ describe("mount trust is recorded, re-judged and scoped (roast `1ygp` L4.2)", ()
     expect(summarise(r.plan.outcomes).state).toBe("missing");
     // never deleted by the agent...
     expect(existsSync(join(root, "core/scripts/run.ts"))).toBe(true);
-    // ...the lock is not rewritten without it (smart-ra, 2026-11-18)...
+    // ...the lock is not rewritten without it (a downstream layer, 2026-11-18)...
     expect(readFileSync(join(root, "index.lock.json"), "utf-8")).toBe(lockBefore);
     // ...and never presented as current: the check re-judges the basis
     const c = checkRemote({ instanceRoot: root });
@@ -805,7 +805,7 @@ describe("mount trust is recorded, re-judged and scoped (roast `1ygp` L4.2)", ()
     expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
   });
 
-  // smart-ra, 2026-11-18: mount:remote rewrote index.lock.json without the
+  // A downstream layer, 2026-11-18: mount:remote rewrote index.lock.json without the
   // instances it refused to re-mount, so the lock CI replays was partial.
   test("25b. a refusal of one locked instance writes nothing: the lock keeps every entry, and no other layer is re-laid", () => {
     const root = downstream({});
