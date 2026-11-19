@@ -40,6 +40,8 @@ import { join } from "node:path";
 import { TOOLS_ROOT } from "./lib/roots.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { findDeclarationFile } from "../schemas/kg/cat-harness.ts";
+import { rootProfile } from "./lib/root-gate-set.ts";
+import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const DECL = join(TOOLS_ROOT, "scripts", "artefact-verification.json");
@@ -204,15 +206,28 @@ export function report(checks: ArtefactCheck[], d: Declaration, unchecked: strin
 
 /**
  * Why the checkout at `root` holds only part of the table the declaration
- * describes, or `undefined` when it holds all of it: its root carries an
- * instance declaration of its own (an IG repository that is its own index,
- * cat-harness-tools#1701). The folio-assistant index declares no instance at
- * its root, and is judged exactly as before.
+ * describes, or `undefined` when it holds all of it. Two cases:
+ *
+ * - its root carries an instance declaration of its own (an IG repository
+ *   that is its own index, cat-harness-tools#1701);
+ * - it is a CONTENT root (`rootProfile`: no gates workflow), a composed index
+ *   that mounts only the layers it needs. A check declared by a layer it does
+ *   not mount (`check:figures`, `check:l1-coverage`, another IG's
+ *   `<ig>:pages:check`) is absent here because its declaring layer is, which
+ *   says nothing about whether the declaration is stale (a FHIR IG judged with no base, 2026-11-19: ten such entries read stale).
+ *
+ * The folio-assistant index, the harness root this declaration describes,
+ * is judged exactly as before.
  */
 export function partialScriptTable(root: string): string | undefined {
   const own = findDeclarationFile(root);
-  if (own === undefined) return undefined;
-  return `this checkout's root is the instance declared by ${own}, so its package.json is its own, not the folio-assistant index's this declaration describes`;
+  if (own !== undefined) {
+    return `this checkout's root is the instance declared by ${own}, so its package.json is its own, not the folio-assistant index's this declaration describes`;
+  }
+  if (rootProfile(root) === "content") {
+    return `this checkout is a content root (no ${GATES_WORKFLOW}), composed of only the layers it needs, so a check whose declaring layer it does not mount is absent here, not stale`;
+  }
+  return undefined;
 }
 
 if (import.meta.main) {
