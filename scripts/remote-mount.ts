@@ -1524,10 +1524,21 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
     const lockFile = join(plan.instanceRoot, mountLockFilename(plan.downstream));
     const excluded: string[] = [];
     if (plan.mounts.length === 0) return { plan, lockFile, excluded };
+    const legacyLock = mountLockPathFor(plan.instanceRoot, plan.downstream);
+    // A refusal never leaves a partial lock (smart-ra, 2026-11-18): the lock
+    // was rewritten without the instances the mount refused to re-mount, so
+    // a replay of it (`mount-from-lock.ts`, CI) laid down a closure with
+    // layers missing. When the trust check, or the plan itself (a fetch, a
+    // read, a declaration), refuses an instance the lock already holds, the
+    // mount stops HERE: nothing is laid down and nothing is written, so the
+    // lock and every mount stay as they were. Roast `1ygp` L4.2 still holds:
+    // the check re-judges that lock against the declaration (other pins, or a
+    // basis that no longer holds), so the old mount is never reported current.
+    const refusedLocked = refusalsOfLocked(plan, readMountLock(existsSync(lockFile) ? lockFile : legacyLock), opts);
+    if (refusedLocked.length) return { plan, lockFile, excluded };
     // The lock moved to `index.lock.json` (owner, 2026-10-07). A legacy
     // `<name>.mount-lock.json` is RENAMED onto the new name before it is
     // rewritten — moved, never dropped — so the two never coexist.
-    const legacyLock = mountLockPathFor(plan.instanceRoot, plan.downstream);
     if (legacyLock !== lockFile && existsSync(legacyLock)) renameSync(legacyLock, lockFile);
     // With an index, the committed `.gitignore` block is regenerated from it
     // before anything lands, and `info/exclude` is never written.
@@ -1574,6 +1585,15 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
         plan.outcomes.push({ instance: p.instance, state: trust.state, path: p.path, detail });
         continue;
       }
+      // Any other refusal of an instance the lock holds keeps its entry as it
+      // is, as edited bytes do below: the check judges it from disk, and the
+      // lock never silently loses a layer (smart-ra, 2026-11-18).
+      const keepPrior = (): string => {
+        if (!before || untouched.has(p.instance) || locked.some((l) => l.instance === p.instance)) return "";
+        locked.push(before);
+        untouched.add(p.instance);
+        return `; the lock keeps its entry (${before.repository}@${before.sha.slice(0, 12)}) unchanged`;
+      };
       let adopting = false;
       try {
         if (before) {
@@ -1604,7 +1624,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           adopting = true;
         }
         if (tracked(plan.instanceRoot, p.path)) {
-          plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `\`${p.path}/\` holds tracked files — a mount never lands on tracked bytes` });
+          plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `\`${p.path}/\` holds tracked files — a mount never lands on tracked bytes${keepPrior()}` });
           continue;
         }
         const tree = trees.get(`${p.repository}@${p.sha}`)!;
@@ -1627,7 +1647,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
             instance: p.instance,
             state: "could-not-determine",
             path: p.path,
-            detail: `\`${pinsArtefacts.upstreamPath}\` at ${p.sha.slice(0, 12)} tracks files under node_modules/, which the mount digest excludes as install artefacts — refused rather than locked with bytes no check would see`,
+            detail: `\`${pinsArtefacts.upstreamPath}\` at ${p.sha.slice(0, 12)} tracks files under node_modules/, which the mount digest excludes as install artefacts — refused rather than locked with bytes no check would see${keepPrior()}`,
           });
           continue;
         }
@@ -1815,7 +1835,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
             (ignored === "not-ignored" ? ` — but \`${p.path}/\` is NOT ignored: the committed .gitignore index-mounts block does not cover it` : ""),
         });
       } catch (e) {
-        plan.outcomes.push({ instance: p.instance, state: "could-not-determine", path: p.path, detail: `mounting threw: ${(e as Error).message}` });
+        plan.outcomes.push({ instance: p.instance, state: "could-not-determine", path: p.path, detail: `mounting threw: ${(e as Error).message}${keepPrior()}` });
       }
     }
 
@@ -1876,6 +1896,41 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
     for (const t of trees.values()) t.close();
     for (const f of packages.values()) if (f.state === "ok") f.close();
   }
+}
+
+/**
+ * The instances `lock` already holds that this mount would refuse to
+ * re-mount: the trust check says no, or the plan could not reach them
+ * (`missing`, `refused` or `could-not-determine` before anything is fetched
+ * into place). Each is reported, and so is every other planned instance, as
+ * not re-mounted because nothing was written. A `local` or `skipped` instance
+ * is not a refusal: the checkout or the override took it over.
+ */
+export function refusalsOfLocked(plan: Plan, prior: ReturnType<typeof readMountLock>, opts: Pick<RemoteMountOptions, "purpose">): string[] {
+  if (!prior.ok) return [];
+  const held = new Map(prior.lock.instances.map((i) => [i.instance, i]));
+  const refused = new Set<string>();
+  const planned = new Set(plan.instances.map((p) => p.instance));
+  for (const o of plan.outcomes) {
+    if (held.has(o.instance) && !planned.has(o.instance) && (o.state === "missing" || o.state === "refused" || o.state === "could-not-determine")) refused.add(o.instance);
+  }
+  for (const p of plan.instances) {
+    const before = held.get(p.instance);
+    if (!before) continue;
+    const trust = trustFor(plan.mounts.find((m) => m.harness === p.via), p, opts.purpose ?? "mount", plan.approvers);
+    if (trust.ok) continue;
+    refused.add(p.instance);
+    plan.outcomes.push({ instance: p.instance, state: trust.state, path: p.path, detail: `not mounted: ${trust.detail}` });
+  }
+  if (refused.size === 0) return [];
+  const names = [...refused].sort();
+  const kept = `the lock already holds ${names.map((n) => `\`${n}\``).join(", ")} and this mount refused to re-mount ${names.length === 1 ? "it" : "them"}, so nothing was written: the lock and every mount are as they were. Restore trust (or reach the pin) and re-mount`;
+  for (const o of plan.outcomes) if (refused.has(o.instance)) o.detail += `; ${kept}`;
+  for (const p of plan.instances) {
+    if (refused.has(p.instance)) continue;
+    plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `not re-mounted: ${kept}` });
+  }
+  return names;
 }
 
 // ── Seeding: create or re-pin a remote layer, WITH its consent ────────────
