@@ -1067,18 +1067,43 @@ jobs:
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           DIR: src
+          SUBDIR: ${{ inputs.path-in-repo }}
         run: |
           # A PR's merge commit: its first parent is the main it merges into,
           # exactly. Anything else (workflow_dispatch): the default branch's tip.
+          #
+          # NO INSTANCE ON MAIN (WorldHealthOrganization/smart-base#340, run
+          # 44489605227): the PR that first brings the instance into a
+          # repository, an instance newly added beside others, or a main with
+          # no commits at all. Main has no `<path-in-repo>/<instance>.json`, so
+          # main's side cannot be mounted (the swap stopped with `mv: cannot
+          # stat 'src/smart-base'`, and compare then read `results-base-1
+          # missing`). Main's side is then EMPTY (`absent=true`): nothing is
+          # prepared or run for it, and compare judges the PR side on its
+          # own, so every test and gate on the head must pass outright and
+          # no failure is excused as pre-existing. It is never the stricter
+          # judgment's opposite: a wrongly-read absence can only fail a PR.
           set -euo pipefail
           cd "$DIR"
+          absent=false
           if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
             git checkout -q --detach 'HEAD^1'
+          elif [ -z "$(git ls-remote --heads origin "$DEFAULT_BRANCH")" ]; then
+            # An empty main: no branch to fetch, so no instance on it.
+            absent=true
+            echo "::notice::main ($DEFAULT_BRANCH) has no commits: main's side is empty, and the PR side is judged on its own"
           else
             git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
             git checkout -q --detach FETCH_HEAD
           fi
-          git log -1 --format='base side: %h %s'
+          if [ "$absent" = false ]; then
+            git log -1 --format='base side: %h %s'
+            if [ ! -f "${SUBDIR:-.}/$INSTANCE.json" ]; then
+              absent=true
+              echo "::notice::main has no ${SUBDIR:-.}/$INSTANCE.json: this PR brings the instance in, so main's side is empty, and the PR side is judged on its own (every test and gate must pass)"
+            fi
+          fi
+          echo "absent=$absent" >> "$GITHUB_OUTPUT"
       - name: Is there anything to prepare?
         continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
         id: skip-prep
@@ -1832,6 +1857,10 @@ jobs:
       # True on the first harness PR: main had no lock, so main's side is
       # the PR's own tree (see the base-root step).
       first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
+      # True when main has no instance at all (layer mode; the caller-base
+      # step): main's side is empty, nothing is prepared or run for it, and
+      # compare judges the PR side on its own, every failure counted.
+      absent: ${{ steps.fa-caller-base.outputs.absent == 'true' }}
       # Whether this push re-records every page-build writer (writer-record-hours);
       # otherwise it records incrementally (cat-harness-tools#1702).
       writer-record-full: ${{ steps.writer-stamp.outputs.full }}
@@ -1966,8 +1995,11 @@ jobs:
       # shards, hours later on a busy day, and the entry may be evicted by
       # then (cat-harness-tools#926). What is restored goes to compare as an
       # artifact (below).
+      # Not when main has no instance: there is no answer to find, and an
+      # empty side is never cached as one (compare).
       - name: Is main's answer already known?
         id: base-lookup
+        if: steps.fa-caller-base.outputs.absent != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
@@ -1991,6 +2023,7 @@ jobs:
         id: stored-lookup
         if: >-
           steps.base-lookup.outputs.cache-hit != 'true' && github.event_name != 'push' &&
+          steps.fa-caller-base.outputs.absent != 'true' &&
           inputs.reuse-stored-main && github.run_attempt == '1'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -2107,6 +2140,7 @@ jobs:
           BASE_HIT: ${{ steps.base-hit.outputs.hit == 'true' }}
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
           PREVIEW: ${{ github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true' }}
+          ABSENT: ${{ steps.fa-caller-base.outputs.absent == 'true' }}
         run: |
           hit=false
           # Why nothing runs, for main's verdict on a push (owner, Q-MQA-2 A):
@@ -2119,6 +2153,11 @@ jobs:
             echo "main's integration run already started in this window: this push runs nothing, and the next window's first push judges it" | tee -a "$GITHUB_STEP_SUMMARY"
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
+          elif [ "$ABSENT" = "true" ]; then
+            # Main has no instance (the caller-base step): its side is empty,
+            # and there is nothing of it to mount, prepare or run.
+            hit=true
+            echo "main has no $INSTANCE: main's side is empty, nothing is prepared for it, and the PR side is judged on its own" | tee -a "$GITHUB_STEP_SUMMARY"
           elif [ "$PREVIEW" = "true" ]; then
             # The preview tier never computes main's side (the header): the
             # cone is judged against main's stored answer, or as unknown.
@@ -2258,7 +2297,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        side: ${{ fromJSON(github.event_name == 'push' && '["base"]' || ((needs.prepare-base.outputs.cached == 'true' || needs.prepare-head.outputs.preview == 'true') && '["head"]' || '["base","head"]')) }}
+        side: ${{ fromJSON(github.event_name == 'push' && '["base"]' || ((needs.prepare-base.outputs.cached == 'true' || needs.prepare-base.outputs.absent == 'true' || needs.prepare-head.outputs.preview == 'true') && '["head"]' || '["base","head"]')) }}
         shard: ${{ fromJSON(needs.prepare-base.outputs.shards) }}
     env:
       SIDE: ${{ matrix.side }}
@@ -2703,6 +2742,16 @@ jobs:
             echo
             echo "Main has no \`index.lock.json\` yet, because this PR adds it, so main cannot be mounted. Main's side was computed from this PR's own tree: nothing below can be new, and every failing gate is listed as the baseline this PR sets. Later PRs are judged against main as usual."
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Say that main has no instance
+        if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.absent == 'true' && github.event_name != 'push'
+        env:
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: |
+          {
+            echo "### Main has no \`$INSTANCE\`: the PR side is judged on its own"
+            echo
+            echo "Main has no \`${SUBDIR:-.}/$INSTANCE.json\` (this PR brings the instance in, or main is empty), so main's side is empty: nothing was prepared or run for it. Every test and gate on this PR must pass outright; a failure, and a gate that could not determine (exit 2), is NEW, never excused as failing on main. Not applicable (78) and skipped gates are listed and not counted, as always."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Join each side's shards
         id: join
         if: steps.pins-only.outputs.only != 'true'
@@ -2718,6 +2767,7 @@ jobs:
           INDEX: ${{ needs.prepare-base.outputs.index }}
           LOWER: ${{ needs.prepare-base.outputs.lower }}
           PREVIEW: ${{ github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true' }}
+          ABSENT: ${{ github.event_name != 'push' && needs.prepare-base.outputs.absent == 'true' }}
         run: |
           set -euo pipefail
           sides="base head"
@@ -2727,12 +2777,22 @@ jobs:
             cp -r "$RUNNER_TEMP/base-results" merged/base
             sides="head"
           fi
+          # Main has no instance: its side is EMPTY, never missing. No test
+          # and no gate ran there, so every head failure is new (compare-gates.py
+          # --no-base also counts head's exit 2).
+          if [ "$ABSENT" = "true" ]; then
+            mkdir -p merged/base
+            printf '<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="main has no instance" tests="0" failures="0"></testsuites>\n' > merged/base/junit.xml
+            printf '{}\n' > merged/base/gates.json
+            sides="head"
+          fi
           # The preview tier ran the head side only; main's is the stored answer or none.
           [ "$PREVIEW" = "true" ] && sides="head"
           for side in $sides; do
             python3 .github/scripts/layer-pr-checks/merge-shards.py results "$side" "$N" "merged/$side"
           done
-          if [ "$CACHED" != "true" ] && [ "$PREVIEW" != "true" ]; then
+          # An empty side is not main's answer: never kept as one.
+          if [ "$CACHED" != "true" ] && [ "$PREVIEW" != "true" ] && [ "$ABSENT" != "true" ]; then
             mkdir -p "$RUNNER_TEMP/base-results"
             cp merged/base/junit.xml merged/base/gates.json "$RUNNER_TEMP/base-results/"
             # Which main this answer is, for a PR that is judged against it
@@ -2757,7 +2817,7 @@ jobs:
             cp merged/head/gates.json "$RUNNER_TEMP/timings/gates.json"
           fi
       - name: Keep main's answer for the next run (bean cis2)
-        if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true' && needs.prepare-head.outputs.preview != 'true'
+        if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true' && needs.prepare-base.outputs.absent != 'true' && needs.prepare-head.outputs.preview != 'true'
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -2912,7 +2972,9 @@ jobs:
         id: gates
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview != 'true'
         continue-on-error: true
-        run: python3 .github/scripts/layer-pr-checks/compare-gates.py merged/base/gates.json merged/head/gates.json
+        env:
+          NO_BASE: ${{ needs.prepare-base.outputs.absent == 'true' && '--no-base' || '' }}
+        run: python3 .github/scripts/layer-pr-checks/compare-gates.py $NO_BASE merged/base/gates.json merged/head/gates.json
       # The typecheck runs in the head side's prepare job; it is judged here.
       - name: Verdict
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview != 'true' && (steps.tests.outcome != 'success' || steps.gates.outcome != 'success' || needs.prepare-head.outputs.typecheck == 'failure')

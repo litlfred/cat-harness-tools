@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare two run-gates.py reports and fail on a gate the PR newly breaks.
 
-Usage: compare-gates.py <base.json> <head.json>
+Usage: compare-gates.py [--no-base] <base.json> <head.json>
 
 A gate fails the PR when it exits non-zero on head and exited 0 on base, or
 when head has a gate base did not run and it fails. A gate red on both is
@@ -18,6 +18,12 @@ read as NEW FAILURE). A gate run-gates.py skipped
 (a `skipped` reason, no `exit`) is listed as skipped and never counted; on
 base it reads as not run. Writes a Markdown summary to
 $GITHUB_STEP_SUMMARY when set.
+
+NO BASE (`--no-base`; WorldHealthOrganization/smart-base#340): main has no
+instance at all (the PR brings it in, or main is empty), so base is empty
+and judges nothing. Every gate head ran must pass outright: red is NEW, and
+so is could not determine (2), which a base that merely did not run one gate
+would excuse. Not applicable (78) and skipped stay listed and uncounted.
 
 ALWAYS GREEN (owner, 2026-11-13: "the json(ld) that is the actual KG need to
 be a part of the merge to main commits. ALWAYS need json(ld) up to date -
@@ -108,8 +114,18 @@ def base_exit(entry):
 
 
 def main():
-    base = json.load(open(sys.argv[1]))
-    head = json.load(open(sys.argv[2]))
+    args = sys.argv[1:]
+    no_base = "--no-base" in args
+    args = [a for a in args if a != "--no-base"]
+    if len(args) != 2:
+        print("usage: compare-gates.py [--no-base] <base.json> <head.json>", file=sys.stderr)
+        sys.exit(2)
+    base = json.load(open(args[0]))
+    head = json.load(open(args[1]))
+    if no_base and base:
+        # Could not determine, never a pass: the workflow said main is empty.
+        print(f"--no-base, but {args[0]} holds {len(base)} gate(s): main's side is not empty", file=sys.stderr)
+        sys.exit(2)
     rows, new, added = [], [], {}
     for name in sorted(head):
         if head[name].get("unchanged"):
@@ -145,6 +161,9 @@ def main():
                 + (f"; main exited {b}" if b not in (None, 0) else "")
             )
             new.append(name)
+        elif no_base and h == 2:
+            verdict = "NEW: could not determine (main has no instance, so nothing is excused)"
+            new.append(name)
         elif b is None and h in UNDETERMINED:
             verdict = f"{UNDETERMINED[h]}; main did not run it, so not counted"
         elif h == 2 and b in (0, 1):
@@ -172,7 +191,8 @@ def main():
         else:
             verdict = "failing on main too"
         rows.append(f"| `{name}` | {side_cell(base.get(name))} | {h} | {verdict} |")
-    lines = ["## Gates: head against main", "", "| gate | main | PR | verdict |", "|---|---|---|---|", *rows, ""]
+    title = "## Gates: the PR on its own (main has no instance)" if no_base else "## Gates: head against main"
+    lines = [title, "", "| gate | main | PR | verdict |", "|---|---|---|---|", *rows, ""]
     if new:
         lines.append(f"**{len(new)} gate(s) newly failing.** Their output tails:")
         for name in new:
