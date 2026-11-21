@@ -123,7 +123,7 @@ from gate_diagnostics import diagnostics, producer  # noqa: E402
 GRAPH_GATES = {
     "kg-audit": "bun cat-harness-tools/scripts/kg-audit.ts --instance {path}",
     "kg-export": "bun cat-harness-tools/scripts/kg-export.ts --instance {path} --out {tmp}/{instance}.jsonld",
-    "import-direction": "bun cat-harness-tools/scripts/check-import-direction.ts --gate {instance}",
+    "import-direction": "bun cat-harness-tools/scripts/check-import-direction.ts --gate {instance} --if-code",
 }
 CHECKOUT_GATES = {
     "check-tools": "bun cat-harness-tools/scripts/check-tools.ts",
