@@ -33,6 +33,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { readDeclaration, resolveDirectories, type ResolvedDirectory } from "./cat-harness.js";
+import { checkoutDirectories as resolvedCheckout } from "./harness-config.js";
 import { parse as parseYaml } from "yaml";
 import { findDeclarationFile, layerRootsIn } from "./instance-roots.js";
 import { kindAndSubclasses, type NameRule, type NodeKindEntry, type NodeKindIndex } from "./node-kind-index.js";
@@ -105,7 +106,22 @@ function checkoutDirectories(root: string, typologies: readonly string[]): Resol
     const parent = all.find((p) => p.id === d.within && p.declaredBy === d.declaredBy);
     return parent !== undefined && offCheckout(parent, seen);
   };
-  return all.filter((d) => d.graphTypologies.some((t) => typologies.includes(t)) && !offCheckout(d));
+  const own = all.filter((d) => d.graphTypologies.some((t) => typologies.includes(t)) && !offCheckout(d));
+  // The layer's own MEMBER of a subgraph a layer below it declares (core's
+  // test/attestations/ of cat-harness's attestations): the state viewer lists
+  // it, so its nodes get pages too.
+  const name = readDeclaration(root)?.name;
+  if (name === undefined) return own;
+  const have = new Set(own.map((d) => d.absPath));
+  let inherited: ResolvedDirectory[] = [];
+  try {
+    inherited = resolvedCheckout(root).filter(
+      (d) => d.member === name && d.declaredBy !== name && !have.has(d.absPath) && d.graphTypologies.some((t) => typologies.includes(t)) && !contentIsOffCheckout(d),
+    );
+  } catch {
+    inherited = [];
+  }
+  return [...own, ...inherited];
 }
 
 /** The layer's own declaration, `<instance>.json`, as an absolute path. */
