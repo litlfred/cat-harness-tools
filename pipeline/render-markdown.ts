@@ -32,6 +32,7 @@
  */
 
 import { resolveLiquidValues } from "./liquid-values";
+import { substituteValuesInMarkdown } from "./render-value";
 import { existsSync, readFileSync } from "fs";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 
@@ -222,7 +223,7 @@ export function renderBlockMarkdown(
   // so. needs _light_ styling", "make more condensed", "look at all the
   // structured assets"). Rendering only; the source text is unchanged.
   if (heading && !NUMBERED_KINDS.has(block.kind)) {
-    const prose = resolveLiquidValues(mdContent).trim();
+    const prose = substituteValuesInMarkdown(resolveLiquidValues(mdContent)).trim();
     const body = entry.dmnTable ? placeDmnTable(prose, entry.dmnTable) : prose;
     return structuredBlockMarkdown(block, heading, title, caption, body, lines);
   }
@@ -250,7 +251,7 @@ export function renderBlockMarkdown(
   // Same resolver as the LaTeX path (`liquid-values.ts`, bean kott), so the
   // site and the PDF print one number; pass-through prefixes (`site.data`)
   // are left for Jekyll / the IG Publisher.
-  const prose = resolveLiquidValues(mdContent).trim();
+  const prose = substituteValuesInMarkdown(resolveLiquidValues(mdContent)).trim();
   const body = entry.dmnTable ? placeDmnTable(prose, entry.dmnTable) : prose;
   if (body) lines.push(body);
 

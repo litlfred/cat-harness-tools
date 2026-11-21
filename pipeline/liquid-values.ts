@@ -44,7 +44,7 @@
  * @module pipeline/liquid-values
  */
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { dirname, join, relative } from "path";
 import {
   findDeclarationFile,
@@ -176,18 +176,40 @@ export function resolveKey(key: string, scope: ValueScope): Resolution & { raw?:
     return { state: "unresolved", reason: `${inst.name} declares no scalar field "${rest[0]}"` };
   }
 
-  const [dirId, entry, ...path] = rest as [string, string, ...string[]];
+  const [dirId, ...afterDir] = rest as [string, ...string[]];
   const dir = inst.directories.get(dirId);
   if (!dir) {
     return { state: "unresolved", reason: `${inst.name} declares no directory "${dirId}" (only declared directories are addressable)` };
   }
-  if (!path.length) return { state: "unresolved", reason: `"${key}" names an entry but no field inside it` };
+  // The entry may sit in a SUBDIRECTORY of the declared directory:
+  // `{{ qou.computations.qbeta.<entry>.<path> }}` reads
+  // `computations/qbeta/<entry>.witness.json` (qou bean `qou-h59j`, defect 1).
+  // Leading segments are taken as subdirectories only while each names an
+  // existing directory, and the SHALLOWEST match wins, so every flat address
+  // that resolved before resolves to the same file. Segments are already
+  // restricted to `SEG`, so no `..` or `/` can escape the declared directory.
   // A witness, a JSON entry, or a library DATASET entry (`<entry>/values.json`,
   // written by an ingest tool such as `codata-ingest`, bean uyp8).
-  const candidates = [join(dir, `${entry}.witness.json`), join(dir, `${entry}.json`), join(dir, entry, "values.json")];
-  const file = candidates.find((f) => existsSync(f));
+  const candidatesIn = (d: string, e: string) => [join(d, `${e}.witness.json`), join(d, `${e}.json`), join(d, e, "values.json")];
+  let file: string | undefined;
+  let entry = afterDir[0]!;
+  let path: string[] = [];
+  let at = dir;
+  for (let i = 0; i < afterDir.length - 1; i++) {
+    const found = candidatesIn(at, afterDir[i]!).find((f) => existsSync(f));
+    if (found) {
+      file = found;
+      entry = afterDir[i]!;
+      path = afterDir.slice(i + 1);
+      break;
+    }
+    const sub = join(at, afterDir[i]!);
+    if (!existsSync(sub) || !statSync(sub).isDirectory()) break;
+    at = sub;
+  }
   if (!file) {
-    return { state: "unresolved", reason: `no ${entry}.witness.json, ${entry}.json or ${entry}/values.json in ${relative(scope.repoRoot, dir)}` };
+    if (afterDir.length < 2) return { state: "unresolved", reason: `"${key}" names an entry but no field inside it` };
+    return { state: "unresolved", reason: `no ${entry}.witness.json, ${entry}.json or ${entry}/values.json in ${relative(scope.repoRoot, dir)} or a subdirectory named by the address` };
   }
   const doc = readJson(file);
   if (doc === undefined) return { state: "unresolved", reason: `${relative(scope.repoRoot, file)} is not valid JSON` };
