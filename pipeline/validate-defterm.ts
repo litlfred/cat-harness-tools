@@ -106,6 +106,14 @@ export interface DeftermValidationOptions {
    * `["glossary"]`.
    */
   forwardRefExemptDirs?: string[];
+  /**
+   * Block kinds whose OWN prose is exempt from `defterm-forward-ref`. A
+   * `prose` block is pure exposition (chapter overviews, section intros,
+   * transitions), and naming what the next block defines is its job. Default
+   * `["prose"]`. Owner ruling 2026-11-21 (qou thread "Turn the Lean build
+   * green on main", option "Narrow the check").
+   */
+  forwardRefExemptKinds?: string[];
 }
 
 /** Shortest phrase `defterm-forward-ref` will look for in bare prose. */
@@ -286,6 +294,7 @@ function forwardRefIssues(
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const exempt = new Set(opts.forwardRefExemptDirs ?? ["glossary"]);
+  const exemptKinds = new Set(opts.forwardRefExemptKinds ?? ["prose"]);
   const order = [...blocks.keys()];
   const pos = new Map(order.map((n, i) => [n, i]));
 
@@ -300,11 +309,16 @@ function forwardRefIssues(
   const escape = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   for (const [slug, def] of firstDef) {
     if (exempt.has(lastPathSegment(blocks.get(def.name)!.dir) ?? "")) continue;
-    const phrases = [...new Set([def.label.toLowerCase(), slug.replace(/-/g, " ").toLowerCase()])]
+    // The visible label is the term as the author wrote it; the slug is an
+    // identifier. Match the slug only when there is no label, so
+    // `:defterm[descent homomorphism]{#descent}` does not fire on every
+    // ordinary use of the word "descent".
+    const phrases = [def.label ? def.label.toLowerCase() : slug.replace(/-/g, " ").toLowerCase()]
       .filter((x) => x.length >= FORWARD_REF_MIN_PHRASE)
       .map((x) => new RegExp(`(?<![\\w-])${escape(x)}(?![\\w-])`));
     for (let i = 0; i < def.at; i++) {
       const name = order[i];
+      if (exemptKinds.has(String((blocks.get(name)!.block as { kind?: unknown }).kind))) continue;
       const usage = usageByBlock.get(name)!;
       if (usage.refs.has(slug)) {
         issues.push({
