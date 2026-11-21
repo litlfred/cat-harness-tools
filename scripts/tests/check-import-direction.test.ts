@@ -17,7 +17,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { analyse, readInstances, type ImportDirectionReport } from "../check-import-direction.ts";
+import { analyse, codelessGate, readInstances, type ImportDirectionReport } from "../check-import-direction.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 let tmp: string;
@@ -152,5 +152,21 @@ describe("check:import-direction — the cat-harness / cat-harness-tools boundar
   test("a planted cat-harness → cat-harness-tools import is wrong-direction", () => {
     const wrong = report.findings.filter((f) => f.verdict === "wrong-direction");
     expect(wrong.map((f) => `${f.file} → ${f.toInstance}`)).toEqual(["cat-harness/src/planted.ts → cat-harness-tools"]);
+  });
+});
+
+describe("check:import-direction — a gated instance with no code", () => {
+  const read = new Map([["coded", 3]]);
+  test("is refused by default: nothing was checked, which is not a pass", () => {
+    expect(codelessGate(["empty"], read, false)?.exit).toBe(2);
+  });
+  test("is not applicable with --if-code, neither a pass nor a failure", () => {
+    const r = codelessGate(["empty"], read, true);
+    expect(r?.exit).toBe(78);
+    expect(r?.message).toContain("NOT APPLICABLE");
+  });
+  test("an instance that holds code is gated as before", () => {
+    expect(codelessGate(["coded"], read, true)).toBeUndefined();
+    expect(codelessGate(["coded"], read, false)).toBeUndefined();
   });
 });
