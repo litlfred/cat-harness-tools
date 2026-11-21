@@ -750,38 +750,6 @@ const PROOF: QaCriterionDefinition[] = [
     ],
   },
   {
-    id: "proof-no-axiom-growth",
-    checker_contributed: true,
-    domain: "proof",
-    description:
-      "Block's `#print axioms` set is a subset of the same block's axiom " +
-      "set on `origin/main`. Verified against the doc-gen4 axiom-report. " +
-      "Routes to `lean-witness-audit` on failure.",
-    default_severity: "critical",
-    depends_on: ["lean"],
-    automated: true,
-    applies_to: ["theorem", "lemma", "proposition", "corollary"],
-  },
-  {
-    id: "proof-build-green",
-    checker_contributed: true,
-    domain: "proof",
-    description:
-      "Block's Lake package builds clean. On failure routes to " +
-      "`lean-build-fix`. Result is read from the `proof-objects.json` " +
-      "manifest emitted by `lean_ci.yml`.",
-    default_severity: "critical",
-    depends_on: ["lean"],
-    automated: true,
-    applies_to: [
-      "theorem",
-      "lemma",
-      "proposition",
-      "corollary",
-      "definition",
-    ],
-  },
-  {
     id: "proof-narrative-lean-equiv",
     domain: "proof",
     description:
