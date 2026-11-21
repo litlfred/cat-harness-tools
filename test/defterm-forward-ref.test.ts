@@ -7,16 +7,16 @@ import { describe, expect, test } from "bun:test";
 import type { Block } from "../schemas/types.ts";
 import { validateDefterms } from "../pipeline/validate-defterm";
 
-function blk(defines: string[] = []): Block {
-  return { kind: "remark", label: "rem:x", defines } as unknown as Block;
+function blk(defines: string[] = [], kind = "remark"): Block {
+  return { kind, label: "rem:x", defines } as unknown as Block;
 }
 
 function run(
-  entries: [string, string, string[], string][],
+  entries: [string, string, string[], string, string?][],
   readingOrder = true,
 ) {
   const m = new Map<string, { block: Block; md: string | undefined; dir?: string }>();
-  for (const [name, dir, defines, md] of entries) m.set(name, { block: blk(defines), md, dir });
+  for (const [name, dir, defines, md, kind] of entries) m.set(name, { block: blk(defines, kind), md, dir });
   return validateDefterms(m, { readingOrder }).filter((i) =>
     i.message.startsWith("defterm-forward-ref"),
   );
@@ -47,6 +47,23 @@ describe("defterm-forward-ref", () => {
       ["later", "ch2", [], "The photon again."],
     ]);
     expect(got).toEqual([]);
+  });
+
+  test("prose blocks may name what a later block defines", () => {
+    const got = run([
+      ["overview", "ch1", [], "The photon carries the interaction. :refterm[photon]", "prose"],
+      ["def-photon", "ch2", ["photon"], "A :defterm[photon] is a word."],
+    ]);
+    expect(got).toEqual([]);
+  });
+
+  test("a labelled defterm matches its label, not its slug", () => {
+    const got = run([
+      ["early", "ch1", [], "Lifting and descent are developed later."],
+      ["mid", "ch1", [], "The descent homomorphism appears here."],
+      ["def", "ch2", ["descent"], "The :defterm[descent homomorphism]{#descent} maps down."],
+    ]);
+    expect(got.map((i) => i.block)).toEqual(["mid"]);
   });
 
   test("glossary-chapter definitions are exempt", () => {
