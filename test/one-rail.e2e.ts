@@ -119,7 +119,11 @@ test.describe("the top bar is FULL WIDTH on every page (owner, 2026-10-15)", () 
     await expect.poll(async () => page.locator("#main-header.fa-page-bar").evaluate((b) => {
       const r = b.getBoundingClientRect();
       const rail = document.querySelector("nav.fa-nav")!.getBoundingClientRect().right;
-      return Math.round(r.left - rail) === 0 && Math.round(document.documentElement.clientWidth - r.right) === 0 && Math.round(r.top) === 0;
+      // Flush with the top means flush under the DRAFT banner where one is
+      // drawn (every host but the official one, so this test's): the banner
+      // publishes its height as --fa-staging-offset and pads html by it.
+      const offset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fa-staging-offset")) || 0;
+      return Math.round(r.left - rail) === 0 && Math.round(document.documentElement.clientWidth - r.right) === 0 && Math.round(r.top - offset) === 0;
     })).toBe(true);
   });
 
@@ -134,7 +138,9 @@ test.describe("the top bar is FULL WIDTH on every page (owner, 2026-10-15)", () 
     const spans = () => page.locator("#main-header.fa-page-bar").evaluate((b) => {
       const r = b.getBoundingClientRect();
       const rail = document.querySelector("nav.fa-nav")!.getBoundingClientRect().right;
-      return { start: Math.round(r.left - rail), end: Math.round(document.documentElement.clientWidth - r.right), top: Math.round(r.top), rail: Math.round(rail) };
+      // `top` is measured from the DRAFT banner's bottom, as in the test above.
+      const offset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fa-staging-offset")) || 0;
+      return { start: Math.round(r.left - rail), end: Math.round(document.documentElement.clientWidth - r.right), top: Math.round(r.top - offset), rail: Math.round(rail) };
     });
     await page.mouse.move(20, 400);
     await expect.poll(async () => { const s = await spans(); return s.rail > 56 ? { ...s, rail: "open" } : s; }).toEqual({ start: 0, end: 0, top: 0, rail: "open" });
