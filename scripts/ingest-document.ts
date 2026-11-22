@@ -1061,6 +1061,28 @@ function planForPdf(pdf: string, p: Probe, lib: string, langs: readonly string[]
       steps: [],
     };
   }
+  // A scan with a usable outline. Publishers' scans (Springer's, for one)
+  // carry a single bookmark naming the article over pages with no text layer
+  // at all. `pagesToOcr` cannot see them: `_text_quality.page_problem` passes
+  // a blank page on purpose, because most blank pages are blank. Without this
+  // the outline branch below won, `pdf-structure` ran without `--ocr`, and
+  // `mcmullen-braids-hodge-2013` (Invent. Math. 1988, 14 scanned pages) was
+  // filed as "embedded" with every section "(no text on this page)" although
+  // its OCR was on disk. With `--ocr`, `pdf-structure` reads the whole document
+  // from OCR (`text_is_unusable`) and keeps the outline.
+  if ((p.outlineUsable ?? 0) > 0 && p.chars < OCR_THRESHOLD_CHARS) {
+    return {
+      rung: "pdf-ocr+pdf-structure",
+      why:
+        `${p.outlineUsable} of ${p.outline} outline entries can carry a chapter, but only ${p.chars} characters ` +
+        `of text layer over the first pages (< ${OCR_THRESHOLD_CHARS}) — a scan with a bookmark. OCR reads the ` +
+        `pages and pdf-structure keeps the outline`,
+      steps: [
+        ["python3", pyHelper("pdf-ocr.py"), "-o", lib, pdf],
+        ["python3", pyHelper("pdf-structure.py"), "-o", lib, "--ocr", pdf],
+      ],
+    };
+  }
   const ocrPages = pagesToOcr(p);
   if (ocrPages && ((p.outlineUsable ?? 0) > 0 || !ocrPages.most)) {
     return {
