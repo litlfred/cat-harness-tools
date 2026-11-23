@@ -60,7 +60,7 @@ import { igProcessPage, PRESENT_SEGMENTS, presentationOf, renderPresentationPage
 import { PRESENT_ASSETS } from "./present-assets.ts";
 import { moduleSlots, scheduleFor, scheduleGlanceHtml, scheduleHtml, scheduleTitle } from "./schedule.ts";
 import { canvasPartsOf } from "./canvas-form.ts";
-import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
+import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, processActorsLine, type StepPageLinks } from "./dak-links.ts";
 import { imageSize, type ImageSize } from "./image-size.ts";
 
 export const TOOL_ID = "journeys-viewer";
@@ -571,11 +571,14 @@ let figureSeq = 0;
  * links come too, and without one the drawing is highlighted only. The
  * scroll box takes keyboard focus, so a wide drawing scrolls from the keys.
  *
+ * `actors` is the drawing's actors line (`processActorsLine`), carried in
+ * the caption under the drawing; empty for none.
+ *
  * The XML prologue and doctype are dropped. Comments are left as they are:
  * they are harmless inside inline SVG, and a one-pass strip could JOIN the
  * pieces of a nested one (`<!<!---->--`) into a `<!--` that swallows the page.
  */
-export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string, panel?: string): string {
+export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string, panel?: string, actors = ""): string {
   const id = `jv-fig-${++figureSeq}`;
   const body = svg
     .replace(/<\?xml[^>]*\?>/g, "")
@@ -583,7 +586,7 @@ export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, ca
     .trim();
   const hl = [...new Set(tasks ?? [])];
   const attrs = `${panel ? ` data-panel="${e(panel)}"` : ""}${hl.length ? ` data-pt-highlight="${e(hl.join(" "))}"` : ""}`;
-  return `<figure class="bpmn-figure pt-diagram jv-bpmn" id="${id}"${attrs}><div class="jv-bpmn-scroll" tabindex="0" role="group" aria-label="Process drawing, scrolls with the arrow keys">${body}</div><figcaption>${caption}</figcaption></figure>`;
+  return `<figure class="bpmn-figure pt-diagram jv-bpmn" id="${id}"${attrs}><div class="jv-bpmn-scroll" tabindex="0" role="group" aria-label="Process drawing, scrolls with the arrow keys">${body}</div><figcaption>${caption}${actors}</figcaption></figure>`;
 }
 
 /** The task panel's client and styles, for a page that carries a {@link bpmnFigure}; nothing for one that does not. */
@@ -761,7 +764,8 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
       const page = links.processesPage?.(j.instance);
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted: ${r.tasks.map((t) => `<code>${e(t)}</code>`).join(" ")}` : " · the whole process"}${page ? ` · <a href="${e(page)}">processes viewer</a>` : ""}`;
       const panel = links.processPanel?.(j.instance, r.process);
-      return d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite)) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
+      const actors = processActorsLine(corpus, igOf(corpus, j.instance), j.instance, r.process, toSite);
+      return d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite), actors) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
     })
     .join("\n");
   const prev = steps[i - 1];
