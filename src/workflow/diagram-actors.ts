@@ -16,7 +16,7 @@
  * `laneRoleRef` (`schemas/process/role-graph.ts`) — `partitionElementRef`
  * first, the legacy `<bootstrap.processes:role ref>` only when it is absent.
  * The ref names a harness Role or, in a DAK, the ActorDefinition a persona
- * plays (WHO smart-base#340); where its page is, is the caller's
+ * plays; where its page is, is the caller's
  * {@link ActorResolver}, since each site publishes those pages differently.
  *
  * - A lane bound to something with a page is linked to that page.
