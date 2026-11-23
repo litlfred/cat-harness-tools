@@ -125,7 +125,7 @@ const PASSING_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
  * One commit's verdict from its combined status and its check runs.
  *
  * NOT main's verdict, and no longer what {@link githubApi} judges a candidate
- * by (2026-11-23, litlfred/smart-base#454): a commit on main carries the
+ * by (2026-11-23, a downstream site's re-pin): a commit on main carries the
  * check runs of every workflow recorded against it, among them superseded
  * `workflow_run` runs of "Merge guard" that end `cancelled`, so three
  * cat-harness-tools commits whose push run of "PR checks" was green read
@@ -255,7 +255,7 @@ export function lockPinsOf(lock: unknown): Record<string, string> {
  *
  * `current` (the pin now) bounds the search: nothing at or older than the
  * current pin is ever a candidate (never backwards, 2026-11-23,
- * litlfred/smart-base#454, where who-iris went from bc7e22c3 back to its
+ * a downstream site's re-pin, where a content layer went from bc7e22c3 back to its
  * ancestor 1ae63149). When `current` is among the branch's commits, the
  * search stops there and `atCurrent` is set; a pin older than the window, or
  * off the branch, is judged by the caller ({@link planRepin}).
@@ -443,7 +443,7 @@ export async function planRepin(mounts: readonly RemoteMount[], api: GitHubApi, 
       });
       continue;
     }
-    // Never BACKWARDS (litlfred/smart-base#454). Within the window the search
+    // Never BACKWARDS (2026-11-23). Within the window the search
     // already stopped at the pin; a pin older than the window, or off the
     // branch, is asked about directly.
     if (!found.atCurrent && found.candidate.sha !== m.ref) {

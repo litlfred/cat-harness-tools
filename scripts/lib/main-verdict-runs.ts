@@ -7,7 +7,7 @@
  * @graphNode none — a pure reduction of GitHub workflow runs
  *
  * Why push runs and not every check on the commit (2026-11-23,
- * litlfred/smart-base#454): a commit on main carries check runs from many
+ * a downstream site's standing re-pin): a commit on main carries check runs from many
  * workflows that are not main's verdict. `workflow_run` and `issue_comment`
  * runs of "Merge guard" are recorded against main's head sha, and a
  * superseded one ends `cancelled`. Reading every check run called three

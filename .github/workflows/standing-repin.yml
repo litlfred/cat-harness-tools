@@ -215,7 +215,7 @@ jobs:
           # Never drop a commit someone else pushed to the repin branch (an
           # agent's fix on the open re-pin PR). A re-dispatch rebuilt the
           # branch from main and force-pushed it, and an agent's commit was
-          # lost (2026-11-23, litlfred/smart-base#454). Commits this workflow
+          # lost (2026-11-23, a downstream site's re-pin). Commits this workflow
           # made are the ones whose subject starts "Standing repin:"; any
           # other commit on the branch, past main, is someone's work. Then the
           # re-pin goes to a FRESH branch and PR, and the old PR is left to

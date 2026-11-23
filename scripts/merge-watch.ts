@@ -497,8 +497,8 @@ export function supersededBy(
 
 /**
  * The pins a PR moves BACKWARDS: each change whose new sha is a strict
- * ancestor of the one it replaces (litlfred/smart-base#454, where a standing
- * re-pin PR took who-iris and cat-harness-tools back to ancestors of main's
+ * ancestor of the one it replaces (2026-11-23: a downstream site's standing
+ * re-pin PR took a content layer and cat-harness-tools back to ancestors of main's
  * pins). `isAncestor(repo, a, b)` is `undefined` when it could not be read,
  * which never flags. Pure.
  */
