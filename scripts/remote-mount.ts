@@ -201,6 +201,7 @@ import { upstreamConcernMembers, upstreamDirectories, withKindsOf, type Upstream
 import { run as syncWorkflowPins } from "./workflow-pins.ts";
 import { afterMountHealth } from "./lib/repin-health.ts";
 import { ConcernGroupCodeSchema } from "../schemas/kg/concern-groups.ts";
+import { gateOwnInstances } from "./lib/gate-own.ts";
 
 /**
  * Move every state mount under `target` (per `stateMountedDirs`) out of the
@@ -2112,7 +2113,15 @@ export interface CheckResult {
  * must be the lock's; every locked directory must be on disk and hash to its
  * digest; every locked declaration must be byte-identical.
  */
-export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
+/**
+ * `excuse`: instances whose pinned bytes are NOT judged. A layer's PR checks
+ * swap the caller's own instance in at the PR's head over main's pinned mount
+ * (layer-pr-checks, the as-mounted step), so every PR that changes its own
+ * instance read that mount as modified (separation:cutover's `mounts` row,
+ * 2026-11-19). Passed only by `--excuse-own`, which takes the run's own layers
+ * from `CAT_GATE_OWN_INSTANCES`; every other instance is judged as before.
+ */
+export function checkRemote(opts: { instanceRoot?: string; excuse?: ReadonlySet<string> } = {}): CheckResult {
   let ds: ReturnType<typeof downstreamOf>;
   try {
     ds = downstreamOf(opts);
@@ -2179,6 +2188,15 @@ export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
       continue;
     }
     const basis = inst.trust ? trust.detail : `${trust.detail} (no basis recorded in the lock; re-derived — re-run \`bun run cat mount:remote\` to record it)`;
+    if (opts.excuse?.has(inst.instance)) {
+      outcomes.push({
+        instance: inst.instance,
+        state: mountedState(trust),
+        path: inst.path,
+        detail: `this run's own instance, at the PR's head in place of its pin (CAT_GATE_OWN_INSTANCES); its pinned bytes are not judged here`,
+      });
+      continue;
+    }
     try {
       const decl = join(ds.instanceRoot, inst.path, inst.declaration.file);
       // A hydrated mount records its declaration and lays none down (G2):
@@ -2447,7 +2465,7 @@ function installMissingDependencies(root: string, outcomes: readonly InstanceOut
  * declaration cannot be read is could-not-determine for the whole fan-out:
  * it may be the one that declares mounts.
  */
-export function remoteFanOut(checkout: string, opts: { check?: boolean; plan?: boolean; urlFor?: UrlFor; purpose?: "staging" | "mount"; install?: InstallMode | false; discardEdits?: boolean } = {}): { state: CheckResult["state"]; text: string } {
+export function remoteFanOut(checkout: string, opts: { check?: boolean; plan?: boolean; urlFor?: UrlFor; purpose?: "staging" | "mount"; install?: InstallMode | false; discardEdits?: boolean; excuse?: ReadonlySet<string> } = {}): { state: CheckResult["state"]; text: string } {
   const { roots, unreadable } = declaringInstances(checkout);
   const parts: string[] = [];
   const states: CheckResult["state"][] = [];
@@ -2457,7 +2475,7 @@ export function remoteFanOut(checkout: string, opts: { check?: boolean; plan?: b
   }
   for (const root of roots) {
     if (opts.check) {
-      const r = checkRemote({ instanceRoot: root });
+      const r = checkRemote({ instanceRoot: root, excuse: opts.excuse });
       states.push(r.state);
       parts.push(reportOutcomes(`Remote mounts — ${root}`, r.state, r.reason, r.outcomes));
     } else if (opts.plan) {
@@ -2592,6 +2610,7 @@ export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new M
   ["--no-layers-publish", "switch"],
   ["--no-health", "switch"],
   ["--fresh", "switch"],
+  ["--excuse-own", "switch"],
   ["--whole", "switch"],
   ["--instance", "value"],
   ["--seed", "value"],
@@ -2625,6 +2644,11 @@ export function usageText(): string {
 }
 
 /** `--no-install` lays bytes only; `--install-all` adds devDependencies; default `production`. */
+/** `--excuse-own` (with `--check`): the run's own layers, whose pinned bytes are not judged ({@link checkRemote}). */
+function excuseOf(argv: string[]): ReadonlySet<string> | undefined {
+  return argv.includes("--excuse-own") && argv.includes("--check") ? gateOwnInstances() : undefined;
+}
+
 function installOf(argv: string[]): InstallMode | false {
   return argv.includes("--no-install") ? false : argv.includes("--install-all") ? "all" : "production";
 }
@@ -2691,13 +2715,13 @@ if (import.meta.main) {
     const plan = argv.includes("--plan");
     const mounting = !argv.includes("--check") && !argv.includes("--staging") && !plan;
     const before = lockBytes(root);
-    const r = remoteFanOut(root, { check: argv.includes("--check"), plan, purpose: argv.includes("--staging") ? "staging" : "mount", install: installOf(argv), discardEdits: argv.includes("--fresh") });
+    const r = remoteFanOut(root, { check: argv.includes("--check"), plan, purpose: argv.includes("--staging") ? "staging" : "mount", install: installOf(argv), discardEdits: argv.includes("--fresh"), excuse: excuseOf(argv) });
     console.log(r.text);
     process.exit(mounting ? afterMount(root, before, argv, exitCode(r.state)) : exitCode(r.state));
   }
   const instanceRoot = resolve(argv[at + 1]!);
   if (argv.includes("--check")) {
-    const r = checkRemote({ instanceRoot });
+    const r = checkRemote({ instanceRoot, excuse: excuseOf(argv) });
     console.log(argv.includes("--json") ? JSON.stringify(r, null, 2) : reportOutcomes("Remote mounts — check", r.state, r.reason, r.outcomes));
     process.exit(exitCode(r.state));
   }
