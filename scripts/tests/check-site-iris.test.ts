@@ -3,6 +3,7 @@
  * Every case is a temp site tree: the check never fetches.
  */
 import { afterAll, describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -141,5 +142,25 @@ describe("sampling", () => {
     for (let i = 0; i < 20; i++) files[`n${String(i).padStart(2, "0")}.jsonld`] = { "@id": `n${String(i).padStart(2, "0")}.jsonld` };
     const r = checkSiteIris(site(files), BASE, 4);
     expect(r).toMatchObject({ documents: 20, sampled: 4, checked: 4, findings: [] });
+  });
+});
+
+// A layer-mode gate run over a checkout calls it with no built site (2026-11-23).
+describe("the CLI with no built site", () => {
+  const script = join(import.meta.dir, "..", "check-site-iris.ts");
+  const run = (...args: string[]) => spawnSync(process.execPath, [script, ...args], { encoding: "utf-8" });
+
+  test("no --site is not applicable (78), not a usage error", () => {
+    const r = run();
+    expect(r.status).toBe(78);
+    expect(r.stdout).toContain("NOT APPLICABLE");
+  });
+
+  test("a --site that does not exist is not applicable (78)", () => {
+    expect(run("--site", join(tmpdir(), "no-such-site-iris-dir"), "--base", BASE).status).toBe(78);
+  });
+
+  test("a built site with no --base is still a usage error (2)", () => {
+    expect(run("--site", site({ "a.html": "" })).status).toBe(2);
   });
 });

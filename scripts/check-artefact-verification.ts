@@ -35,11 +35,12 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { TOOLS_ROOT } from "./lib/roots.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { findDeclarationFile } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
 import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
 
@@ -150,6 +151,14 @@ interface Declaration {
    * needs none, or what checks its sidecar instead. Bean `v556`.
    */
   unchecked?: Record<string, string>;
+  /**
+   * check name -> the layers that declare it, for a check NO layer of the
+   * harness index declares: a content layer's own script, gated by that
+   * layer's layer-mode run, where it is composed into the index. Where none of
+   * them is mounted the check is absent, not stale ({@link report}'s
+   * `mounted`). Unlisted, a check is the index's, and absent means stale.
+   */
+  declaredBy?: Record<string, string[]>;
 }
 
 function readDeclaration(): Declaration {
@@ -174,6 +183,12 @@ export interface Report {
    * `partialTable`). Printed, never counted as a pass or a failure.
    */
   excusedStale: string[];
+  /**
+   * Entries absent here because none of the layers `declaredBy` names is
+   * mounted: their declarer's own layer-mode run judges them. Printed, never
+   * counted as a pass or a failure.
+   */
+  notMounted: string[];
 }
 
 /**
@@ -185,10 +200,27 @@ export interface Report {
  * check missing here may still be the index's; only `undeclared` (a check
  * present here with no declaration) is decidable. Unset, judged as before.
  */
-export function report(checks: ArtefactCheck[], d: Declaration, unchecked: string[] = [], partialTable?: string): Report {
+export function report(
+  checks: ArtefactCheck[],
+  d: Declaration,
+  unchecked: string[] = [],
+  partialTable?: string,
+  mounted?: ReadonlySet<string>,
+): Report {
   const names = new Set(checks.map((c) => c.check));
   const declared = new Set([...Object.keys(d.verified), ...Object.keys(d.none)]);
-  const stale = [...declared].filter((n) => !names.has(n));
+  const absent = [...declared].filter((n) => !names.has(n));
+  // A check only content layers declare is absent wherever none of them is
+  // mounted: the composed harness index mounts one caller at a time
+  // (a FHIR IG's no-base layer-mode run, 2026-11-23: check:figures,
+  // check:as-drawn and check:l1-coverage read stale). Unknown mounts excuse
+  // nothing.
+  const elsewhere = (n: string): boolean => {
+    const by = d.declaredBy?.[n];
+    return mounted !== undefined && by !== undefined && by.length > 0 && !by.some((l) => mounted.has(l));
+  };
+  const notMounted = absent.filter(elsewhere);
+  const stale = absent.filter((n) => !elsewhere(n));
   const uncheckedStale = Object.keys(d.unchecked ?? {}).filter((g) => !unchecked.includes(g));
   const partial = partialTable !== undefined;
   return {
@@ -201,7 +233,18 @@ export function report(checks: ArtefactCheck[], d: Declaration, unchecked: strin
     uncheckedUndeclared: unchecked.filter((g) => !Object.hasOwn(d.unchecked ?? {}, g)),
     uncheckedStale: partial ? [] : uncheckedStale,
     excusedStale: partial ? [...stale, ...uncheckedStale] : [],
+    notMounted,
   };
+}
+
+/** The names of the layers mounted at `root`: each layer root's declaration file, less `.json`. */
+export function mountedLayers(root: string): Set<string> {
+  const out = new Set<string>();
+  for (const dir of layerRootsIn(root)) {
+    const f = findDeclarationFile(dir);
+    if (f !== undefined) out.add(basename(f).replace(/\.json$/, ""));
+  }
+  return out;
 }
 
 /**
@@ -267,6 +310,7 @@ if (import.meta.main) {
           verified: existing.verified,
           none,
           unchecked,
+          ...(existing.declaredBy ? { declaredBy: existing.declaredBy } : {}),
         },
         null,
         2,
@@ -276,7 +320,7 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  const r = report(checks, d, generators, partialScriptTable(ROOT));
+  const r = report(checks, d, generators, partialScriptTable(ROOT), mountedLayers(ROOT));
   const noParse = checks.filter((c) => c.classification === "no-parsing").length;
   console.log(
     `Artefact verification (${checks.length} generated-artefact check(s); ` +
@@ -296,6 +340,9 @@ if (import.meta.main) {
   for (const n of r.stale) {
     console.log(`  ✗ stale declaration, remove it: ${n}`);
     bad = true;
+  }
+  for (const n of r.notMounted) {
+    console.log(`  · ${n}: declared by ${(d.declaredBy?.[n] ?? []).join(", ")}, none mounted here; absent, not stale — its declarer's own run judges it`);
   }
   for (const n of r.excusedStale) {
     console.log(`  · ${n}: stale-or-not is not applicable here — ${partialScriptTable(ROOT)}`);
