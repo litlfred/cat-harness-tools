@@ -287,3 +287,71 @@ describe("standing repin creates the needs-repin label where the repository has 
     expect(r.code).not.toBe(0);
   });
 });
+
+/**
+ * A re-dispatch never drops a commit someone else pushed to the repin branch
+ * (2026-11-23, litlfred/smart-base#454: the re-pin rebuilt the branch from
+ * main and force-pushed it over an agent's commit). Real git, a bare remote,
+ * and the open PR (#7) on `repin/standing-2026-11-01`.
+ */
+describe("standing repin never overwrites someone else's commit on the repin branch (smart-base#454)", () => {
+  const BRANCH = "repin/standing-2026-11-01";
+  function setup(branchCommits: Array<{ subject: string; file: string; body: string }>): { remote: string; work: string; before: string } {
+    const root = mkdtempSync(join(tmpdir(), "standing-repin-lease-"));
+    const remote = join(root, "remote.git");
+    const work = join(root, "work");
+    git(root, "init", "-q", "--bare", "-b", "main", remote);
+    git(root, "init", "-q", "-b", "main", work);
+    writeFileSync(join(work, "index.lock.json"), '{"pin":"a"}\n');
+    git(work, "add", "-A");
+    git(work, "commit", "-q", "-m", "base");
+    git(work, "remote", "add", "origin", remote);
+    git(work, "push", "-q", "origin", "main");
+    git(work, "checkout", "-q", "-b", BRANCH);
+    for (const c of branchCommits) {
+      writeFileSync(join(work, c.file), c.body);
+      git(work, "add", "-A");
+      git(work, "commit", "-q", "-m", c.subject);
+    }
+    git(work, "push", "-q", "origin", BRANCH);
+    const before = git(work, "rev-parse", "HEAD");
+    git(work, "checkout", "-q", "main");
+    git(work, "branch", "-q", "-D", BRANCH);
+    // The re-pin's new change, on main as the workflow checks it out.
+    writeFileSync(join(work, "index.lock.json"), '{"pin":"c"}\n');
+    return { remote, work, before };
+  }
+
+  test("an agent's commit on the open repin branch: the branch is left as it is, and the re-pin goes to a fresh branch and PR", () => {
+    const { remote, work, before } = setup([
+      { subject: "Standing repin: index.lock.json", file: "index.lock.json", body: '{"pin":"b"}\n' },
+      { subject: "Fix the site for the new pin", file: "fix.txt", body: "agent's fix\n" },
+    ]);
+    const r = runStep("workflow_dispatch", 7, false, undefined, undefined, undefined, work);
+    expect(r.code).toBe(0);
+    expect(git(remote, "rev-parse", BRANCH)).toBe(before);
+    expect(git(remote, "show", `${BRANCH}:fix.txt`)).toBe("agent's fix");
+    const fresh = git(remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/repin/").split("\n").filter((b) => b !== BRANCH);
+    expect(fresh).toHaveLength(1);
+    expect(git(remote, "show", `${fresh[0]}:index.lock.json`)).toBe('{"pin":"c"}');
+    expect(r.calls.some((c) => c.startsWith(`gh pr create --base main --head ${fresh[0]}`))).toBe(true);
+    expect(r.calls.some((c) => c.startsWith("gh pr edit 7"))).toBe(false);
+    expect(r.summary).toContain("carries commits this workflow did not make");
+    expect(r.summary).toContain("Fix the site for the new pin");
+  });
+
+  test("a branch holding only this workflow's own commits is updated in place, as before", () => {
+    const { remote, work, before } = setup([{ subject: "Standing repin: index.lock.json", file: "index.lock.json", body: '{"pin":"b"}\n' }]);
+    const r = runStep("workflow_dispatch", 7, false, undefined, undefined, undefined, work);
+    expect(r.code).toBe(0);
+    expect(git(remote, "rev-parse", BRANCH)).not.toBe(before);
+    expect(git(remote, "show", `${BRANCH}:index.lock.json`)).toBe('{"pin":"c"}');
+    expect(git(remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/repin/")).toBe(BRANCH);
+    expect(r.calls.some((c) => c.startsWith("gh pr edit 7 --title"))).toBe(true);
+  });
+
+  test("every push is a lease on the branch as it was read, never a bare --force", () => {
+    expect(step().run).not.toMatch(/git push -q --force /);
+    expect(step().run).toContain('lease="--force-with-lease=refs/heads/$branch:$old"');
+  });
+});
