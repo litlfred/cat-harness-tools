@@ -115,6 +115,8 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+import { pushRunsVerdict } from "./lib/main-verdict-runs.ts";
+
 export interface CheckRun {
   id: number;
   name: string;
@@ -358,23 +360,21 @@ export interface MainReading {
   verdict: string;
 }
 
-/** The verdict of the newest main push: every workflow's latest run on that SHA. */
+/**
+ * The verdict of the newest main push: every workflow's latest push run on
+ * that SHA, reduced by `pushRunsVerdict` — the same reading the standing
+ * re-pin judges a candidate commit by, so the two never disagree about main
+ * (a cancelled run is no verdict, never red).
+ */
 export function mainReading(pushRuns: readonly WorkflowRun[]): MainReading {
   const withSha = pushRuns.filter((r) => r.head_sha);
   if (withSha.length === 0) return { sha: null, verdict: "pending: no main push run" };
   const newest = [...withSha].sort((a, b) => Date.parse(b.created_at ?? "") - Date.parse(a.created_at ?? "") || b.id - a.id)[0];
   const sha = newest.head_sha ?? null;
-  const latest = new Map<number, WorkflowRun>();
-  for (const r of withSha.filter((x) => x.head_sha === sha)) {
-    const had = latest.get(r.workflow_id);
-    if (!had || r.id > had.id) latest.set(r.workflow_id, r);
-  }
-  const runs = [...latest.values()];
-  const name = (r: WorkflowRun) => r.name ?? String(r.id);
-  const red = runs.filter((r) => !busy(r) && !PASSING.has(r.conclusion ?? "")).map(name);
-  if (red.length > 0) return { sha, verdict: `red: ${red.join(", ")}` };
-  const going = runs.filter(busy).map(name);
-  if (going.length > 0) return { sha, verdict: `pending: ${going.join(", ")}` };
+  const v = pushRunsVerdict(withSha, sha ?? undefined);
+  if (v.verdict === "red") return { sha, verdict: `red: ${v.red.join(", ")}` };
+  if (v.verdict === "pending") return { sha, verdict: `pending: ${v.pending.join(", ")}` };
+  if (v.verdict === "none") return { sha, verdict: "pending: every push run on it was cancelled" };
   return { sha, verdict: "green" };
 }
 
@@ -493,6 +493,20 @@ export function supersededBy(
     if (covered && further) return o.number;
   }
   return undefined;
+}
+
+/**
+ * The pins a PR moves BACKWARDS: each change whose new sha is a strict
+ * ancestor of the one it replaces (litlfred/smart-base#454, where a standing
+ * re-pin PR took who-iris and cat-harness-tools back to ancestors of main's
+ * pins). `isAncestor(repo, a, b)` is `undefined` when it could not be read,
+ * which never flags. Pure.
+ */
+export function backwardPins(
+  pinChanges: readonly PinChange[],
+  isAncestor: (repository: string, a: string, b: string) => boolean | undefined,
+): PinChange[] {
+  return pinChanges.filter((p) => p.from !== null && p.from !== p.sha && isAncestor(repoSlug(p.repository), p.sha, p.from) === true);
 }
 
 // ── Runner relief ───────────────────────────────────────────────────────
@@ -772,6 +786,9 @@ export function watchRepo(api: GitHub, repo: string, opts: Options = DEFAULT_OPT
   for (const row of prs) {
     const mine = pinning.find((p) => p.number === row.number);
     if (!mine) continue;
+    for (const p of backwardPins(mine.pinChanges, isAncestor)) {
+      row.flags.push(`moves ${p.instance} BACKWARDS (${p.sha.slice(0, 10)} is an ancestor of ${p.from!.slice(0, 10)})`);
+    }
     const by = supersededBy(mine, pinning, isAncestor);
     if (by !== undefined) {
       const others = (files.get(row.number) ?? []).filter((f) => !isLockFile(f)).length;

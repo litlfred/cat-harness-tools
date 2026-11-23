@@ -26,8 +26,11 @@
  * 2. Resolves the followed branch through {@link GitHubApi} — the ONLY place
  *    this script reaches the network, so tests stub it. Without `require`, the
  *    candidate is the branch head; with `require: "green"`, the newest of the
- *    last `--depth` commits whose own combined status and check runs are green
- *    ({@link verdictOf}). None green: that layer does not move.
+ *    last `--depth` commits whose push runs are green — main's verdict, as the
+ *    merge manager reads it (`lib/main-verdict-runs.ts`), not every check run
+ *    on the commit. None green: that layer does not move.
+ * 2a. Never backwards: the search stops at the current pin, and a candidate
+ *    at or behind it ({@link movesBackwards}) holds the pin.
  * 3. Asks `standingCovers` (the harness's pure coverage decision) whether the
  *    rule covers the move. Not covered: reported, not moved.
  * 3a. The cascade ({@link alignToHeldPins}): a layer below the harness
@@ -67,6 +70,7 @@ import { contentIsOffCheckout, type SubgraphSource } from "../schemas/kg/subgrap
 import { standingCovers, standingGrantOf, type StandingCandidate, type StandingConsent } from "../schemas/kg/mount-trust.js";
 import type { RemoteMount } from "../schemas/kg/remote-mount.js";
 import { readLockFile, repositoryOwner, resolveLockJson } from "../schemas/kg/repo-owner.ts";
+import { pushRunsVerdict, type PushRun } from "./lib/main-verdict-runs.ts";
 
 // ── The network, behind one seam ────────────────────────────────────────────
 
@@ -76,7 +80,12 @@ export type CommitVerdict = NonNullable<StandingCandidate["verdict"]>;
 export interface GitHubApi {
   /** The last `limit` commits of `branch` in `repository` (`owner/repo`), NEWEST FIRST. */
   branchCommits(repository: string, branch: string, limit: number): Promise<string[]>;
-  /** The commit's own combined status and check runs, reduced by {@link verdictOf}. */
+  /**
+   * Main's verdict on the commit: its PUSH workflow runs, reduced by
+   * `pushRunsVerdict` (the reading the merge manager uses); a repository
+   * with no push run on it falls back to its combined status. Never every
+   * check run on the commit: see {@link verdictOf}.
+   */
   commitVerdict(repository: string, sha: string): Promise<CommitVerdict>;
   /**
    * The pins `repository`'s own `index.lock.json` holds at `sha`, as
@@ -114,6 +123,15 @@ const PASSING_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
 
 /**
  * One commit's verdict from its combined status and its check runs.
+ *
+ * NOT main's verdict, and no longer what {@link githubApi} judges a candidate
+ * by (2026-11-23, litlfred/smart-base#454): a commit on main carries the
+ * check runs of every workflow recorded against it, among them superseded
+ * `workflow_run` runs of "Merge guard" that end `cancelled`, so three
+ * cat-harness-tools commits whose push run of "PR checks" was green read
+ * `red` here and the re-pin moved the pin backwards past them. The real API
+ * reads the push runs (`pushRunsVerdict`); this stays for the fallback (a
+ * combined status alone) and for its callers.
  * `green` only when at least ONE signal exists and every one passed — a
  * commit nothing checked is `none`, never green. Any failure is `red`; any
  * signal not yet concluded is `pending`.
@@ -144,11 +162,11 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
       return xs.map((x) => x.sha);
     },
     async commitVerdict(repository, sha) {
-      const [status, runs] = await Promise.all([
-        get<RawStatus>(`/repos/${repo(repository)}/commits/${sha}/status`),
-        get<{ check_runs: RawCheckRun[] }>(`/repos/${repo(repository)}/commits/${sha}/check-runs?per_page=100`),
-      ]);
-      return verdictOf(status, runs.check_runs);
+      const runs = await get<{ workflow_runs: PushRun[] }>(`/repos/${repo(repository)}/actions/runs?head_sha=${sha}&event=push&per_page=100`);
+      const v = pushRunsVerdict(runs.workflow_runs, sha).verdict;
+      if (v !== "none") return v;
+      // No push run gives a verdict: an external CI's combined status, if any.
+      return verdictOf(await get<RawStatus>(`/repos/${repo(repository)}/commits/${sha}/status`), []);
     },
     async compareCommits(repository, base, head) {
       return (await get<{ status: string }>(`/repos/${repo(repository)}/compare/${base}...${head}`)).status;
@@ -234,17 +252,55 @@ export function lockPinsOf(lock: unknown): Record<string, string> {
  * The candidate a rule would pin: the branch head, or — `require: "green"` —
  * the newest of the last `depth` commits whose verdict is green. `undefined`
  * when the rule requires green and none of them is.
+ *
+ * `current` (the pin now) bounds the search: nothing at or older than the
+ * current pin is ever a candidate (never backwards, 2026-11-23,
+ * litlfred/smart-base#454, where who-iris went from bc7e22c3 back to its
+ * ancestor 1ae63149). When `current` is among the branch's commits, the
+ * search stops there and `atCurrent` is set; a pin older than the window, or
+ * off the branch, is judged by the caller ({@link planRepin}).
+ *
+ * A commit with no verdict yet that is newer than a finished one (green or
+ * red) is reported `pending`, never `none`: its run has not finished.
  */
-export async function candidateFor(api: GitHubApi, repository: string, rule: StandingConsent, depth = 30): Promise<{ candidate?: StandingCandidate; looked: Array<{ sha: string; verdict: CommitVerdict }> }> {
+export async function candidateFor(
+  api: GitHubApi,
+  repository: string,
+  rule: StandingConsent,
+  depth = 30,
+  current?: string,
+): Promise<{ candidate?: StandingCandidate; looked: Array<{ sha: string; verdict: CommitVerdict }>; atCurrent?: boolean }> {
   const shas = await api.branchCommits(repository, rule.follows, rule.require === "green" ? depth : 1);
   const looked: Array<{ sha: string; verdict: CommitVerdict }> = [];
   if (rule.require !== "green") return { candidate: shas[0] ? { branch: rule.follows, sha: shas[0] } : undefined, looked };
-  for (const sha of shas.slice(0, depth)) {
+  const stop = current === undefined ? -1 : shas.indexOf(current);
+  const window = shas.slice(0, stop >= 0 ? stop : depth);
+  let candidate: StandingCandidate | undefined;
+  for (const sha of window) {
     const verdict = await api.commitVerdict(repository, sha);
     looked.push({ sha, verdict });
-    if (verdict === "green") return { candidate: { branch: rule.follows, sha, verdict }, looked };
+    if (verdict === "green") {
+      candidate = { branch: rule.follows, sha, verdict };
+      break;
+    }
   }
-  return { candidate: undefined, looked };
+  const lastFinished = looked.map((l) => l.verdict === "green" || l.verdict === "red").lastIndexOf(true);
+  const shown = looked.map((l, i) => (l.verdict === "none" && i < lastFinished ? { ...l, verdict: "pending" as const } : l));
+  return { candidate, looked: shown, ...(stop >= 0 ? { atCurrent: true } : {}) };
+}
+
+/**
+ * Whether moving a pin from `from` to `to` would go BACKWARDS or nowhere:
+ * `to` is `from` or one of its ancestors. Asked through
+ * `api.compareCommits` (GitHub's `base...head` status: `behind` and
+ * `identical` are backwards or nowhere). `undefined` when it cannot be
+ * asked; a failure throws.
+ */
+export async function movesBackwards(api: GitHubApi, repository: string, from: string, to: string): Promise<boolean | undefined> {
+  if (from === to) return true;
+  if (!api.compareCommits) return undefined;
+  const rel = await api.compareCommits(repository, from, to);
+  return rel === "behind" || rel === "identical";
 }
 
 // ── The plan ─────────────────────────────────────────────────────────────────
@@ -367,17 +423,41 @@ export async function planRepin(mounts: readonly RemoteMount[], api: GitHubApi, 
     if (!rule) continue;
     let found: Awaited<ReturnType<typeof candidateFor>>;
     try {
-      found = await candidateFor(api, m.repository, rule, depth);
+      found = await candidateFor(api, m.repository, rule, depth, m.ref);
     } catch (e) {
       plan.unknown.push({ harness: m.harness, reason: `could not resolve \`${rule.follows}\` of ${m.repository}: ${(e as Error).message}` });
       continue;
     }
     if (!found.candidate) {
+      const waiting = found.looked.filter((l) => l.verdict === "pending").length;
       plan.held.push({
         harness: m.harness,
-        reason: rule.require === "green" ? `none of the last ${found.looked.length} commit(s) of \`${rule.follows}\` is green` : `\`${rule.follows}\` of ${m.repository} has no commits`,
+        reason:
+          rule.require !== "green"
+            ? `\`${rule.follows}\` of ${m.repository} has no commits`
+            : found.atCurrent
+              ? found.looked.length === 0
+                ? `already pinned at the head of \`${rule.follows}\` (${m.ref.slice(0, 10)})`
+                : `none of the ${found.looked.length} commit(s) of \`${rule.follows}\` newer than its pin ${m.ref.slice(0, 10)} is green yet${waiting ? ` (${waiting} pending)` : ""}; it holds its pin`
+              : `none of the last ${found.looked.length} commit(s) of \`${rule.follows}\` is green`,
       });
       continue;
+    }
+    // Never BACKWARDS (litlfred/smart-base#454). Within the window the search
+    // already stopped at the pin; a pin older than the window, or off the
+    // branch, is asked about directly.
+    if (!found.atCurrent && found.candidate.sha !== m.ref) {
+      let back: boolean | undefined;
+      try {
+        back = await movesBackwards(api, m.repository, m.ref, found.candidate.sha);
+      } catch (e) {
+        plan.held.push({ harness: m.harness, reason: `whether ${found.candidate.sha.slice(0, 10)} is older than its pin ${m.ref.slice(0, 10)} could not be asked, so it holds its pin: ${(e as Error).message}` });
+        continue;
+      }
+      if (back) {
+        plan.held.push({ harness: m.harness, reason: `the newest green commit, ${found.candidate.sha.slice(0, 10)}, is OLDER than its pin ${m.ref.slice(0, 10)}; a re-pin never moves a pin backwards, so it holds its pin` });
+        continue;
+      }
     }
     const cover = standingCovers(m, found.candidate);
     if (!cover.covered) {
@@ -437,18 +517,16 @@ export async function alignToHeldPins(plan: RepinPlan, mounts: readonly RemoteMo
     // it can trail the site's own pin; aligning to it then undid fixes the
     // site already had (folio-assistant train #3111 took bootstrap-tools from
     // 0f88368 back to bbdaffb, the commit before a reference-direction fix).
-    if (api.compareCommits) {
-      let rel: string;
-      try {
-        rel = await api.compareCommits(m.repository, m.ref, ref);
-      } catch (e) {
-        held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, and whether that is older than its current pin could not be asked: ${(e as Error).message}` });
-        continue;
-      }
-      if (rel === "behind") {
-        held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, OLDER than its current pin ${m.ref.slice(0, 10)}; a re-pin never moves a pin backwards` });
-        continue;
-      }
+    let back: boolean | undefined;
+    try {
+      back = await movesBackwards(api, m.repository, m.ref, ref);
+    } catch (e) {
+      held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, and whether that is older than its current pin could not be asked: ${(e as Error).message}` });
+      continue;
+    }
+    if (back) {
+      held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, OLDER than its current pin ${m.ref.slice(0, 10)}; a re-pin never moves a pin backwards` });
+      continue;
     }
     const verdict = rule.require === "green" ? await api.commitVerdict(m.repository, ref) : undefined;
     const cover = standingCovers(m, { branch: rule.follows, sha: ref, ...(verdict ? { verdict } : {}) });
