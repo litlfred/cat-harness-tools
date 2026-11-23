@@ -46,8 +46,10 @@
  * reads N documents spread evenly over the sorted list, so a run is quick and
  * repeatable; `--sample 0` reads every one.
  *
- * Exit: 0 every sampled IRI is served · 1 some is not · 78 the site publishes
- * no JSON-LD (nothing to check).
+ * Exit: 0 every sampled IRI is served · 1 some is not · 78 there is no built
+ * site to read (no `--site`, or no such directory: a checkout gate run, which
+ * a FHIR IG's layer-mode run saw exit 2 on its usage line) or it publishes no
+ * JSON-LD · 2 a site is given with no `--base`, or a bad `--sample`.
  *
  * Usage:
  *   bun run cat check:site-iris --site <built site dir> --base <site URL> [--sample N] [--json]
@@ -55,7 +57,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { NOT_APPLICABLE_EXIT } from "./lib/not-applicable.ts";
+import { NOT_APPLICABLE_EXIT, exitNotApplicable } from "./lib/not-applicable.ts";
 
 /** One IRI the site mints and does not serve. */
 export interface IriFinding {
@@ -232,7 +234,11 @@ if (import.meta.main) {
   const argv = process.argv.slice(2);
   const site = arg(argv, "--site");
   const base = arg(argv, "--base");
-  if (site === undefined || base === undefined) {
+  // No built site is not a usage error: a gate run over a checkout has none
+  // to give it, and a site build always passes both (siteIriCheckStep).
+  if (site === undefined || site === "") exitNotApplicable("check:site-iris", "no built site was given (--site <dir>); it judges a built site tree, not a checkout");
+  if (!existsSync(site) || !statSync(site).isDirectory()) exitNotApplicable("check:site-iris", `there is no built site at ${site}`);
+  if (base === undefined) {
     console.error("usage: check-site-iris.ts --site <built site dir> --base <site URL> [--sample N] [--json]");
     process.exit(2);
   }

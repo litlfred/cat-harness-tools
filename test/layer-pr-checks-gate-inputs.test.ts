@@ -74,6 +74,23 @@ describe("run-gates.py gate inputs", () => {
     expect(w2).toContain("absent");
   });
 
+  // A FHIR IG's layer-mode run (2026-11-23): run bare, check:site-iris printed its usage and exited 2.
+  test("site-iris is given the built site and the caller's iriBase", () => {
+    const root = mkdtempSync(join(tmpdir(), "gate-inputs-"));
+    mkdirSync(join(root, "acme"));
+    writeFileSync(join(root, "acme", "acme.json"), JSON.stringify({ $schema: "cat-harness-declaration/v1", name: "acme", iriBase: "https://example.org/acme/" }));
+    const args = `m.gate_args("check:site-iris", {"GATE_SITE": "/built"}, ${JSON.stringify(root)}, ["acme"])`;
+    expect(py("run-gates.py", args)).toEqual([["--site", "/built", "--base", "https://example.org/acme/"], null]);
+  });
+
+  test("site-iris with no built site runs bare, to say not applicable; with a site and no iriBase it is skipped", () => {
+    expect(py("run-gates.py", `m.gate_args("check:site-iris", {}, ".", ["acme"])`)).toEqual([[], null]);
+    const root = mkdtempSync(join(tmpdir(), "gate-inputs-"));
+    const [args, why] = py("run-gates.py", `m.gate_args("check:site-iris", {"GATE_SITE": "/built"}, ${JSON.stringify(root)}, ["acme"])`) as [unknown, string];
+    expect(args).toBeNull();
+    expect(why).toContain("iriBase");
+  });
+
   test("a gate that takes no input runs as declared", () => {
     expect(py("run-gates.py", `m.gate_args("check:workflows", {})`)).toEqual([[], null]);
   });
