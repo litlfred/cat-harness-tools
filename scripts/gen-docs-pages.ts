@@ -25,6 +25,8 @@ import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, unlinkSync } from "node:fs";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
+import { diagramActorsLine, type ActorResolver } from "../src/workflow/diagram-actors.ts";
+import { roleActorResolver } from "./lib/role-actors.ts";
 import { listInstances } from "../src/workflow/store.js";
 import { workPlanFindings, workPlanOf } from "../schemas/sdlc/work-plan.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
@@ -877,13 +879,27 @@ function blockLabel(page: WebPage, node: WebPageNode): string | undefined {
  * renders the PDF"): browsers load lazy images for a printout, and
  * `docs-ui.js` turns them eager on `beforeprint` and inlines every drawing.
  */
-export function bpmnFigureLines(id: string, src: string, alt: string): string[] {
+export function bpmnFigureLines(id: string, src: string, alt: string, actors = ""): string[] {
   return [
     `<div class="bpmn-figure" id="figure-${id}">`,
     `  <img src="${src}" loading="lazy" decoding="async"`,
     `       alt="${alt.replace(/"/g, "&quot;")}">`,
     "</div>",
+    // The roles and actors its lanes are bound to, as the figure's description
+    // (owner, 2026-11-23); nothing when the drawing has no lanes or pools.
+    ...(actors ? [actors] : []),
   ];
+}
+
+let roleActors: ActorResolver | undefined;
+
+/** The actors line for a node's BPMN asset (`diagram-actors.ts`); empty for an SVG asset or a source that is not there. */
+function assetActorsLine(source: string): string {
+  if (!source.endsWith(".bpmn")) return "";
+  const abs = resolve(repoRootFor(INSTANCE_ROOT), source);
+  if (!existsSync(abs)) return "";
+  roleActors ??= roleActorResolver(INSTANCE_ROOT);
+  return diagramActorsLine(readFileSync(abs, "utf-8"), roleActors);
 }
 
 function emitNode(page: WebPage, node: WebPageNode): string[] {
@@ -926,7 +942,7 @@ function emitNode(page: WebPage, node: WebPageNode): string[] {
 
   if (node.asset) {
     const a = node.asset;
-    out.push(...bpmnFigureLines(node.id, siteAddressed(page, a.rendered), a.alt));
+    out.push(...bpmnFigureLines(node.id, siteAddressed(page, a.rendered), a.alt, a.kind === "bpmn" ? assetActorsLine(a.source) : ""));
     out.push("");
     // The source links are kept as well as the edit link: they are different
     // acts. Reading the XML and changing it are not the same request, and the

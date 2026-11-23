@@ -21,6 +21,7 @@ import { dirname, join, posix, relative, resolve } from "node:path";
 
 import type { DakLink, DakRel } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation } from "../../schemas/process/workshop.ts";
+import { diagramActorsLine } from "../../src/workflow/diagram-actors.ts";
 import { linkSteps, stepsOf } from "../../src/workflow/diagram-links.ts";
 import { instanceFile, lookup, processDrawing, type JourneyCorpus } from "./read.ts";
 
@@ -96,6 +97,49 @@ export function personaArtifact(corpus: JourneyCorpus, instance: string, actor: 
     if (hit) return hit;
   }
   return undefined;
+}
+
+/**
+ * The ActorDefinition a lane's ref names, by artefact-index key: the ref as
+ * the actor's own id (a persona, through the role it plays), else as the
+ * ActorDefinition's id, verbatim or PascalCased (`birth-clinic-vaccinator` →
+ * `BirthClinicVaccinator`), optionally namespaced (`<ns>.BirthClinicVaccinator`).
+ */
+export function laneActorArtifact(corpus: JourneyCorpus, instance: string, ref: string): string | undefined {
+  if (lookup(corpus.actors, instance, ref)) {
+    const viaPersona = personaArtifact(corpus, instance, ref);
+    if (viaPersona) return viaPersona;
+  }
+  const want = new Set([ref, pascal(ref)]);
+  return [...corpus.examples.keys()].find((k) => {
+    if (!k.startsWith("ActorDefinition/")) return false;
+    const id = k.slice("ActorDefinition/".length);
+    return want.has(id) || [...want].some((w) => id.endsWith(`.${w}`));
+  });
+}
+
+/**
+ * The drawing's actors line (`src/workflow/diagram-actors.ts`, owner
+ * 2026-11-23): each lane's actor or role, linked to its ActorDefinition's page
+ * in the IG where the index lists one. Empty when the BPMN source cannot be
+ * found or has no lanes or pools.
+ */
+export function processActorsLine(
+  corpus: JourneyCorpus,
+  pr: WorkshopPresentation | undefined,
+  instance: string,
+  process: string,
+  siteRoot: string,
+): string {
+  const file = instanceFile(corpus, instance, process);
+  if (file === undefined || !existsSync(file)) return "";
+  return diagramActorsLine(readFileSync(file, "utf8"), (ref) => {
+    const key = laneActorArtifact(corpus, instance, ref);
+    if (key === undefined) return undefined;
+    const href = artifactPage(corpus, pr, key, siteRoot);
+    const title = corpus.examples.get(key)?.title;
+    return { ...(href ? { href } : {}), ...(title ? { title } : {}) };
+  }, { linkAttr: DAK_ATTR });
 }
 
 /** The IG a journey's pages link into: the first workshop of its layer that declares one, else of the checkout. */
