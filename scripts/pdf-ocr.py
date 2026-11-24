@@ -83,7 +83,7 @@ import tempfile
 # document overwrote the first page for page, silently, and
 # `pdf-structure.py --ocr` looked somewhere this never wrote.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _pdf_doc_id import OCR_DIRNAME, derive_doc_id, ocr_cache_dir  # noqa: E402
+from _pdf_doc_id import ocr_cache_dir  # noqa: E402
 import _run_context  # noqa: E402
 
 # A page below this many characters is treated as having no usable text.
@@ -1037,7 +1037,7 @@ def main() -> int:
             n, lang = ocr_pdf(pdf, root, args.lang, args.dpi, args.force, hints, vision_ask)
             # Name the directory, because it is no longer the one the caller
             # passed and a reader should not have to derive it.
-            rel = os.path.join(derive_doc_id(pdf), OCR_DIRNAME)
+            rel = os.path.relpath(ocr_cache_dir(root, pdf), root)
             print(f"  {os.path.basename(pdf)}: {n} pages ({lang}) -> {rel}/")
         except Exception as e:
             print(f"  {os.path.basename(pdf)}: FAILED — {e}")

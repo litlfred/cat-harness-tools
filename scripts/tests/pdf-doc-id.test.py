@@ -64,7 +64,6 @@ pages = load("pdf-pages.py")
 # did it just move": three equal strings could still be three implementations.
 check("pdf-structure.derive_doc_id is shared", structure.derive_doc_id, shared.derive_doc_id)
 check("pdf-structure.slugify is shared", structure.slugify, shared.slugify)
-check("pdf-ocr.derive_doc_id is shared", ocr.derive_doc_id, shared.derive_doc_id)
 check("pdf-ocr.ocr_cache_dir is shared", ocr.ocr_cache_dir, shared.ocr_cache_dir)
 check("pdf-pages._slugify is shared", pages._slugify, shared.slugify)
 check("pdf-pages.ocr_cache_dir is shared", pages.ocr_cache_dir, shared.ocr_cache_dir)
@@ -100,14 +99,51 @@ check(
     shared.ocr_cache_dir("lib", "x.pdf", AX),
     os.path.join("lib", "arxiv-math-0304010v1", "ocr"),
 )
-# No metadata => the basename slug, which is what `pdf-ocr.py` can compute
-# without reading the PDF. Sound because the arXiv id is found by regex over
-# page one's TEXT, and no usable text layer is the precondition for OCR.
+# No metadata => the basename slug, from `derive_doc_id` alone.
 check("no metadata falls back to the stem", shared.derive_doc_id("x.pdf"), "x")
 
-# ------------------------------------------------------ the legacy read, warned
+# ------------------------------------- an arXiv PDF routed to an OCR rung (#2326)
+#
+# `9901120v3.pdf` carries its arXiv stamp in a text layer that is otherwise
+# unusable, so the plan named it `arxiv-math-9901120v3` (bibSlug ->
+# `derive_doc_id_from_pdf`) and chose an OCR rung. The OCR cache and the
+# structure then landed in `9901120v3/` and `--promote` found no structure.json.
+# Every no-meta path now asks the PDF, so all three agree on the slug.
 
 import tempfile  # noqa: E402
+
+try:
+    import pymupdf  # noqa: F401
+except ImportError:
+    pymupdf = None
+if pymupdf is None:
+    print("skip  arXiv-stamped OCR rung: pymupdf not installed", file=sys.stderr)
+else:
+    with tempfile.TemporaryDirectory() as root:
+        pdf = os.path.join(root, "9901120v3.pdf")
+        d = pymupdf.open()
+        d.new_page().insert_text((40, 60), "arXiv:math/9901120v3 [math.AG] 3 Jan 1999")
+        d.save(pdf)
+        d.close()
+        want = "arxiv-math-9901120v3"
+        check("the plan's slug", shared.derive_doc_id_from_pdf(pdf), want)
+        check("pdf-ocr writes the cache under the slug",
+              ocr.ocr_cache_dir(root, pdf), os.path.join(root, want, "ocr"))
+        check("pdf-pages reads the cache from the slug",
+              pages.ocr_cache_dir(root, pdf), os.path.join(root, want, "ocr"))
+        cache = os.path.join(root, want, "ocr")
+        os.makedirs(cache)
+        # OCR text WITHOUT the stamp: pdf-structure's meta then has no arXiv
+        # id, and the doc-id must still come from the PDF, not the stem.
+        open(os.path.join(cache, "page-001.txt"), "w").write(
+            "On the moduli of curves\n\nWe study the moduli space of stable curves. " * 4)
+        check("pdf-structure --ocr finds the cache under the slug",
+              structure.find_ocr_cache(root, pdf), (cache, False))
+        art, _sections = structure.process(pdf, root, use_ocr=True)
+        check("pdf-structure --ocr read the OCR text", art["source"]["text_source"], "ocr")
+        check("pdf-structure --ocr names the slug, not the stem", art["doc_id"], want)
+
+# ------------------------------------------------------ the legacy read, warned
 
 with tempfile.TemporaryDirectory() as root:
     pdf = os.path.join(root, "doc.pdf")
