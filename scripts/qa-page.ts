@@ -66,6 +66,15 @@ export interface QaForge {
   blob: string;
   /** Optional: a recursive tree listing, used only for an entry with no `listing`. */
   treeApi?: string;
+  /**
+   * Optional: the repository, unauthenticated: `{repo}`. Asked only when the
+   * raw host answers 404, to tell a branch that is ABSENT from one that cannot
+   * be READ: a forge's raw host answers 404 for a private repository too, so
+   * the 404 alone says neither.
+   */
+  repoApi?: string;
+  /** Optional: one branch of the repository, unauthenticated: `{repo}`, `{branch}`. */
+  branchApi?: string;
 }
 
 export const GITHUB_FORGE: QaForge = {
@@ -73,6 +82,8 @@ export const GITHUB_FORGE: QaForge = {
   tree: "https://github.com/{repo}/tree/{branch}/{path}",
   blob: "https://github.com/{repo}/blob/{ref}/{path}",
   treeApi: "https://api.github.com/repos/{repo}/git/trees/{branch}:{path}?recursive=1",
+  repoApi: "https://api.github.com/repos/{repo}",
+  branchApi: "https://api.github.com/repos/{repo}/branches/{branch}",
 };
 
 /** A further section linked from the page: another visualiser's page for this instance. */
@@ -220,9 +231,78 @@ export const QA_PAGE_JS = String.raw`(function () {
       return r.json();
     });
   }
-  function say(box, text) {
+  function say(box, text, href, hrefText) {
     box.textContent = "";
-    box.appendChild(el("p", text, "sv-sub"));
+    var p = el("p", text, "sv-sub");
+    if (href) {
+      p.appendChild(document.createTextNode(" "));
+      p.appendChild(link(href, hrefText));
+      p.appendChild(document.createTextNode("."));
+    }
+    box.appendChild(p);
+  }
+  /** A message to draw in place of the results: quiet (stated), with a link to the branch. */
+  function notice(text, href, hrefText) {
+    var e = new Error(text);
+    e.quiet = true;
+    e.href = href;
+    e.hrefText = hrefText;
+    return e;
+  }
+  /**
+   * Why the branch's files cannot be had. The raw host answers 404 for a branch
+   * that is absent AND for a repository this browser may not read (a private
+   * one), so a 404 is decided by asking the forge whether the repository and
+   * the branch are visible; a 401/403 is unreadable outright; no status at all
+   * is the network. Each answer is a different message: "absent" is said only
+   * when the repository is seen and the branch is not.
+   */
+  function whyNot(src, forge, e) {
+    var where = src.repo + "'s " + src.branch + " branch";
+    var view = src.tree("").replace(/\/$/, "");
+    var signIn = "Open the branch on the forge, signed in with an account that can read " + src.repo;
+    function unreadable(why) {
+      return notice(
+        "The QA results cannot be read here: " + where + " is not readable without signing in (" + why + "). " +
+          "This page reads it unauthenticated, so the results are unknown, not absent.",
+        view,
+        signIn,
+      );
+    }
+    function network(what) {
+      return notice("Could not reach the forge to read " + where + " (" + what + "). The results are unknown, not absent.", view, "Try the branch on the forge");
+    }
+    if (typeof e.status !== "number") return Promise.resolve(network("no HTTP answer: " + e.message));
+    if (e.status === 401 || e.status === 403) return Promise.resolve(unreadable("the forge answered HTTP " + e.status + ": the repository is private or this browser has no access"));
+    if (e.status !== 404) return Promise.resolve(e);
+    if (!forge.repoApi)
+      return Promise.resolve(
+        notice("No QA results could be found: either " + src.repo + " has no " + src.branch + " branch, or the repository is private and cannot be read without signing in.", view, signIn),
+      );
+    return getJson(fill(forge.repoApi, { repo: src.repo })).then(
+      function () {
+        if (!forge.branchApi) return notice("No QA results are published for this instance yet: " + src.repo + " has no " + src.branch + " branch (or it holds no index.json).");
+        return getJson(fill(forge.branchApi, { repo: src.repo, branch: encodeURIComponent(src.branch) })).then(
+          function () {
+            return notice("No QA results are published for this instance yet: " + where + " exists but holds no index.json.", view, "See the branch");
+          },
+          function (e3) {
+            if (e3.status === 404) return notice("No QA results are published for this instance yet: " + src.repo + " has no " + src.branch + " branch.");
+            return network("the forge answered " + (e3.status ? "HTTP " + e3.status : e3.message) + " when asked for the branch");
+          },
+        );
+      },
+      function (e2) {
+        if (e2.status === 404 || e2.status === 401) return unreadable("the repository is private, or does not exist for this browser");
+        if (e2.status === 403 || e2.status === 429)
+          return notice(
+            "Could not tell whether " + where + " is absent or unreadable: the forge refused to say (HTTP " + e2.status + ", likely its unauthenticated rate limit). The results are unknown, not absent.",
+            view,
+            "Try the branch on the forge",
+          );
+        return network(e2.status ? "HTTP " + e2.status : e2.message);
+      },
+    );
   }
   function glob(g, p) {
     var re = "";
@@ -309,7 +389,10 @@ export const QA_PAGE_JS = String.raw`(function () {
           return { key: "main/" + src.ref, manifest: m, exact: true };
         },
         function (e) {
-          if (e.status !== 404) throw e;
+          if (e.status !== 404)
+            return whyNot(src, forge, e).then(function (x) {
+              throw x;
+            });
           return getJson(src.raw("index.json")).then(
             function (ix) {
               if (!ix || !ix.main || !ix.main.sha) throw new Error(src.branch + " holds no main entry");
@@ -319,12 +402,9 @@ export const QA_PAGE_JS = String.raw`(function () {
               });
             },
             function (e2) {
-              if (e2.status === 404) {
-                var none = new Error("no QA results are published for this instance yet: " + src.repo + " has no " + src.branch + " branch");
-                none.quiet = true;
-                throw none;
-              }
-              throw e2;
+              return whyNot(src, forge, e2).then(function (x) {
+                throw x;
+              });
             },
           );
         },
@@ -359,7 +439,8 @@ export const QA_PAGE_JS = String.raw`(function () {
         render(box, src, cfg, r);
       })
       .catch(function (e) {
-        say(box, e.quiet ? "Not available: " + e.message + "." : "Could not load this instance's QA results (" + e.message + "). This is unknown, not zero.");
+        if (e.quiet) say(box, e.message, e.href, e.hrefText);
+        else say(box, "Could not load this instance's QA results (" + e.message + "). This is unknown, not zero.");
       });
   }
 

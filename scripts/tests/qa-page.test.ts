@@ -108,10 +108,10 @@ async function settle() {
 }
 
 /** Runs the page script over one panel with `fetch` answered from `answers` (URL substring → JSON or a status). */
-async function runScript(answers: Array<[string, unknown | number]>, decl?: QaDeclaration) {
+async function runScript(answers: Array<[string, unknown | number]>, decl?: QaDeclaration, forge?: QaForge) {
   const { node, textOf, all } = fakeDom();
   const box = node("div");
-  const html = qaIntegratedPanel(qaLiveSourceOf(SUBJECT, MOUNT)!, { decl });
+  const html = qaIntegratedPanel(qaLiveSourceOf(SUBJECT, MOUNT)!, { decl, forge });
   const cfg = /data-config="([^"]*)"/.exec(html)![1]!.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&amp;/g, "&");
   Object.assign(box.attrs, { "data-repo": MOUNT.repository, "data-ref": MOUNT.ref, "data-branch": SUBJECT.storage, "data-root": ROOT, "data-config": cfg });
   const urls: string[] = [];
@@ -122,6 +122,7 @@ async function runScript(answers: Array<[string, unknown | number]>, decl?: QaDe
     // the URL; any other key is a path fragment of the entry.
     const hit = answers.find(([k]) => (/^https:\/\/[^/]+$/.test(k) ? new URL(u).origin === k : u.includes(k)));
     const v = hit?.[1] ?? 404;
+    if (v instanceof Error) throw v;
     return typeof v === "number" ? { ok: false, status: v, json: async () => ({}) } : { ok: true, status: 200, json: async () => v };
   };
   runInNewContext(QA_PAGE_JS, { document, fetch, Promise, Error, String, Object, JSON, RegExp, Array, encodeURIComponent });
@@ -211,9 +212,60 @@ describe("the page script", () => {
     expect(r.text()).toContain("ANOTHER commit");
   });
 
-  test("a layer with no branch is 'not available', never an empty page", async () => {
+  // The raw host answers 404 both for a branch that is absent and for a
+  // repository this browser may not read, so the page asks the forge which.
+  const REPO_API = `https://api.github.com/repos/${MOUNT.repository}`;
+  const BRANCH_API = `${REPO_API}/branches/`;
+
+  test("a readable repository with no branch says the branch is absent, never an empty page", async () => {
+    const r = await runScript([[BRANCH_API, 404], [REPO_API, { private: false }]]);
+    expect(r.text()).toContain(`No QA results are published for this instance yet: ${MOUNT.repository} has no ${SUBJECT.storage} branch.`);
+    expect(r.text()).not.toContain("signing in");
+    expect(r.urls.some((u) => u.startsWith(BRANCH_API))).toBe(true);
+  });
+
+  test("a repository the browser cannot read is 'not readable', never 'no branch'", async () => {
     const r = await runScript([]);
-    expect(r.text()).toContain("no QA results are published for this instance yet");
+    const t = r.text();
+    expect(t).toContain("cannot be read here");
+    expect(t).toContain("is not readable without signing in (the repository is private, or does not exist for this browser)");
+    expect(t).toContain("unknown, not absent");
+    expect(t).not.toContain("has no");
+    const a = r.all().find((n) => n.tag === "a")!;
+    expect(a.href).toBe(`https://github.com/${MOUNT.repository}/tree/${SUBJECT.storage}`);
+    expect(a.text).toContain("signed in");
+  });
+
+  test("a raw host that refuses outright (401/403) is unreadable, with no probe", async () => {
+    for (const status of [401, 403]) {
+      const r = await runScript([[`main/${MOUNT.ref}/manifest.json`, status]]);
+      expect(r.text()).toContain(`the forge answered HTTP ${status}: the repository is private or this browser has no access`);
+      expect(r.urls).toHaveLength(1);
+    }
+  });
+
+  test("a branch that exists with no index.json says so", async () => {
+    const r = await runScript([[BRANCH_API, { name: SUBJECT.storage }], [REPO_API, { private: false }]]);
+    expect(r.text()).toContain("exists but holds no index.json");
+  });
+
+  test("a rate-limited probe says it cannot tell, rather than guessing", async () => {
+    const r = await runScript([[REPO_API, 403]]);
+    expect(r.text()).toContain("Could not tell whether");
+    expect(r.text()).not.toContain("has no");
+  });
+
+  test("a network failure is unknown, not absent", async () => {
+    const r = await runScript([[`main/${MOUNT.ref}/manifest.json`, new TypeError("Failed to fetch")]]);
+    expect(r.text()).toContain("Could not reach the forge");
+    expect(r.text()).toContain("Failed to fetch");
+  });
+
+  test("a forge with no repository API cannot tell the two apart, and says both", async () => {
+    const { repoApi: _r, branchApi: _b, ...bare } = GITHUB_FORGE;
+    const r = await runScript([], undefined, bare);
+    expect(r.text()).toContain("either");
+    expect(r.text()).toContain("private");
   });
 
   test("an unreachable forge is unknown, not zero", async () => {
