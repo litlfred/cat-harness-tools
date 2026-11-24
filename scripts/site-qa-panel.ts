@@ -18,7 +18,7 @@
  * a path relative to the page, so the panel never goes stale against the
  * build that wrote them. A file that is missing, unreachable or not the
  * schema it should be is SAID, never drawn as an empty table: unknown, not
- * zero (the rule `qa-live.ts` follows).
+ * zero (the rule `qa-page.ts` follows).
  *
  * @module scripts/site-qa-panel
  * @covers none — a page panel: it draws reports a build wrote and judges nothing

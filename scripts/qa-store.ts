@@ -85,6 +85,7 @@ import { TreeStore } from "./branch-store.js";
 import { authEnvFrom } from "./lib/git-auth-env.ts";
 import { inputSiteReached, qaRefLine, quietly } from "../schemas/sdlc/input-trace.ts";
 import { mountedInstancesCached, outputTwinOf, overlayDirs, writePathOf } from "./lib/layer-output.ts";
+import { isQaRecordPath, summarizeQaDoc, type QaRecordSummary } from "../schemas/sdlc/qa-axis.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -194,6 +195,69 @@ export interface QaManifest {
    * add may only create a path, or replace one an earlier add created.
    */
   added?: Record<string, { written_at: string; bytes: number; run?: string }>;
+  /**
+   * Every JSON record in the payload, with its axis and counts in the shared
+   * vocabulary (`schemas/sdlc/qa-axis.ts`), so a reader in a browser needs
+   * this one file and raw fetches only: no tree listing from the forge's API,
+   * whose unauthenticated rate limit is what made the per-layer QA page read
+   * "HTTP 403" (owner, 2026-11-24, the integrated QA page). Outside
+   * `payloadTree`, so verification is unchanged. Absent on an entry published
+   * before it existed, or when the payload holds more than
+   * {@link LISTING_CAP} records (`listingTruncated` then says so).
+   */
+  listing?: QaRecordSummary[];
+  listingTruncated?: true;
+}
+
+/** The most records a manifest lists; past it the reader falls back to the tree. */
+export const LISTING_CAP = 20000;
+
+/**
+ * The {@link QaManifest.listing} of a payload tree: one `cat-file --batch`
+ * for every JSON blob, each summarised. A blob that will not parse is listed
+ * without counts, never dropped, so the page can say it was unreadable.
+ */
+export function listingOf(store: Store, tree: string): Pick<QaManifest, "listing" | "listingTruncated"> {
+  const rows = store
+    .must(["ls-tree", "-r", "-z", tree])
+    .split("\0")
+    .filter(Boolean)
+    .map((l) => {
+      const tab = l.indexOf("\t");
+      const [, type, sha] = l.slice(0, tab).split(/\s+/);
+      return { type, sha: sha!, path: l.slice(tab + 1) };
+    })
+    .filter((e) => e.type === "blob" && isQaRecordPath(e.path));
+  if (rows.length > LISTING_CAP) return { listingTruncated: true };
+  if (rows.length === 0) return { listing: [] };
+  const r = store.git(["cat-file", "--batch"], { input: rows.map((e) => e.sha).join("\n") + "\n", env: { GIT_NO_LAZY_FETCH: "1" } });
+  if (r.status !== 0) return {};
+  const out: QaRecordSummary[] = [];
+  const buf = r.stdout;
+  let at = 0;
+  for (const e of rows) {
+    const nl = buf.indexOf(10, at);
+    if (nl < 0) break;
+    const head = buf.subarray(at, nl).toString().trim().split(/\s+/);
+    if (head[1] !== "blob") {
+      // `<sha> missing`: listed, uncounted, never fetched one by one.
+      at = nl + 1;
+      out.push({ path: e.path });
+      continue;
+    }
+    const size = Number(head[2]);
+    const body = buf.subarray(nl + 1, nl + 1 + size).toString("utf8");
+    at = nl + 1 + size + 1;
+    let doc: unknown;
+    try {
+      doc = JSON.parse(body);
+    } catch {
+      out.push({ path: e.path });
+      continue;
+    }
+    out.push(summarizeQaDoc(e.path, doc));
+  }
+  return { listing: out };
 }
 
 export interface QaIndex {
@@ -972,6 +1036,7 @@ function buildEntry(
       payloadTree: payload,
       files,
       bytes,
+      ...listingOf(store, payload),
       // input-site: store #18c2fdfe — configures or performs a qa-reports store read; every by-ref read is reported by snapshot(), every other git call by TreeStore.git()
       written_at: extra.written_at ?? new Date().toISOString(),
     };
@@ -1440,7 +1505,20 @@ export function addQa(
       outcome = "present";
       return { done: `${target} already holds these files, identical` };
     }
-    const next: QaManifest = { ...manifest, payloadTree: payload, files, bytes, added };
+    // The added files are summarised from the blobs just written; the entry's
+    // own are carried from its manifest (its blobs need not be local). An
+    // entry that predates the listing stays without one rather than half of one.
+    const { listing: prior, listingTruncated: _t, ...rest } = manifest;
+    const fresh = listingOf(store, addTree!);
+    const listing =
+      prior && fresh.listing
+        ? (() => {
+            const now = new Set(fresh.listing.map((x) => x.path));
+            const merged = [...prior.filter((x) => !now.has(x.path)), ...fresh.listing].sort((a, b) => a.path.localeCompare(b.path));
+            return merged.length > LISTING_CAP ? { listingTruncated: true as const } : { listing: merged };
+          })()
+        : {};
+    const next: QaManifest = { ...rest, payloadTree: payload, files, bytes, added, ...listing };
     const mblob = store.hashBlob(JSON.stringify(next, null, 2) + "\n");
     const entry = store.mktree([...store.lsTree(payload), { mode: "100644", type: "blob", sha: mblob, name: MANIFEST_FILE }]);
     return { tree: store.setPath(base, target.split("/"), { mode: "040000", type: "tree", sha: entry, name: "" })! };

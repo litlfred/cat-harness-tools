@@ -99,6 +99,7 @@ import { propertyIri, termIri } from "./namespaces";
 import { StickyContributionSchema, type StickyContribution } from "../content/sticky-contribution";
 import { BuiltAtPublishListSchema, isBuiltAtPublish, type BuiltAtPublish } from "./built-at-publish";
 import { JsonldPrefixTableSchema, type JsonldPrefixTable } from "./jsonld-prefixes";
+import { QaDeclarationSchema, type QaDeclaration } from "../sdlc/qa-axis";
 import { BranchPrefixSchema, KeyedBySchema, SubgraphSourceSchema, contentIsOffCheckout, type SubgraphSource } from "./subgraph-source";
 
 
@@ -838,6 +839,13 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
   directories: ContentDirectory[];
   /** The visualisers this harness declares, each at `<base>/<name>/<id>/` — {@link HarnessVisualiser}. Owner, 2026-10-09. */
   visualisers?: HarnessVisualiser[];
+  /**
+   * What this instance's QA publish runs and which QA axes it answers for —
+   * {@link QaDeclaration} (`schemas/sdlc/qa-axis.ts`). Owner, 2026-11-24: one
+   * integrated QA page per instance, drawn by the platform. Absent: the
+   * platform's own KG audit only, and the axes the published entry holds.
+   */
+  qa?: QaDeclaration;
   /**
    * Artefacts this layer serves and must never commit, each built at publish
    * by the package scripts it names — {@link BuiltAtPublish}. Owner, 2026-10-14
@@ -1774,6 +1782,14 @@ export const HarnessVisualiserSchema = TileSchema.extend({
    * of the mount digest.
    */
   builtOnHostSite: z.object({ translated: z.literal(true).optional() }).strict().optional(),
+  /**
+   * Other visualisers of THIS harness whose per-instance page is a section of
+   * this one's, linked from it at `../../<id>/<instance>/` (owner, 2026-11-24:
+   * one integrated QA page per instance; translation status, health and
+   * attestations stay their own pages and are reached from it). Every id must
+   * be declared by this harness — refined with the other visualiser checks.
+   */
+  sections: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "a visualiser id")).nonempty().optional(),
 }).refine((v) => v.covers !== undefined || v.coversKinds !== undefined, {
   message: "a visualiser covers something: declare `covers` (directory ids) or `coversKinds` (graph typologies)",
 });
@@ -3682,6 +3698,8 @@ const catHarnessDeclarationShape = {
    * `.optional()`: absent means this layer declares none.
    */
   visualisers: z.array(HarnessVisualiserSchema).optional(),
+  /** See {@link CatHarnessDeclaration.qa} and `schemas/sdlc/qa-axis.ts`. */
+  qa: QaDeclarationSchema.optional(),
   /** See {@link CatHarnessDeclaration.builtAtPublish} and `schemas/kg/built-at-publish.ts`. Absent: this layer builds nothing at publish. */
   builtAtPublish: BuiltAtPublishListSchema.optional(),
   /** See {@link CatHarnessDeclaration.jsonldPrefixes} and `schemas/kg/jsonld-prefixes.ts`. Absent: this layer speaks no external vocabulary of its own. */
@@ -3921,6 +3939,15 @@ function refineCatHarnessDeclaration(
       });
     }
     visIds.add(v.id);
+    (v.sections ?? []).forEach((x, j) => {
+      if (x === v.id || !(d.visualisers ?? []).some((o) => o.id === x)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["visualisers", i, "sections", j],
+          message: `visualiser \`${v.id}\` names \`${x}\` as a section, which is not another visualiser this harness declares`,
+        });
+      }
+    });
     (v.covers ?? []).forEach((c, j) => {
       if (!dirIds.has(c)) {
         ctx.addIssue({

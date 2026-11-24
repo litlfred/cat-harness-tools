@@ -104,7 +104,8 @@ import { parseFrontMatter } from "../schemas/kg/front-matter.js";
 import { ROUTE_SEGMENT, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
-import { qaLivePanel, qaLiveSourceOf, type QaLiveSource } from "./qa-live.ts";
+import { qaIntegratedPanel, qaLiveSourceOf, type QaLiveSource, type QaSectionLink } from "./qa-page.ts";
+import type { QaDeclaration } from "../schemas/sdlc/qa-axis.ts";
 import { isOpen, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
 import { allInstances, beanInputs, beanStores, declaredDiagramIds, unlinkedReport, unlinkedSectionHtml } from "./unlinked-beans.ts";
 import { MergeQueueEntrySchema } from "../schemas/sdlc/merge-queue.ts";
@@ -2616,6 +2617,33 @@ export function projectInstanceSubject(s: InstanceSubject, kinds: readonly strin
 }
 
 /**
+ * What the integrated QA page of `s` is given beyond its source: the
+ * instance's own `qa` declaration, and the visualiser's `sections` as links to
+ * their pages for this instance (`../../<id>/<instance>/`, siblings under one
+ * harness). A declaration that will not read is no declaration: the page then
+ * draws the axes the entry holds.
+ */
+export function qaPageInputsOf(
+  v: { sections?: readonly string[] },
+  s: Pick<InstanceSubject, "name" | "instanceRoot">,
+  declared: readonly { id: string; title?: string; subgraphs?: string }[],
+): { decl?: QaDeclaration; sections: QaSectionLink[] } {
+  let decl: QaDeclaration | undefined;
+  try {
+    decl = readDeclaration(s.instanceRoot)?.qa;
+  } catch {
+    decl = undefined;
+  }
+  const sections = (v.sections ?? []).map((id) => {
+    const o = declared.find((x) => x.id === id);
+    // A visualiser drawn per instance has this instance's page; one that is not
+    // has its whole-graph page only, which is what the link then names.
+    return { id, title: o?.title ?? id, href: o?.subgraphs === "instance" ? `../../${id}/${s.name}/` : `../../${id}/` };
+  });
+  return { ...(decl ? { decl } : {}), sections };
+}
+
+/**
  * `<base>/<harness>/<vis>/<instance>/` — one layer's graph of the kinds
  * the visualiser covers.
  *
@@ -2628,6 +2656,7 @@ export function instanceSubjectPage(
   subjects: readonly InstanceSubject[],
   ix: QaGraphProjection = projectInstanceSubject(s, vis.coversKinds ?? []),
   live?: QaLiveSource,
+  qa: { decl?: QaDeclaration; sections?: readonly QaSectionLink[] } = {},
 ): string {
   const title = vis.title ?? vis.id;
   const others = subjects
@@ -2642,14 +2671,20 @@ export function instanceSubjectPage(
   // The build holds no corpus, but the layer publishes one: the browser reads
   // it from the layer's qa-reports branch at view time (owner card, 2026-11-10:
   // "Load in the browser"), so a publish never fetches or copies results.
-  const loadsLive = qaFamilies && live !== undefined && (ix as { availability?: string }).availability === "unknown";
+  // ONE integrated page per instance (owner, 2026-11-24): whenever the layer
+  // publishes, the page is the published entry, every axis at once; a copy
+  // this build happens to hold is shown under it, never instead of it.
+  const loadsLive = qaFamilies && live !== undefined;
+  const local = loadsLive && (ix as { availability?: string }).availability !== "unknown";
   return page({
     title: `${s.name} — ${title}`,
     ...(registry || loadsLive ? { noLiquid: true } : {}),
     body:
       `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
       `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
-      (loadsLive ? qaLivePanel(live!) : qaPanelsOf(ix, undefined, { qaFamilies })) +
+      (loadsLive
+        ? qaIntegratedPanel(live!, qa) + (local ? `<h2 class="sv-h2">This build's working copy</h2>` + qaPanelsOf(ix, undefined, { qaFamilies }) : "")
+        : qaPanelsOf(ix, undefined, { qaFamilies })) +
       (registry ? registryTable(withSubjectIris(registryRowsOf(s.absPath), s.absPath, vis.coversKinds ?? [], subjectIri, { instance: s.name, layerPath: relative(s.instanceRoot, s.absPath).split(sep).join("/") })) : "") +
       `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
       `<ul class="sv-list">${others}</ul>`,
@@ -3356,7 +3391,7 @@ for (const { v, harness: vh, hosted } of perInstance) {
         ? codeSubjectPage(v, s, subjects, codeDirectoriesOf(candidates, s.name, kinds), pinnedBlobBase(REPO_ROOT, s.name))
         : memory
           ? memorySubjectPage(v, s, subjects, pinnedBlobBase(REPO_ROOT, s.name))
-          : instanceSubjectPage(v, s, subjects, undefined, qaLiveSourceOf(s, pinnedMount(REPO_ROOT, s.name)));
+          : instanceSubjectPage(v, s, subjects, undefined, qaLiveSourceOf(s, pinnedMount(REPO_ROOT, s.name)), qaPageInputsOf(v, s, declRead?.visualisers ?? []));
     // ANOTHER layer's page depends on which layers the checkout mounts,
     // so it is built at publish wherever this layer is mounted, listed or not:
     // a downstream index adds layers no list here can name (Uganda #15).
