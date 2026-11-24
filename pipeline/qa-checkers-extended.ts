@@ -1559,13 +1559,26 @@ export function checkDetanglerNoDependencyCycle(
 // non-scholarly forms: questions, first-person, second-person,
 // imperatives, and casual aside markers.
 
-const TITLE_FIELD_RE = /\btitle:\s*(?:"([^"]+)"|'([^']+)')/;
+const TITLE_OR_CAPTION_FIELD_RE =
+  /\b(title|caption):\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/g;
 
 const NON_SCHOLARLY_TITLE_PATTERNS: Array<{
   re: RegExp;
   what: string;
 }> = [
   { re: /\?$/, what: "ends in '?' — title is a question" },
+  {
+    re: /\b(?:rem|def|prop|thm|lem|cor|conj|alg|ex|sec|ch|app|tbl|fig):[a-zA-Z0-9_-]*/,
+    what: "raw LaTeX/Folio label prefix in title/caption",
+  },
+  {
+    re: /\bData\s+table\b|\bTable\s+\d+\s+from\b/i,
+    what: "mechanical table-extraction placeholder in title/caption",
+  },
+  {
+    re: /\s+(?:a|[Aa]n|[Tt]he|[Ff]rom|[Oo]f|[Ii]n|[Tt]o|[Ff]or|[Ww]ith|[Ii]s\s+a)\s*$/,
+    what: "truncated title/caption ending in dangling article or preposition",
+  },
   {
     re: /^\s*(?:relation(?:ship)?|connection|link)\s+(?:to|with|between)\b/i,
     what: "relational header — retitle to a noun phrase naming the subject",
@@ -1614,25 +1627,27 @@ export function checkVoiceTitleScholarly(
   if (!tsPath) return { result: "n/a", hits: [] };
   const text = readMaybe(tsPath);
   if (!text) return { result: "n/a", hits: [] };
-  const m = text.match(TITLE_FIELD_RE);
-  if (!m) return { result: "n/a", hits: [] };
-  const title = m[1] ?? m[2] ?? "";
-  if (!title) return { result: "n/a", hits: [] };
+  const matches = [...text.matchAll(TITLE_OR_CAPTION_FIELD_RE)];
+  if (matches.length === 0) return { result: "n/a", hits: [] };
   const hits: CheckerHit[] = [];
-  for (const { re, what } of NON_SCHOLARLY_TITLE_PATTERNS) {
-    if (re.test(title)) {
-      // Find the line containing the title field for accurate
-      // reporting.
-      const lineIdx = text
-        .slice(0, m.index)
-        .split("\n").length;
-      hits.push({
-        file: tsPath,
-        line: lineIdx,
-        text: `title "${title.slice(0, 100)}" — ${what}`,
-      });
+  let sawNonEmptyField = false;
+  for (const m of matches) {
+    const field = m[1] ?? "title";
+    const val = m[2] ?? m[3] ?? "";
+    if (!val) continue;
+    sawNonEmptyField = true;
+    for (const { re, what } of NON_SCHOLARLY_TITLE_PATTERNS) {
+      if (re.test(val)) {
+        const lineIdx = text.slice(0, m.index ?? 0).split("\n").length;
+        hits.push({
+          file: tsPath,
+          line: lineIdx,
+          text: `${field} "${val.slice(0, 100)}" — ${what}`,
+        });
+      }
     }
   }
+  if (!sawNonEmptyField) return { result: "n/a", hits: [] };
   return { result: hits.length > 0 ? "fail" : "pass", hits };
 }
 

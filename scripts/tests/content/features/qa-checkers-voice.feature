@@ -304,3 +304,53 @@ Feature: Voice QA checkers keep their exemptions narrow
     Then checkEditorializing passes it
     Given a file whose line ending "clearly" continues on "represents the ith parallel"
     Then checkEditorializing passes it
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::fourth-wall_Lean_prose_mentions_fail_in_markdown
+  Scenario: Fourth-wall Lean and Mathlib prose mentions fail in paper markdown
+    Given markdown lines naming "Lean carrier", "Lean sibling", "proved in the Lean" or "Mathlib"
+    When checkScholarlyDefault runs on each
+    Then each result is "fail"
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::Lean_section_headers_and_formalisation_status_markers_fail_status_checks
+  Scenario: Lean section headers and formalisation status markers fail status checks
+    Given a markdown section header "## Lean structure" and status-leak lines naming "Lean carrier" or "proved formally"
+    When checkStatusSectionHeader and checkStatusLeak run
+    Then each result is "fail"
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::backticked_Lean_FQNs_and_snake_or_camel_identifiers_fail_before_inline-code_stripping
+  Scenario: Backticked Lean FQNs and declaration identifiers fail in paper markdown
+    Given markdown lines carrying backticked `QOU.QBeta.bar_letter_shift_fixed_iff`, `dimQK0_eq_evDimQ_chernCharacter`, `su2Character_one` or `CommRing`
+    When checkScholarlyDefault runs on each
+    Then each result is "fail"
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::Lean_docstrings_allow_backticked_Lean_identifiers_while_rejecting_first-person_prose
+  Scenario: Lean docstrings allow Lean identifiers while rejecting first-person pronouns
+    Given a Lean docstring naming `QOU.QBeta.bar_letter_shift_fixed_iff` and `CommRing`
+    Then checkScholarlyDefault passes it
+    Given a Lean docstring reading "Here we prove the converse over an arbitrary ring."
+    Then checkScholarlyDefault fails it
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::general_first-person_plural_and_singular_pronouns_fail_in_paper_markdown
+  Scenario: General first-person plural pronouns fail in paper markdown
+    Given markdown lines containing "we", "our", "us" or "let's"
+    When checkScholarlyDefault runs on each
+    Then each result is "fail"
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::Roman_numerals_and_uppercase_US_pass_without_false_positives
+  Scenario: Roman numerals, uppercase US and lowercase verb "lean" pass
+    Given markdown lines containing "Part I", "Type I", "US" and the verb "lean"
+    When checkScholarlyDefault runs on each
+    Then each result is "pass"
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::block_title_and_caption_raw_label_prefixes_and_mechanical_table_placeholders_fail
+  Scenario: Block title and caption raw label prefixes and mechanical table placeholders fail
+    Given block manifests with title "Data table 2 from rem:linking-relations-table" or "Table 3 from def:frobenius-hopf-substrate"
+    When checkScholarlyDefault and checkVoiceTitleScholarly run
+    Then each result is "fail"
+
+  @test:scripts/tests/content/qa-checkers-voice.test.ts::fourth-wall_Lean_leaks_and_general_first-person_prose_in_paper_voice::truncated_block_titles_and_captions_ending_in_dangling_articles_or_prepositions_fail
+  Scenario: Truncated block titles and captions ending in dangling articles or prepositions fail
+    Given block manifests whose title or caption ends in a dangling "from " or "the "
+    When checkScholarlyDefault and checkVoiceTitleScholarly run
+    Then each result is "fail"
+    And a complete scholarly title and caption pass
