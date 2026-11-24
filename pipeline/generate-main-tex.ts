@@ -22,9 +22,9 @@
 
 import { folioDir } from "../schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
 import type { Paper } from "../schemas/types.ts";
-import { escapeLatex } from "./render-latex";
+import { escapeLatex, markdownToLatex } from "./render-latex";
 import { resolveRenderTarget } from "./render-discovery";
 import { findContentRepoRoot, requirePaper } from "./repo-root";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
@@ -75,6 +75,47 @@ export interface GenerateMainTexOptions {
   excludeChapterIndices?: Set<number>;
   /** Labels from excluded appendix chapters to declare as phantom anchors. */
   phantomLabels?: string[];
+  /** Directory containing the paper manifest (used to locate introduction/authors-note.md for Page 1). */
+  paperDir?: string;
+  /** Explicit LaTeX for the Lean 4 formalisation & authorship declaration on Page 1. */
+  leanDeclarationLatex?: string;
+}
+
+/**
+ * Resolve the Lean 4 formalisation and authorship declaration (`authors-note.md`)
+ * to render on Page 1 beneath the Abstract.
+ */
+function resolveFrontPageLeanDeclaration(
+  paper: Paper,
+  opts: GenerateMainTexOptions,
+): string | undefined {
+  if (opts.leanDeclarationLatex !== undefined) {
+    return opts.leanDeclarationLatex.trim() || undefined;
+  }
+  const candidateDirs: string[] = [];
+  if (opts.paperDir) {
+    candidateDirs.push(opts.paperDir);
+  }
+  const paperId = (paper as { id?: string }).id;
+  try {
+    const contentRoot = findContentRepoRoot();
+    if (paperId) {
+      candidateDirs.push(join(folioDir(contentRoot), paperId));
+    } else if (opts.chapterSlugs.size > 0) {
+      const sole = requirePaper(undefined, contentRoot);
+      candidateDirs.push(join(folioDir(contentRoot), sole));
+    }
+  } catch {
+    // Ignore when called in unit tests outside a content repo
+  }
+  for (const dir of candidateDirs) {
+    const notePath = join(dir, "introduction", "authors-note.md");
+    if (existsSync(notePath)) {
+      const raw = readFileSync(notePath, "utf-8").trim();
+      if (raw) return markdownToLatex(raw);
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -174,56 +215,63 @@ export function generateMainTex(
   lines.push("\\begin{document}");
   lines.push("");
 
-  // Title page — title, author, date only. Centered, vertically balanced.
-  // The CC license + copyright notice now lives on its own page (front matter
-  // book convention).
-  lines.push("% ── Title page ────────────────────────────────────────────────────────────");
+  // Title page — cover header (title, author, date), abstract, Lean 4
+  // formalisation & authorship declaration (authors-note.md), Lean status
+  // key (\proofstatuslegend), and CC-BY 4.0 license footer combined on
+  // ONE single front page (Page 1). Note that report.cls defines
+  // \begin{abstract}...\end{abstract} using \titlepage...\endtitlepage,
+  // which would force page breaks before and after the abstract; inline
+  // minipages inside titlepage keep cover, abstract, declaration, key,
+  // and license together on Page 1.
+  lines.push("% ── Title page (combined Cover + Abstract + Lean Declaration on Page 1) ──");
   lines.push("\\begin{titlepage}");
-  lines.push("\\centering");
-  lines.push("\\vspace*{3cm}");
-  lines.push(`{\\LARGE\\bfseries ${escapeLatexMeta(paper.title)}}\\\\[2em]`);
+  lines.push("\\begin{center}");
+  lines.push("\\vspace*{0.2cm}");
+  lines.push(`{\\LARGE\\bfseries ${escapeLatexMeta(paper.title)}}\\\\[0.8em]`);
   if (paper.affiliations?.length) {
     lines.push("\\ifshowaffiliations");
-    lines.push(`  {\\large ${authorName}\\thanks{${escapeLatexMeta(paper.affiliations[0])}}}\\\\[1em]`);
+    lines.push(`  {\\large ${authorName}\\thanks{${escapeLatexMeta(paper.affiliations[0])}}}\\\\[0.4em]`);
     lines.push("\\else");
-    lines.push(`  {\\large ${authorName}}\\\\[1em]`);
+    lines.push(`  {\\large ${authorName}}\\\\[0.4em]`);
     lines.push("\\fi");
   } else {
-    lines.push(`{\\large ${authorName}}\\\\[1em]`);
+    lines.push(`{\\large ${authorName}}\\\\[0.4em]`);
   }
   lines.push(`{\\large ${paper.date ? escapeLatexMeta(paper.date) : "\\today"}}`);
-  lines.push("\\vfill");
-  lines.push("\\end{titlepage}");
-  lines.push("");
-
-  // Copyright page — CC license notice on its own page.
-  lines.push("% ── Copyright page ────────────────────────────────────────────────────────");
-  lines.push("\\thispagestyle{empty}");
-  lines.push("\\null\\vfill");
-  lines.push("\\begin{center}{\\small");
-  lines.push("  \\ccby\\\\[0.5em]");
-  lines.push("  This work is licensed under a");
-  lines.push("  \\href{https://creativecommons.org/licenses/by/4.0/}{%");
-  lines.push("    Creative Commons Attribution 4.0 International License}.\\\\[0.3em]");
-  lines.push("  You are free to share and adapt this material for any purpose,\\\\");
-  lines.push("  provided appropriate credit is given, a link to the license is provided,\\\\");
-  lines.push("  and any changes made are indicated.");
-  lines.push("}\\end{center}");
-  lines.push("\\vfill\\null");
-  lines.push("\\clearpage");
-  lines.push("");
-
-  // Abstract — placed before TOC, book-style.
+  lines.push("\\end{center}");
   if (paper.abstract) {
-    lines.push("% ── Abstract ──────────────────────────────────────────────────────────────");
-    lines.push("\\begin{abstract}");
-    lines.push(paper.abstract);
-    lines.push("\\end{abstract}");
     lines.push("");
+    lines.push("% ── Abstract ──────────────────────────────────────────────────────────────");
+    lines.push("\\vspace{0.8em}");
+    lines.push("\\begin{center}");
+    lines.push("{\\bfseries Abstract}\\par\\smallskip");
+    lines.push("\\begin{minipage}{0.90\\textwidth}");
+    lines.push("\\footnotesize\\noindent\\ignorespaces");
+    lines.push(paper.abstract);
+    lines.push("\\end{minipage}");
+    lines.push("\\end{center}");
   }
-
-  lines.push("\\proofstatuslegend");
-  lines.push("\\clearpage");
+  const leanDeclarationLatex = resolveFrontPageLeanDeclaration(paper, opts);
+  if (leanDeclarationLatex) {
+    lines.push("");
+    lines.push("% ── Lean 4 Formalisation and Authorship Declaration ──────────────────────");
+    lines.push("\\vspace{0.8em}");
+    lines.push("\\begin{center}");
+    lines.push("\\phantomsection\\label{sec:authors-note}\\label{prose:authors-note}%");
+    lines.push("{\\bfseries Lean 4 Formalisation and Authorship Declaration}\\par\\smallskip");
+    lines.push("\\begin{minipage}{0.90\\textwidth}");
+    lines.push("\\footnotesize\\noindent\\ignorespaces");
+    lines.push(leanDeclarationLatex);
+    lines.push("\\end{minipage}");
+    lines.push("\\end{center}");
+  }
+  lines.push("\\vfill");
+  lines.push("\\noindent\\begin{minipage}{\\textwidth}");
+  lines.push("\\footnotesize\\proofstatuslegend");
+  lines.push("\\par\\smallskip\\noindent{\\footnotesize\\ccby\\enspace");
+  lines.push("This work is licensed under a \\href{https://creativecommons.org/licenses/by/4.0/}{Creative Commons Attribution 4.0 International License} (CC-BY 4.0): free to share and adapt with attribution and indication of changes.}");
+  lines.push("\\end{minipage}");
+  lines.push("\\end{titlepage}");
   lines.push("");
 
   // Introduction (if present) is emitted before the TOC per chapter-reorg
@@ -411,10 +459,14 @@ if (import.meta.main) {
   const { buildPaper } = await import("./build");
   const result = await buildPaper(paperPath);
 
+  const excludeChapterIndices = new Set(result.appendixChapters.keys());
   const tex = generateMainTex(paper, {
     preamblePath,
     chaptersDir,
     chapterSlugs: result.chapterSlugs,
+    excludeChapterIndices,
+    phantomLabels: result.appendixPhantomLabels,
+    paperDir: dirname(paperPath),
   });
 
   writeFileSync(outPath, tex);
