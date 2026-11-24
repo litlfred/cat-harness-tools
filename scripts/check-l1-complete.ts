@@ -33,7 +33,8 @@ import {
   ArchiveContentsSchema,
   isArchiveMimetype,
 } from "../schemas/library/archive-contents.ts";
-import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "../schemas/content/attribution.ts";
+import { ProvenanceSchema, isIngested, libraryOriginOf, type DeclaredLibraryOrigin } from "../schemas/content/attribution.ts";
+import { blockKindNode } from "../schemas/content/block-kinds.ts";
 import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "../schemas/content/narrative.ts";
 import { STRUCTURE_FILENAME, structureOf } from "../schemas/content/document-structure.ts";
 import {
@@ -728,6 +729,14 @@ export function sourceBlockOf(dir: string): Record<string, unknown> | undefined 
   return undefined;
 }
 
+/**
+ * The `libraryOrigin` a kind's own block-kind node declares — the kinds a
+ * higher layer owns (a paper's `lemma`, `remark`, ...), found by
+ * `block-kinds.ts`'s discovery of every layer's declared `block-kinds` graph.
+ */
+export const nodeLibraryOrigin: DeclaredLibraryOrigin = (kind) => blockKindNode(kind)?.libraryOrigin;
+const declaredOrigin = nodeLibraryOrigin;
+
 function derivableRequirements(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): Requirement[] {
   const out: Requirement[] = [];
   const has = (p: string) => existsSync(join(dir, p));
@@ -1215,10 +1224,13 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
           continue;
         }
         const kind = typeof b.kind === "string" ? b.kind : "";
-        const origin = LIBRARY_BLOCK_ORIGIN[kind];
+        const origin = libraryOriginOf(kind, declaredOrigin);
         if (origin === undefined) {
           unclassified++;
-          bad.push(`${f}: kind \`${kind || "(absent)"}\` is not classified in LIBRARY_BLOCK_ORIGIN`);
+          bad.push(
+            `${f}: kind \`${kind || "(absent)"}\` is not classified in LIBRARY_BLOCK_ORIGIN ` +
+              `or by a \`libraryOrigin\` on its block-kind node`,
+          );
           continue;
         }
         if (!ProvenanceSchema.safeParse(b.provenance).success) {

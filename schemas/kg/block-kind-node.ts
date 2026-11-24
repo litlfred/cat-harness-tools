@@ -61,6 +61,18 @@ export const BlockKindNodeSchema = z
      * the theorems that use them), so it is authored, not sorted.
      */
     indexRank: z.number().int().positive().optional(),
+    /**
+     * How a LIBRARY block of this kind came to be: `extracted` when its text
+     * is the source document's own, lifted verbatim (an ingested paper's
+     * theorem, lemma or remark), `authored` when it is somebody's account of
+     * the source and must name who wrote it. Read by `check:l1-complete`'s
+     * `narrative-provenance` requirement for a kind the platform's own
+     * `LIBRARY_BLOCK_ORIGIN` table does not classify, so the layer that OWNS
+     * a kind classifies it, and this layer never names a higher layer's kind.
+     * Absent: the kind is unclassified, and a library block carrying it is
+     * reported as such.
+     */
+    libraryOrigin: z.enum(["extracted", "authored"]).optional(),
     rationale: z.string().optional(),
   })
   .strict();
