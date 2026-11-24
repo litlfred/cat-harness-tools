@@ -248,10 +248,9 @@ export function renderBlockMarkdown(
     lines.push("");
   }
 
-  // Same resolver as the LaTeX path (`liquid-values.ts`, bean kott;
-  // `render-value.ts` for `:val[…]`), so the site and the PDF print one
-  // number; pass-through prefixes (`site.data`) are left for Jekyll /
-  // the IG Publisher.
+  // Same resolver as the LaTeX path (`liquid-values.ts`, bean kott), so the
+  // site and the PDF print one number; pass-through prefixes (`site.data`)
+  // are left for Jekyll / the IG Publisher.
   const prose = substituteValuesInMarkdown(resolveLiquidValues(mdContent)).trim();
   const body = entry.dmnTable ? placeDmnTable(prose, entry.dmnTable) : prose;
   if (body) lines.push(body);

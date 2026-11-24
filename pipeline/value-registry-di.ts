@@ -29,12 +29,8 @@ export interface ValueRegistryAPI {
 
 let currentApi: ValueRegistryAPI | null = null;
 
-export function configureValueRegistry(api: ValueRegistryAPI | null) {
+export function configureValueRegistry(api: ValueRegistryAPI) {
   currentApi = api;
-}
-
-export function isValueRegistryConfigured(): boolean {
-  return currentApi !== null;
 }
 
 export function getValueRegistry(): ValueRegistryAPI {

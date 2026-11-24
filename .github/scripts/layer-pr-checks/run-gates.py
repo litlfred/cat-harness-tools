@@ -67,7 +67,9 @@ A gate whose input this runner DOES have is given it instead
 PR's diff base, `translation:catalogue:check` gets `--base` the same commit,
 and `check:test-budgets` the junit report at `$GATE_JUNIT`
 that the tests step wrote. Either is skipped, with its reason, only on a side
-that holds no such input.
+that holds no such input. `check:site-iris` gets `--site $GATE_SITE --base`
+the caller's declared `iriBase` when the run built a site; with none it runs
+bare and exits 78, not applicable.
 
 `GATE_CONE` wires in the CI cone (`scripts/ci-cone.ts`, bean `4rbc`;
 cat-harness-tools#398). Unset, nothing changes. Every declared gate run as
@@ -123,7 +125,7 @@ from gate_diagnostics import diagnostics, producer  # noqa: E402
 GRAPH_GATES = {
     "kg-audit": "bun cat-harness-tools/scripts/kg-audit.ts --instance {path}",
     "kg-export": "bun cat-harness-tools/scripts/kg-export.ts --instance {path} --out {tmp}/{instance}.jsonld",
-    "import-direction": "bun cat-harness-tools/scripts/check-import-direction.ts --gate {instance}",
+    "import-direction": "bun cat-harness-tools/scripts/check-import-direction.ts --gate {instance} --if-code",
 }
 CHECKOUT_GATES = {
     "check-tools": "bun cat-harness-tools/scripts/check-tools.ts",
@@ -400,11 +402,46 @@ def test_budgets_input(env):
     return [path], None
 
 
+def own_iri_base(root, own):
+    """The `iriBase` the caller's own instance declares: the first of `own` that declares one, or None."""
+    if root is None or not os.path.isdir(root):
+        return None
+    known = instances_in(root)
+    for name in own or []:
+        decl = read_json(os.path.join(root, known.get(name, name), f"{name}.json")) or {}
+        base = decl.get("iriBase")
+        if isinstance(base, str) and base:
+            return base
+    return None
+
+
+def site_iris_input(env, root=None, own=None):
+    # check:site-iris judges a BUILT site (`--site <dir> --base <iriBase>`).
+    # Run bare it printed its usage and exited 2 on base and head alike (a FHIR
+    # IG's no-base layer-mode run, 2026-11-23). A run that built a site names it in GATE_SITE, and the
+    # site is checked against the caller's own declared iriBase, as
+    # build-instance-site.ts checks it. With no built site the gate still runs:
+    # given no --site, the script exits 78, not applicable, which is the true
+    # answer here and never a pass.
+    site = env.get("GATE_SITE", "").strip()
+    if not site:
+        return [], None
+    base = own_iri_base(root, own)
+    if base is None:
+        return None, (f"GATE_SITE names a built site ({site}), but the caller's own instance declares no iriBase "
+                      "to check its minted IRIs against")
+    return ["--site", site, "--base", base], None
+
+
 SUPPLIED_INPUTS = {
     "check:corpus-gate": corpus_gate_input,
+    "check:site-iris": site_iris_input,
     "check:test-budgets": test_budgets_input,
     "translation:catalogue:check": catalogue_input,
 }
+
+# The inputs that need the root and the caller's own instances, not only the environment.
+ROOT_INPUTS = {"check:site-iris"}
 
 
 # Scripts `gates.ts` declares `kind: "report"`: check scripts CI deliberately
@@ -453,10 +490,13 @@ def report_scripts(root):
     return out
 
 
-def gate_args(script, env=None):
+def gate_args(script, env=None, root=None, own=None):
     """(extra arguments, skip reason) for a declared gate: ([], None) for one that needs none."""
     fn = SUPPLIED_INPUTS.get(script)
-    return fn(os.environ if env is None else env) if fn else ([], None)
+    if not fn:
+        return [], None
+    env = os.environ if env is None else env
+    return fn(env, root, own) if script in ROOT_INPUTS else fn(env)
 
 
 def skip_reason(root, script, env=None, own=None, declarer=None):
@@ -579,7 +619,7 @@ def declared_gates(root, name, path, runner, env=None, own=None):
     for s in sorted(scripts):
         if not (s.startswith("check:") or s.endswith(":check")):
             continue
-        extra, why = gate_args(s, env)
+        extra, why = gate_args(s, env, root, own)
         command = " ".join([runner, s, *(shlex.quote(a) for a in extra or [])])
         kind = "input-absent" if why else None
         if not why:

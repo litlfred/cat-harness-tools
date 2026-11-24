@@ -16,6 +16,7 @@
  * Read as DATA: the schema itself belongs to a layer above this one.
  *
  * @module schemas/content/lang-text
+ * @graphNode none — a function library over label text; the glossary schema it reads belongs to a layer above
  */
 
 /** The source language when the scheme declares none. */

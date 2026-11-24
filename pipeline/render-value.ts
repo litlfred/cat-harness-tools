@@ -20,7 +20,7 @@ import { resolve } from "path";
 import { findContentRepoRoot } from "./repo-root";
 import {
   WITNESSED_VALUES,
-  isValueRegistryConfigured,
+  getValueRegistry,
   lookupValue,
   type WitnessedValueEntry,
   type WitnessedValueFormat,
@@ -295,7 +295,6 @@ export function renderValue(
   attrs: ValAttrs,
   mode: "text" | "math",
 ): string {
-  if (!isValueRegistryConfigured()) return literalFallback(name, attrs);
   const entry = lookupValue(name);
   if (!entry) return literalFallback(name, attrs);
 
@@ -410,42 +409,47 @@ export function substituteValuesInMath(text: string): string {
 }
 
 /**
- * Substitute every `:val[…]` occurrence across a Markdown document,
- * dispatching math regions (`$$…$$`, `\[…\]`, `\(…\)`, `$…$`) to
- * `mode = "math"` and prose regions outside fenced code blocks to
- * `mode = "text"`.  Leaves the input untouched when no `:val[` token
- * is present or when `ValueRegistry` is not configured.
+ * Substitute every `:val[…]` in a MARKDOWN source string, for the site
+ * renderer (`render-markdown.ts`). The LaTeX renderer resolves `:val` per
+ * mdast node; the Markdown renderer emits text, so this pass splits the
+ * source into math and prose spans by `$`/`$$` delimiters:
+ *
+ * - inside math, a reference becomes the bare numeral (`substituteValuesInMath`);
+ * - in prose, it becomes the numeral wrapped as inline math (`$…$`), because the
+ *   LaTeX text-mode form (`$v$\\,units`) leaves a literal `\\,` in a web page.
+ *
+ * Without it every `:val[…]` reached the published site as a raw token
+ * (qou bean `qou-h59j`, defect 2). Fenced code is left untouched.
  */
-const MARKDOWN_CODE_OR_MATH =
-  /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`)|(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$(?!\s)(?:\\.|[^$\n\\])+?\$)/g;
-
-export function substituteValuesInMarkdown(text: string): string {
-  if (!text.includes(":val[") || !isValueRegistryConfigured()) return text;
-  let out = "";
-  let last = 0;
-  const replaceProse = (prose: string): string =>
-    prose.replace(MATH_VAL_PATTERN, (_match, name: string, attrStr?: string) => {
-      const attrs = parseValAttrs(parseInlineAttrs(attrStr ?? ""));
-      return renderValue(name, attrs, "text");
-    });
-  for (const m of text.matchAll(MARKDOWN_CODE_OR_MATH)) {
-    const idx = m.index ?? 0;
-    if (idx > last) {
-      out += replaceProse(text.slice(last, idx));
-    }
-    if (m[1] !== undefined) {
-      // Code fence or inline code: leave untouched
-      out += m[1];
-    } else if (m[2] !== undefined) {
-      // Math region: substitute in math mode
-      out += substituteValuesInMath(m[2]);
-    }
-    last = idx + m[0].length;
+export function substituteValuesInMarkdown(md: string): string {
+  if (!md.includes(":val[")) return md;
+  // A renderer run with no registry configured (a repo that has none) keeps
+  // the old behaviour, the visible raw token, rather than crashing the build.
+  try {
+    getValueRegistry();
+  } catch {
+    return md;
   }
-  if (last < text.length) {
-    out += replaceProse(text.slice(last));
-  }
-  return out;
+  const FENCE = /(```[\s\S]*?```)/;
+  return md
+    .split(FENCE)
+    .map((chunk, i) => {
+      if (i % 2 === 1) return chunk; // fenced block
+      return chunk
+        .split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/)
+        .map((seg, j) => {
+          if (j % 2 === 1) return substituteValuesInMath(seg);
+          return seg.replace(MATH_VAL_PATTERN, (_m, name: string, attrStr?: string) => {
+            const attrs = parseValAttrs(parseInlineAttrs(attrStr ?? ""));
+            const out = renderValue(name, attrs, "math");
+            // An unresolved reference comes back as the literal token: keep it
+            // visible, but do not wrap it in math.
+            return out.startsWith(":val[") ? out : `$${out}$`;
+          });
+        })
+        .join("");
+    })
+    .join("");
 }
 
 // ── Directive extraction (for validators / auto-link) ────────────

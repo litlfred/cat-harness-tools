@@ -45,6 +45,19 @@
  * that genuinely has never swept gets the same refusal, which is the honest
  * answer: nothing was judged, so nothing can be called clean.
  *
+ * ## A root with no block is not applicable, not "could not determine"
+ *
+ * The refusal is for a root that HAS blocks and whose verdicts were not read.
+ * A root that holds no block at all (a FHIR IG site,
+ * 2026-11-19, where this exited 2 even after `qa:fetch`) has no block-QA
+ * producer: `qa-sweep` has nothing to judge there, so no verdict will ever be
+ * written and no fetch can change the answer. The same holds for a content
+ * root with no folio at all: `findContentRepoRoot` then falls back to the
+ * harness layer, whose verdicts only the harness index produces. It exits 78
+ * (`scripts/lib/not-applicable.ts`) through {@link notApplicableReason}. Only
+ * the empty case is excused: a verdict found in such a root is still swept,
+ * and is an abandoned orphan.
+ *
  * @module pipeline/orphan-verdict-sweep
  * @covers qa
  */
@@ -52,6 +65,8 @@ import { existsSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
 import { BLOCK_QA_RESULTS_DIR, BLOCK_QA_SUFFIX, blockOfQaPath } from "./qa-paths";
+import { walkBlocks } from "./qa-utils";
+import type { FolioContribution } from "../schemas/content/contributions";
 
 export interface OrphanVerdict {
   /** Repo-relative path of the verdict with no block behind it. */
@@ -129,13 +144,76 @@ export function sweepOrphanVerdicts(repoRoot: string): OrphanSweep {
   };
 }
 
+/** What {@link notApplicableReason} needs to know about where the sweep ran. */
+export interface SweepRootFacts {
+  /** The swept root holds at least one block ({@link rootHasBlocks}). */
+  hasBlocks: boolean;
+  /**
+   * The swept root is the harness layer because the checkout has no folio of
+   * its own (`findContentRepoRoot`'s fallback), and the checkout is a CONTENT
+   * root (`rootProfile`): the harness's block verdicts are produced only by the
+   * harness index's `qa:refresh` (`qa-sweep:docs`), never here.
+   */
+  harnessFallbackInContentRoot: boolean;
+}
+
+/**
+ * Why the sweep does not apply in this root, or `undefined` when it does. Only
+ * when no verdict was examined, and either the root holds no block for
+ * `qa-sweep` to judge, or the checkout is a content root with no folio (so the
+ * sweep landed on the harness layer, whose verdicts this root never produces).
+ * Either way no block-QA producer writes here and no fetch changes the answer.
+ * A root with blocks it produces verdicts for keeps the vacuity refusal; a
+ * root with verdicts is swept whatever else it holds.
+ */
+export function notApplicableReason(sweep: Pick<OrphanSweep, "examined">, facts: SweepRootFacts, root: string): string | undefined {
+  if (sweep.examined > 0) return undefined;
+  if (facts.harnessFallbackInContentRoot) {
+    return `this content root declares no folio, so the sweep fell back to the harness layer at ${root}, whose block verdicts only the harness index's \`qa:refresh\` (\`qa-sweep:docs\`) produces; this root has no block-QA producer`;
+  }
+  if (!facts.hasBlocks) {
+    return `${root} holds no block manifest, so it has no block-QA producer (\`qa-sweep\` has nothing to judge) and no verdict under ${BLOCK_QA_RESULTS_DIR} can exist to be orphaned`;
+  }
+  return undefined;
+}
+
+/**
+ * Whether `root` holds at least one block, by the walk `qa-sweep` itself uses
+ * (unlabelled blocks included, a dependency's contributed builders passed).
+ * Textual (`verify: false`): the question is whether a population exists, and
+ * loading every manifest to ask it would run them. Stops at the first block.
+ */
+export function rootHasBlocks(root: string, contributedBuilders?: ReadonlyMap<string, string>): boolean {
+  for (const _ of walkBlocks(root, { includeUnlabelled: true, verify: false, contributedBuilders })) return true;
+  return false;
+}
+
 if (import.meta.main) {
-  const { findContentRepoRoot } = await import("./repo-root");
+  const { findContentRepoRoot, contributionsRoot } = await import("./repo-root");
   const { vacuityRefusal } = await import("../scripts/vacuity-refusal");
+  const { exitNotApplicable } = await import("../scripts/lib/not-applicable");
   const root = findContentRepoRoot();
   const sweep = sweepOrphanVerdicts(root);
   const found = sweep.orphans;
   const abandoned = found.filter((f) => f.kind === "abandoned");
+
+  if (sweep.examined === 0) {
+    // The same contributed builders `qa-sweep` walks with, so a root whose only
+    // blocks are a dependency's kinds (`dak`) is not read as having none.
+    const { loadContributions } = await import("../schemas/kg/harness-config");
+    const { ContributionRegistry } = await import("../schemas/content/contributions");
+    const contributions = await loadContributions<FolioContribution, InstanceType<typeof ContributionRegistry>>(contributionsRoot(), new ContributionRegistry());
+    const { HARNESS_ROOT } = await import("../scripts/lib/roots");
+    const { rootProfile } = await import("../scripts/lib/root-gate-set");
+    const { resolve } = await import("node:path");
+    const harnessFallbackInContentRoot = resolve(root) === resolve(HARNESS_ROOT) && rootProfile(contributionsRoot()) === "content";
+    const na = notApplicableReason(
+      sweep,
+      { harnessFallbackInContentRoot, hasBlocks: harnessFallbackInContentRoot || rootHasBlocks(root, contributions.contributedBuilders()) },
+      root,
+    );
+    if (na !== undefined) exitNotApplicable("check:orphan-verdicts", na);
+  }
 
   // Zero examined is "could not determine", never "no orphans" (C6). The
   // refusal names the tree and its state, and the remedy: the derived corpus

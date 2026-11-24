@@ -43,7 +43,10 @@
 #      bun.lock without the pin edits, and the summary says so.
 #   4. When a tracked file changed, push `repin/standing-<date>` and open ONE
 #      PR, or update the one already open (any `repin/standing-*` head), so
-#      runs never stack PRs. Then label it `needs-repin` for the merge
+#      runs never stack PRs. A branch that carries a commit this workflow did
+#      not make (an agent's fix) is never overwritten: the re-pin goes to a
+#      fresh branch and PR instead, and every push is a lease on the branch
+#      as it was read. Then label it `needs-repin` for the merge
 #      manager, whatever started the run, creating the label first in a
 #      repository that has none (owner, card 2026-11-18). It NEVER merges and never asks for
 #      auto-merge; an auto-merge already on the PR (set before this rule) is
@@ -209,6 +212,29 @@ jobs:
             branch="repin/standing-$(date -u +%Y-%m-%d)"
             number=""
           fi
+          # Never drop a commit someone else pushed to the repin branch (an
+          # agent's fix on the open re-pin PR). A re-dispatch rebuilt the
+          # branch from main and force-pushed it, and an agent's commit was
+          # lost (2026-11-23, a downstream site's re-pin). Commits this workflow
+          # made are the ones whose subject starts "Standing repin:"; any
+          # other commit on the branch, past main, is someone's work. Then the
+          # re-pin goes to a FRESH branch and PR, and the old PR is left to
+          # its author. The push below is a lease on what was read here, so a
+          # commit pushed in between is refused rather than overwritten.
+          old=""
+          if git fetch -q --depth=200 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE" "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null; then
+            old=$(git rev-parse "refs/remotes/origin/$branch")
+            theirs=$(git log --format='%h %s' "refs/remotes/origin/$BASE..refs/remotes/origin/$branch" | grep -v '^[0-9a-f]* Standing repin: ' || true)
+            if [ -n "$theirs" ]; then
+              was="$branch"
+              branch="repin/standing-$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID:-$(date -u +%H%M%S)}"
+              number=""
+              old=""
+              echo "::warning::$was carries commits this workflow did not make; the re-pin goes to a fresh branch, $branch, and $was is left as it is"
+              { echo "\`$was\` carries commits this workflow did not make, so it was not overwritten; this re-pin is on \`$branch\`:"; sed 's/^/- /' <<<"$theirs"; echo; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          lease="--force-with-lease=refs/heads/$branch:$old"
           git checkout -q -B "$branch"
           git add -A
           git commit -q -F - <<EOF
@@ -221,12 +247,20 @@ jobs:
           # a commit that edits .github/workflows. Then drop the pin edits and
           # push the rest, so the lock still moves; check:workflow-pins warns
           # that the calls trail it until an agent session moves them.
-          if ! git push -q --force origin "HEAD:refs/heads/$branch"; then
+          if ! git push -q "$lease" origin "HEAD:refs/heads/$branch"; then
             if git diff --quiet HEAD~1 HEAD -- .github/workflows; then exit 1; fi
             echo "::warning::the push with the workflow pins was refused (no \`workflows\` permission?): pushing without them; the \`uses:\` calls trail index.lock.json until an agent session runs \`bun run cat workflow-pins\`"
-            git checkout -q HEAD~1 -- .github/workflows
+            # Reset the index of the whole directory to the parent: a
+            # `checkout HEAD~1 -- .github/workflows` restores the files the
+            # parent has but keeps a workflow the re-pin ADDED, so the
+            # amended commit still touched workflows and was refused again
+            # (a downstream standing repin). Then bring the working tree to
+            # the amended commit: modified files back, added ones removed.
+            git reset -q HEAD~1 -- .github/workflows
             git commit -q --amend --no-edit
-            git push -q --force origin "HEAD:refs/heads/$branch"
+            git checkout -q -- .github/workflows
+            git clean -qfd -- .github/workflows
+            git push -q "$lease" origin "HEAD:refs/heads/$branch"
             echo "Workflow pins NOT moved: the credential cannot push .github/workflows. Pass a \`repin-token\` with the \`workflows\` permission." >> "$GITHUB_STEP_SUMMARY"
           fi
           title="Standing repin ($(date -u +%Y-%m-%d))"

@@ -14,6 +14,7 @@ import type { StandingConsent } from "../../../schemas/kg/mount-trust.js";
 import type { RemoteMount } from "../../../schemas/kg/remote-mount.js";
 import { readDeclaration } from "../../../schemas/kg/cat-harness.ts";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
+import { pushRunsVerdict } from "../../lib/main-verdict-runs.ts";
 import {
   alignToHeldPins,
   applyRepin,
@@ -27,6 +28,8 @@ import {
   planRepin,
   summaryOf,
   upstreamRootsOf,
+  githubApi,
+  movesBackwards,
   verdictOf,
   type CommitVerdict,
   type GitHubApi,
@@ -106,7 +109,8 @@ describe("planRepin: the coverage decision, per instance", () => {
   test("already at the newest green: held, not moved", async () => {
     const plan = await planRepin([mount("x", C, rule())], stubApi({ "o/x@main": [D, C] }, { [D]: "red", [C]: "green" }));
     expect(plan.moves).toEqual([]);
-    expect(plan.held[0]!.reason).toContain("already pinned");
+    expect(plan.held[0]!.reason).toContain("holds its pin");
+    expect(plan.held[0]!.reason).toContain("newer than its pin");
   });
   test("nothing green: held with the reason", async () => {
     const plan = await planRepin([mount("x", A, rule())], stubApi({ "o/x@main": [D] }, { [D]: "pending" }));
@@ -474,5 +478,123 @@ describe("alignToHeldPins never moves a pin backwards (folio-assistant train #31
     const plan = await alignToHeldPins(empty, [harness(A), lower(C)], api(new Error("HTTP 500")), cap);
     expect(plan.moves).toEqual([]);
     expect(plan.held[0]!.reason).toContain("HTTP 500");
+  });
+});
+
+/**
+ * litlfred/smart-base#454 (2026-11-23): the standing re-pin moved who-iris
+ * and cat-harness-tools to ANCESTORS of their pins, and called three
+ * cat-harness-tools commits "red" whose push run of PR checks was green,
+ * because it read every check run on the commit (superseded Merge guard
+ * runs end `cancelled`).
+ */
+describe("never backwards: the search stops at the current pin (smart-base#454)", () => {
+  test("the newest green is older than the pin: held, not moved back to it", async () => {
+    // main: D (red), C (the pin), B (green). B is an ancestor of C.
+    const api = stubApi({ "o/x@main": [D, C, B, A] }, { [D]: "red", [B]: "green" });
+    const plan = await planRepin([mount("x", C, rule())], api);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("holds its pin");
+    // Nothing at or behind the pin is even asked about.
+    expect(api.calls).not.toContain("verdict o/x c");
+    expect(api.calls).not.toContain("verdict o/x b");
+  });
+  test("the pin at the branch head: held, no verdict asked", async () => {
+    const api = stubApi({ "o/x@main": [C, B] }, { [B]: "green" });
+    const plan = await planRepin([mount("x", C, rule())], api);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("already pinned at the head");
+    expect(api.calls.some((c) => c.startsWith("verdict"))).toBe(false);
+  });
+  test("a newer green above the pin still moves forward", async () => {
+    const plan = await planRepin([mount("x", B, rule())], stubApi({ "o/x@main": [D, C, B] }, { [D]: "pending", [C]: "green" }));
+    expect(plan.moves.map((m) => [m.from, m.to])).toEqual([[B, C]]);
+  });
+  test("a pin older than the window: a candidate GitHub says is behind it is held", async () => {
+    const api = { ...stubApi({ "o/x@main": [D, C] }, { [D]: "green" }), compareCommits: async () => "behind" };
+    const plan = await planRepin([mount("x", A, rule())], api);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("never moves a pin backwards");
+  });
+  test("a pin older than the window: a candidate ahead of it moves", async () => {
+    const api = { ...stubApi({ "o/x@main": [D, C] }, { [D]: "green" }), compareCommits: async () => "ahead" };
+    expect((await planRepin([mount("x", A, rule())], api)).moves.map((m) => m.to)).toEqual([D]);
+  });
+  test("no require: a branch head behind the pin is held too", async () => {
+    const api = { ...stubApi({ "o/x@main": [B] }), compareCommits: async () => "behind" };
+    const plan = await planRepin([mount("x", C, rule({ require: undefined }))], api);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("OLDER than its pin");
+  });
+  test("a comparison that fails holds the pin, never moves it", async () => {
+    const api = { ...stubApi({ "o/x@main": [D] }, { [D]: "green" }), compareCommits: async () => { throw new Error("HTTP 502"); } };
+    const plan = await planRepin([mount("x", A, rule())], api);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("could not be asked");
+  });
+  test("movesBackwards: identical and behind are backwards; ahead and diverged are not", async () => {
+    const api = (rel: string) => ({ ...stubApi({}), compareCommits: async () => rel });
+    expect(await movesBackwards(api("behind"), "o/x", C, B)).toBe(true);
+    expect(await movesBackwards(api("identical"), "o/x", C, B)).toBe(true);
+    expect(await movesBackwards(api("ahead"), "o/x", B, C)).toBe(false);
+    expect(await movesBackwards(api("diverged"), "o/x", B, C)).toBe(false);
+    expect(await movesBackwards(stubApi({}), "o/x", B, C)).toBeUndefined();
+    expect(await movesBackwards(stubApi({}), "o/x", B, B)).toBe(true);
+  });
+});
+
+describe("pending, not red: a commit newer than the last finished verdict (smart-base#454)", () => {
+  test("a commit with no verdict yet, above a green one, is reported pending", async () => {
+    const r = await candidateFor(stubApi({ "o/x@main": [D, C, B] }, { [C]: "green" }), "o/x", rule());
+    expect(r.looked.map((l) => l.verdict)).toEqual(["pending", "green"]);
+    const plan = await planRepin([mount("x", B, rule())], stubApi({ "o/x@main": [D, C, B] }, { [C]: "green" }));
+    expect(summaryOf(plan, true)).toContain(`\`${D.slice(0, 10)}\` (pending)`);
+  });
+});
+
+describe("main's verdict is its push runs, as the merge manager reads it (smart-base#454)", () => {
+  // The runs of cat-harness-tools 6e99c49a on 2026-11-23: PR checks' push run
+  // green, and Merge guard runs (workflow_run, issue_comment) on the same
+  // sha, two of them cancelled.
+  const runs6e99 = [
+    { id: 45057944855, workflow_id: 1, name: "PR checks", event: "push", status: "completed", conclusion: "success", head_sha: "6e99" },
+    { id: 45057944846, workflow_id: 2, name: "Push on main", event: "dynamic", status: "completed", conclusion: "success", head_sha: "6e99" },
+    { id: 45057953213, workflow_id: 3, name: "Merge guard", event: "workflow_run", status: "completed", conclusion: "cancelled", head_sha: "6e99" },
+    { id: 45057945664, workflow_id: 3, name: "Merge guard", event: "workflow_run", status: "completed", conclusion: "cancelled", head_sha: "6e99" },
+    { id: 45057958049, workflow_id: 3, name: "Merge guard", event: "issue_comment", status: "completed", conclusion: "success", head_sha: "6e99" },
+  ];
+  test("cancelled Merge guard runs on main's sha do not make it red", () => {
+    expect(pushRunsVerdict(runs6e99, "6e99").verdict).toBe("green");
+    // What the old reading said of the same commit: red.
+    expect(verdictOf(undefined, runs6e99.map((r) => ({ status: r.status, conclusion: r.conclusion })))).toBe("red");
+  });
+  test("red, pending and none", () => {
+    const r = (o: object) => ({ id: 1, workflow_id: 1, name: "PR checks", event: "push", status: "completed", conclusion: "success", head_sha: "s", ...o });
+    expect(pushRunsVerdict([r({ conclusion: "failure" })], "s")).toEqual({ verdict: "red", red: ["PR checks"], pending: [] });
+    expect(pushRunsVerdict([r({ status: "in_progress", conclusion: null })], "s").verdict).toBe("pending");
+    expect(pushRunsVerdict([r({ conclusion: "cancelled" })], "s").verdict).toBe("none");
+    expect(pushRunsVerdict([], "s").verdict).toBe("none");
+    // A re-run replaces the run it re-ran.
+    expect(pushRunsVerdict([r({ conclusion: "failure" }), r({ id: 2 })], "s").verdict).toBe("green");
+  });
+  test("githubApi().commitVerdict asks for the push runs, and falls back to the combined status only without one", async () => {
+    const real = globalThis.fetch;
+    const asked: string[] = [];
+    const answer = (path: string): unknown =>
+      path.includes("/actions/runs") ? { workflow_runs: path.includes("6e99") ? runs6e99 : [] } : { state: "success", total_count: 1 };
+    globalThis.fetch = (async (url: string) => {
+      asked.push(String(url));
+      return new Response(JSON.stringify(answer(String(url))), { status: 200 });
+    }) as unknown as typeof fetch;
+    try {
+      const api = githubApi("t", "https://api.test");
+      expect(await api.commitVerdict("o/x", "6e99")).toBe("green");
+      expect(asked).toEqual(["https://api.test/repos/o/x/actions/runs?head_sha=6e99&event=push&per_page=100"]);
+      expect(asked.some((u) => u.includes("check-runs"))).toBe(false);
+      expect(await api.commitVerdict("o/x", "ext")).toBe("green");
+      expect(asked.at(-1)).toBe("https://api.test/repos/o/x/commits/ext/status");
+    } finally {
+      globalThis.fetch = real;
+    }
   });
 });

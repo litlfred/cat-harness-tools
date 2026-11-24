@@ -704,7 +704,8 @@
     var m = /^#lab-(.+)$/.exec(location.hash);
     var inner = !m && location.hash.length > 1 ? stepOf(decodeURIComponent(location.hash.slice(1))) : null;
     if (inner) show(inner, false, true);
-    else show(m ? m[1] : store("jp:lab:" + ws) || steps[0].getAttribute("data-jp-lab-step"), false);
+    // On arrival the address is left as it came, so a plain visit opens at the top of the page (the schedule), not at the step.
+    else show(m ? m[1] : store("jp:lab:" + ws) || steps[0].getAttribute("data-jp-lab-step"), false, true);
     window.addEventListener("hashchange", function () {
       var s = stepOf(decodeURIComponent(location.hash.slice(1)));
       if (s) show(s, false, true);
@@ -783,6 +784,11 @@
           if (it.type === "check") {
             var g = it.group || sec.label;
             (ticked[g] = ticked[g] || []).push(it.label);
+            return;
+          }
+          if (it.type === "choice" && it.each) {
+            dl.appendChild(el("dt", null, it.label));
+            dl.appendChild(el("dd", null, v.text));
             return;
           }
           if (it.type === "choice") {

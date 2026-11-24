@@ -65,8 +65,8 @@
  * `BRANCH_STORE_DIR`), never in the checkout's object store: a `--filter`
  * fetch turns the repository it runs in into a partial clone, and a reader
  * must not do that to a contributor's checkout. The checkout's
- * `http.*.extraheader` (CI's token) is carried in the ENVIRONMENT
- * (`GIT_CONFIG_COUNT`), never in argv.
+ * `http.*.extraheader` (CI's token) is carried in the ENVIRONMENT, once and in place
+ * of any global copy (`GIT_CONFIG_COUNT`, `lib/git-auth-env.ts`), never in argv.
  *
  * {@link resolveTipLocation} maps a declared directory to its branch and path.
  *
@@ -100,6 +100,7 @@ import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { projectedRead } from "../schemas/sdlc/read-projections.ts";
 import { githubUrlFor, type UrlFor } from "./remote-tree.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
+import { authEnvFrom } from "./lib/git-auth-env.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -507,24 +508,6 @@ function gitTopLevel(cwd = process.cwd()): string {
   const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf-8" });
   if (r.status !== 0) throw new BranchStoreUsageError(`not inside a git checkout: ${cwd}`);
   return r.stdout.trim();
-}
-
-/** The checkout's own `http.*.extraheader` lines, carried in env (never argv). */
-function authEnvFrom(repoRoot: string): Record<string, string> {
-  // input-site: store #d6d10161 — configures a branch-store read; the read itself goes through TreeStore.git(), which is traced
-  const r = spawnSync("git", ["config", "--get-regexp", "^http\\..*extraheader$"], { cwd: repoRoot, encoding: "utf-8" });
-  if (r.status !== 0 || !r.stdout.trim()) return {};
-  const env: Record<string, string> = {};
-  const lines = r.stdout.trim().split("\n");
-  // input-site: store #d641fe25 — configures a branch-store read; the read itself goes through TreeStore.git(), which is traced
-  const base = Number(process.env.GIT_CONFIG_COUNT ?? 0) || 0;
-  lines.forEach((line, i) => {
-    const sp = line.indexOf(" ");
-    env[`GIT_CONFIG_KEY_${base + i}`] = line.slice(0, sp);
-    env[`GIT_CONFIG_VALUE_${base + i}`] = line.slice(sp + 1);
-  });
-  env.GIT_CONFIG_COUNT = String(base + lines.length);
-  return env;
 }
 
 /** Split and check a branch-relative path. Absolute, `..`, and empty segments are usage errors. */
@@ -1493,12 +1476,20 @@ export function storeOptionsFor(
  * the DECLARING repository has the branch cannot tell those two apart:
  * litlfred/cat-harness carries it in both cases.
  *
+ * A PUBLICATION branch is not adoption ({@link publicationBranches}). CI
+ * writes `cat/cat-harness/qa-reports` (commit-keyed) on every root that runs
+ * the gates, a FHIR IG site included, so counting it made every unowned graph
+ * of the namespace a failed mount there instead of absent, and every bean gate
+ * exited 2 rather than 78 (a FHIR IG judged with no base, 2026-11-19). Only a branch kept
+ * at a tip, the way adopted state is, says the checkout keeps the namespace.
+ *
  * `unknown` when ls-remote could not answer: never read as "not carried".
  */
 export function namespaceCarried(
   loc: Pick<TipLocation, "branch" | "repository">,
   repoRoot: string,
   store?: BranchStoreOptions,
+  publications?: ReadonlySet<string>,
 ): { state: "carried"; branches: string[] } | { state: "not-carried"; namespace: string } | { state: "unknown"; reason: string } {
   const slash = loc.branch.lastIndexOf("/");
   const namespace = slash > 0 ? loc.branch.slice(0, slash + 1) : loc.branch;
@@ -1506,12 +1497,51 @@ export function namespaceCarried(
   const pattern = slash > 0 ? `refs/heads/${namespace}*` : `refs/heads/${loc.branch}`;
   const ls = s.git(["ls-remote", "--heads", "origin", pattern]);
   if (ls.status !== 0) return { state: "unknown", reason: `ls-remote failed: ${ls.stderr.trim()}` };
-  const branches = ls.stdout
+  let branches = ls.stdout
     .toString()
     .split("\n")
     .map((l) => l.split("\t")[1]?.trim().replace(/^refs\/heads\//, ""))
     .filter((b): b is string => Boolean(b));
+  // Asked only when the remote HAS branches here: a checkout with none (smart-ra)
+  // pays nothing for resolving every declaration.
+  if (branches.length > 0) {
+    const pub = publications ?? publicationBranches(repoRoot);
+    branches = branches.filter((b) => !pub.has(b));
+  }
   return branches.length ? { state: "carried", branches } : { state: "not-carried", namespace };
+}
+
+const publicationCache = new Map<string, ReadonlySet<string>>();
+
+/**
+ * The branches a declaration keeps PUBLISHED output on rather than state: every
+ * declared directory whose branch is keyed by anything but `tip` (`commit`, as
+ * `qa` on `cat/cat-harness/qa-reports`; `route` and `route-family`, as a site).
+ * CI writes them wherever it runs, so their presence on a remote says nothing
+ * about which state namespaces that checkout adopted ({@link namespaceCarried}).
+ * Read from the declarations, never a list of names, and cached per root:
+ * resolving every directory of an index is not free.
+ */
+export function publicationBranches(repoRoot: string): ReadonlySet<string> {
+  const key = resolve(repoRoot);
+  const hit = publicationCache.get(key);
+  if (hit) return hit;
+  const out = new Set<string>();
+  for (const inst of layerRootsIn(repoRoot)) {
+    let overrides: SubgraphSourceOverrides | undefined;
+    const overridesOf = (): SubgraphSourceOverrides => (overrides ??= subgraphSourceOverrides(inst, repoRoot));
+    for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
+      let at: ReturnType<typeof keptAt>;
+      try {
+        at = keptAt(inst, repoRoot, d, overridesOf);
+      } catch {
+        continue; // a source the resolver refuses is reported where it is mounted, not here
+      }
+      if (at && at.keyedBy !== "tip" && at.keyedBy !== "family") out.add(at.branch);
+    }
+  }
+  publicationCache.set(key, out);
+  return out;
 }
 
 /**

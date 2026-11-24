@@ -135,7 +135,7 @@
    * The canvas as PDF bytes. `get(key)` answers the value kept under `key`
    * (null when none).
    */
-  function build(model, get) {
+  function build(model, get, drawings) {
     var pdf = new Pdf();
     var paper = PAPER[model.size] || PAPER.A3;
     var W = paper[0];
@@ -172,7 +172,7 @@
     var page = null;
 
     function newPage(sheet, cont) {
-      page = { id: pdf.alloc(), ops: [], annots: [], col: 0, y: 0 };
+      page = { id: pdf.alloc(), ops: [], annots: [], col: 0, y: 0, images: {} };
       pages.push(page);
       var y = H - MARGIN;
       text(MARGIN, y - 10, 9, false, model.title + (sheet.label ? " · " + sheet.label : ""), 0.4);
@@ -244,7 +244,7 @@
     }
 
     function heading(f, w) {
-      var lines = wrap(f.label, 9.5, w, true);
+      var lines = f.label ? wrap(f.label, 9.5, w, true) : [];
       var hint = f.hint ? wrap(f.hint, 8, w) : [];
       return {
         h: lines.length * 12 + hint.length * 10 + 4,
@@ -264,12 +264,18 @@
 
     function field(f, sheet) {
       var hd = heading(f, colW);
+      if (!f.rows.length) {
+        // Words the sheet prints, no answer: the heading alone.
+        room(hd.h + 6, sheet);
+        page.y = hd.draw(x0(), page.y) - 6;
+        return;
+      }
       if (!f.heads) {
-        // A write-in, or a list of options one per line.
+        // A write-in, or a list of options one per line (an option's write-in under it).
         var cells = f.rows[0].cells;
         var text1 = cells.length === 1 && cells[0].kind === "text";
         var bodyH = text1 ? (cells[0].lines || 1) * 12 + 6 : cells.reduce(function (n, c) {
-          return n + wrap(c.label, 9, colW - 16).length * 11 + 3;
+          return n + (c.kind === "text" ? 18 : wrap(c.label, 9, colW - 16).length * 11 + 3);
         }, 0);
         room(hd.h + bodyH + 10, sheet);
         var y = hd.draw(x0(), page.y);
@@ -278,6 +284,11 @@
           y -= bodyH;
         } else {
           cells.forEach(function (c) {
+            if (c.kind === "text") {
+              textField(c, x0() + 14, y - 16, colW - 14, 15);
+              y -= 18;
+              return;
+            }
             var ls = wrap(c.label, 9, colW - 16);
             tickField(c, x0(), y - 10, 9);
             ls.forEach(function (l, i) {
@@ -290,7 +301,10 @@
         return;
       }
       // A grid or a gap strip: row labels down the left, a column per head.
-      var labW = colW * 0.42;
+      // No row-label column when no row has a label (a table whose first column is printed words).
+      var labW = f.rows.some(function (r) {
+        return r.label;
+      }) ? colW * 0.42 : 0;
       var cw = (colW - labW) / f.heads.length;
       var headLines = f.heads.map(function (h) {
         return wrap(h, 7, cw - 4);
@@ -310,8 +324,29 @@
       }
       heads();
       f.rows.forEach(function (r) {
+        if (r.group !== undefined) {
+          // A heading row (a layer of the architecture map).
+          var gl = wrap(r.group, 8, colW - 4);
+          var gh = gl.length * 9 + 4;
+          if (y - gh < MARGIN) {
+            page.y = y;
+            room(gh + headH + 4, sheet);
+            y = page.y;
+            heads();
+          }
+          gl.forEach(function (l, i) {
+            text(x0(), y - 9 - i * 9, 8, true, l, 0.15);
+          });
+          y -= gh;
+          return;
+        }
         var ls = wrap(r.label || "", 8, labW - 4);
-        var rh = Math.max(ls.length * 9 + 4, r.cells[0].kind === "text" ? 16 : 13);
+        var labelLines = r.cells.reduce(function (n, c) {
+          return c.kind === "label" ? Math.max(n, wrap(c.label, 7.5, cw - 4).length) : n;
+        }, 0);
+        var rh = Math.max(ls.length * 9 + 4, labelLines * 8.5 + 4, r.cells.some(function (c) {
+          return c.kind === "text";
+        }) ? 16 : 13);
         if (y - rh < MARGIN) {
           page.y = y;
           room(rh + headH + 4, sheet);
@@ -324,6 +359,9 @@
         r.cells.forEach(function (c, i) {
           var cx = x0() + labW + i * cw;
           if (c.kind === "text") textField(c, cx + 1, y - rh + 1, cw - 2, rh - 2);
+          else if (c.kind === "label") wrap(c.label, 7.5, cw - 4).forEach(function (l, j) {
+            text(cx + 2, y - 8.5 - j * 8.5, 7.5, false, l, 0.25);
+          });
           else tickField(c, cx + (cw - 9) / 2, y - rh / 2 - 4.5, 9);
         });
         page.ops.push("0.85 G 0.4 w " + num(x0()) + " " + num(y - rh) + " m " + num(x0() + colW) + " " + num(y - rh) + " l S");
@@ -354,6 +392,70 @@
       }
     });
 
+    // The appendix (owner, 2026-11-19): the table's systems, the architecture, then each drawing, with the table's own names.
+    var app = model.appendix;
+    if (app) {
+      // The appendix's tables run the page's full width, in one column.
+      nCols = 1;
+      colW = W - 2 * MARGIN;
+      var named = localNames(app, get);
+      var sheetOf = function (title) {
+        return { label: T("Appendix"), title: title, sections: [] };
+      };
+      if (app.systems && app.systems.length) {
+        var sys = sheetOf(T("Our systems"));
+        newPage(sys, false);
+        field(
+          {
+            label: T("The application components, and our name for each"),
+            heads: [T("We have it"), T("Our name")],
+            rows: app.systems.map(function (x) {
+              return {
+                label: x.name,
+                cells: [
+                  { key: x.have, label: x.name + ": " + T("We have it"), kind: "tick", value: "1" },
+                  { key: x.local, label: x.name + ": " + T("Our name"), kind: "text", lines: 1 },
+                ],
+              };
+            }),
+          },
+          sys,
+        );
+      }
+      if (app.panel) {
+        var pan = sheetOf(app.panel.title);
+        newPage(pan, false);
+        var boxName = function (b) {
+          return (b.slug && named[b.slug]) || b.name;
+        };
+        var prow = app.panel.rows.map(function (r) {
+          return {
+            label: r.layer,
+            cells: r.cells.map(function (c) {
+              return { key: "", label: c.map(boxName).join("; "), kind: "label" };
+            }),
+          };
+        });
+        field({ label: "", heads: app.panel.countries, rows: prow }, pan);
+        if (app.panel.shared) {
+          field({ label: app.panel.shared.group, hint: app.panel.shared.members.map(boxName).join("; "), rows: [] }, pan);
+        }
+      }
+      (drawings || []).forEach(function (d, i) {
+        var sh = sheetOf(d.title);
+        newPage(sh, false);
+        var name = "Im" + (i + 1);
+        page.images[name] = pdf.stream("/Type /XObject /Subtype /Image /Width " + d.w + " /Height " + d.h + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode]", d.hex + ">");
+        var aw = W - 2 * MARGIN;
+        var ah = page.y - MARGIN;
+        var sc = Math.min(aw / d.w, ah / d.h);
+        var dw = d.w * sc;
+        var dh = d.h * sc;
+        page.ops.push("q " + num(dw) + " 0 0 " + num(dh) + " " + num(MARGIN + (aw - dw) / 2) + " " + num(page.y - dh) + " cm /" + name + " Do Q");
+        if (d.note) text(MARGIN, MARGIN - 14, 8, false, d.note, 0.4);
+      });
+    }
+
     Object.keys(radios).forEach(function (k) {
       var g = radios[k];
       pdf.set(g.id, "<< /FT /Btn /Ff 49152 /T " + fieldName(k) + " /TU " + utf16(g.label) + " /V " + (g.value ? pdfName(g.value) : "/Off") + " /Kids [" + g.kids.map(function (id) {
@@ -362,7 +464,13 @@
     });
     pages.forEach(function (p) {
       var content = pdf.stream("", p.ops.join("\n"));
-      pdf.set(p.id, "<< /Type /Page /Parent " + pagesId + " 0 R /MediaBox [0 0 " + num(W) + " " + num(H) + "] /Resources " + res + " /Contents " + content + " 0 R" + (p.annots.length ? " /Annots [" + p.annots.map(function (id) {
+      var imgs = Object.keys(p.images);
+      var pres = imgs.length
+        ? "<< /Font << /F1 " + helv + " 0 R /F2 " + bold + " 0 R >> /XObject << " + imgs.map(function (n) {
+            return "/" + n + " " + p.images[n] + " 0 R";
+          }).join(" ") + " >> >>"
+        : res;
+      pdf.set(p.id, "<< /Type /Page /Parent " + pagesId + " 0 R /MediaBox [0 0 " + num(W) + " " + num(H) + "] /Resources " + pres + " /Contents " + content + " 0 R" + (p.annots.length ? " /Annots [" + p.annots.map(function (id) {
         return id + " 0 R";
       }).join(" ") + "]" : "") + " >>");
     });
@@ -379,6 +487,123 @@
     return pdf.bytes(catalog, info);
   }
 
+  // The names the table gave its application components (How it works), by element slug.
+  function localNames(app, get) {
+    var out = {};
+    (app.systems || []).forEach(function (x) {
+      var v = (get(x.local) || "").trim();
+      if (v) out[x.slug] = v;
+    });
+    return out;
+  }
+  // The slug of an element page's address, as the viewer keys its marks (`elementSlug`).
+  function hrefSlug(href) {
+    var seg = String(href || "").replace(/\/(index\.html)?$/, "").split("/").pop() || "";
+    return seg.replace(/\.html$/, "").replace(/[^A-Za-z0-9-]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+  }
+  function norm(s) {
+    return String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+  // A drawing with every component the table named under its own name: an ArchiMate box by the element page it opens, any other label (a BPMN lane) by its words.
+  function renameSvg(svgText, app, named) {
+    var doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
+    var svg = doc.documentElement;
+    if (!svg || svg.nodeName.toLowerCase() !== "svg") return svgText;
+    var byName = {};
+    (app.systems || []).forEach(function (x) {
+      if (named[x.slug]) byName[norm(x.name)] = named[x.slug];
+    });
+    function words(t) {
+      var ts = t.getElementsByTagName("tspan");
+      if (!ts.length) return t.textContent;
+      return Array.prototype.map.call(ts, function (x) {
+        return x.textContent;
+      }).join(" ");
+    }
+    function put(t, v) {
+      var ts = t.getElementsByTagName("tspan");
+      if (!ts.length) {
+        t.textContent = v;
+        return;
+      }
+      ts[0].textContent = v;
+      for (var i = ts.length - 1; i > 0; i--) ts[i].parentNode.removeChild(ts[i]);
+    }
+    Array.prototype.forEach.call(svg.getElementsByTagName("a"), function (a) {
+      var v = named[hrefSlug(a.getAttribute("href") || a.getAttributeNS("http://www.w3.org/1999/xlink", "href"))];
+      if (!v) return;
+      var t = Array.prototype.filter.call(a.getElementsByTagName("text"), function (x) {
+        return /(^|\s)av-name(\s|$)/.test(x.getAttribute("class") || "");
+      })[0];
+      if (t) put(t, v);
+    });
+    Array.prototype.forEach.call(svg.getElementsByTagName("text"), function (t) {
+      var v = byName[norm(words(t))];
+      if (v) put(t, v);
+    });
+    // A drawing with no size of its own takes its viewBox's, so it rasterizes at that size.
+    var vb = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+    if (!svg.getAttribute("width") && vb.length === 4) svg.setAttribute("width", String(vb[2]));
+    if (!svg.getAttribute("height") && vb.length === 4) svg.setAttribute("height", String(vb[3]));
+    return new XMLSerializer().serializeToString(doc);
+  }
+  // A drawing as a JPEG, hex for the PDF's ASCIIHexDecode: at most 3000 px wide, on white.
+  function raster(svgText) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
+      var img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth || 1600;
+        var h = img.naturalHeight || 1000;
+        var s = Math.min(2, 3000 / w);
+        var c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(w * s));
+        c.height = Math.max(1, Math.round(h * s));
+        var g = c.getContext("2d");
+        g.fillStyle = "#fff";
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        var bin = atob(c.toDataURL("image/jpeg", 0.88).split(",")[1]);
+        var hex = "";
+        for (var i = 0; i < bin.length; i++) hex += ("0" + bin.charCodeAt(i).toString(16)).slice(-2);
+        resolve({ w: c.width, h: c.height, hex: hex });
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("the drawing does not load"));
+      };
+      img.src = url;
+    });
+  }
+  // Every drawing of the appendix, renamed and rasterized; one that does not load is left out and said so on the last.
+  function drawingsOf(app, get) {
+    if (!app || !app.figures || !app.figures.length) return Promise.resolve([]);
+    var named = localNames(app, get);
+    var kind = { archimate: T("ArchiMate view"), bpmn: T("Business process (BPMN)") };
+    return Promise.all(
+      app.figures.map(function (f) {
+        return fetch(f.src)
+          .then(function (r) {
+            if (!r.ok) throw new Error(String(r.status));
+            return r.text();
+          })
+          .then(function (t) {
+            return raster(renameSvg(t, app, named));
+          })
+          .then(function (d) {
+            d.title = (kind[f.kind] || "") + ": " + f.title;
+            return d;
+          })
+          .catch(function () {
+            return null;
+          });
+      }),
+    ).then(function (ds) {
+      return ds.filter(Boolean);
+    });
+  }
+
   function slug(s) {
     return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "canvas";
   }
@@ -391,28 +616,48 @@
         var src = holder.querySelector("[data-jp-canvas-model]") || document.querySelector("[data-jp-canvas-model]");
         if (!src) return;
         var model = JSON.parse(src.textContent);
-        var bytes = build(model, function (k) {
+        var get = function (k) {
           try {
             return window.localStorage.getItem("jv:" + k);
           } catch (_e) {
             return null;
           }
-        });
-        var url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-        var a = document.createElement("a");
-        a.href = url;
-        a.download = slug(model.title) + ".pdf";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(function () {
-          URL.revokeObjectURL(url);
-        }, 1000);
+        };
+        if (b.disabled) return;
+        b.disabled = true;
+        b.setAttribute("aria-busy", "true");
+        drawingsOf(model.appendix, get)
+          .catch(function () {
+            return [];
+          })
+          .then(function (drawings) {
+            var bytes = build(model, get, drawings);
+            var url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+            var a = document.createElement("a");
+            a.href = url;
+            a.download = slug(model.title) + ".pdf";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () {
+              URL.revokeObjectURL(url);
+            }, 1000);
+          })
+          .then(
+            function () {
+              b.disabled = false;
+              b.removeAttribute("aria-busy");
+            },
+            function () {
+              b.disabled = false;
+              b.removeAttribute("aria-busy");
+            },
+          );
       });
     });
   }
 
-  var api = { build: build };
+  var api = { build: build, localNames: localNames, hrefSlug: hrefSlug, renameSvg: renameSvg };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else {
     scope.jpCanvasPdf = api;

@@ -195,6 +195,8 @@ body.jv {
 .jv-bpmn-scroll { overflow-x: auto; border: 1px solid var(--jv-line); border-radius: 8px; background: #fff; }
 .jv-bpmn-scroll > svg { min-width: 900px; display: block; }
 .jv-bpmn figcaption { font-size: 0.8rem; color: var(--jv-muted); margin-top: 4px; }
+.jv-bpmn figcaption .bpmn-actors { margin: 2px 0 0; line-height: 1.4; }
+.bpmn-actors-label { font-weight: 600; }
 .jv-bpmn-scroll:focus-visible { outline: 2px solid var(--jv-hl); outline-offset: 2px; }
 .jv-pn { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 0.9rem; }
 

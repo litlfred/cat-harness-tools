@@ -107,3 +107,24 @@ describe("nodesOfKind: name rules, repository scope, off-checkout content", () =
     expect(nodesOfKind(idx, "cat-harness-declaration", agg).map((n) => [n.harness, n.path, n.file])).toEqual([["beta", "beta", "beta/beta.json"]]);
   });
 });
+
+describe("nodesOfKind: a layer's member of a subgraph a lower layer declares", () => {
+  // Core holds test/attestations/ files under cat-harness's `attestations`
+  // declaration without declaring the directory itself. The state viewer lists
+  // them and links a page for each, so the page writer must read them too
+  // (cat-harness-tools#2345: four dead links on every site that mounts core).
+  const agg = mkdtempSync(join(import.meta.dir, ".tmp-node-kind-nodes-member-"));
+  afterAll(() => rmSync(agg, { recursive: true, force: true }));
+  mkdirSync(join(agg, "base", "items"), { recursive: true });
+  writeFileSync(join(agg, "base", "base.json"), JSON.stringify({ name: "base", version: "0.1.0", directories: [{ id: "items", path: "items/", graphTypologies: ["todo-items"] }] }));
+  writeFileSync(join(agg, "base", "items", "b.json"), JSON.stringify({ $schema: "todo/1.0.0", id: "b" }));
+  mkdirSync(join(agg, "top", "items"), { recursive: true });
+  writeFileSync(join(agg, "top", "top.json"), JSON.stringify({ name: "top", version: "0.1.0", needs: ["base"] }));
+  writeFileSync(join(agg, "top", "items", "t.json"), JSON.stringify({ $schema: "todo/1.0.0", id: "t" }));
+
+  test("the upper layer's same-named directory is read, its nodes held by that layer", () => {
+    const got = nodesOfKind({ kinds: [entry("todo", "1.0.0")] }, "todo", agg).map((n) => [n.harness, n.path]);
+    expect(got).toContainEqual(["base", "items/b"]);
+    expect(got).toContainEqual(["top", "items/t"]);
+  });
+});

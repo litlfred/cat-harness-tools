@@ -53,6 +53,16 @@ export interface PublisherWorkflows {
   workflows: readonly string[];
   /** When a repository calls several of them, the one that is the Pages build. */
   preferred?: string;
+  /**
+   * The reusable workflow file names that seed what this publisher builds
+   * from, such as a cache branch. A site publish waits for the run, on the
+   * same commit, of every workflow in the repository that calls one of them,
+   * whichever publisher builds the site (`site-publish-after.ts`). Declared by
+   * the layer whose workflows they are, so no repository has to remember
+   * `site.publishAfter` for them: smart-pcmt declared none, and its first
+   * publish started before its AST cache was seeded and failed (2026-11-19).
+   */
+  after?: readonly string[];
 }
 
 /** The built-in folio publisher's workflows. */
@@ -196,7 +206,14 @@ export function readWorkflows(repo: string): Map<string, string> {
 export function isSitePublisher(x: unknown): x is SitePublisherDeclaration {
   if (typeof x !== "object" || x === null) return false;
   const p = x as Partial<SitePublisherDeclaration>;
-  return typeof p.kind === "string" && p.kind !== "" && Array.isArray(p.workflows) && p.workflows.every((w) => typeof w === "string") && typeof p.stage === "function";
+  return (
+    typeof p.kind === "string" &&
+    p.kind !== "" &&
+    Array.isArray(p.workflows) &&
+    p.workflows.every((w) => typeof w === "string") &&
+    (p.after === undefined || (Array.isArray(p.after) && p.after.every((w) => typeof w === "string"))) &&
+    typeof p.stage === "function"
+  );
 }
 
 /**

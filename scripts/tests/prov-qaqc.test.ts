@@ -10,11 +10,14 @@
  * (bean `7zz1`): standing alone, cat-harness has none of it.
  */
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  instancesOnStateBranch,
+  judged,
   outputs,
   processStem,
   reportSite,
@@ -32,6 +35,7 @@ import type { HistoryEntry } from "../../src/workflow/instance.js";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { harnessRel } from "../lib/harness-layout.ts";
+import { MOUNT_MARKER_SCHEMA, markerPath } from "../branch-store.ts";
 
 const ROOT = join(HARNESS_ROOT);
 // declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
@@ -252,5 +256,82 @@ describe("prov-qaqc: which site", () => {
     const files = outputs(empty(), s);
     expect([...files.keys()]).toEqual([s.page]);
     expect(staleness(files, s.assets).stale).toEqual([s.page]);
+  });
+});
+
+/**
+ * WHO dth-pc#3 (run 44489690657): dth-pc keeps its `beans` graph on
+ * `cat/dth-pc/beans`, and the branch copied in held a content-change-review
+ * instance. The gate then asked for a page and a PROV log over it, which no
+ * commit to the folio can keep current, since the branch moves whenever the
+ * workflow does. Under a mounted graph an output not committed is derived at
+ * check time, not a finding. What must STILL fire: a committed output that is
+ * stale, or a committed log that is an orphan (cat-harness keeps its beans on
+ * a branch too, and commits its logs). Tracked instances are judged as before.
+ */
+describe("prov-qaqc: instances on a state branch", () => {
+  const TIP = { branch: "cat/dth-q/beans", keyedBy: "tip" } as const;
+  const report = (): Report => ({
+    instances: new Map([["t", [{ ...run([{ at, node: "Task_ClaimBean", actor: "agent" }], ctxWith([])) }]]]),
+    policies: ["urn:test"],
+    invalid: [],
+  });
+  const git = (root: string, ...args: string[]) => {
+    const r = spawnSync("git", args, { cwd: root, encoding: "utf-8" });
+    expect(`${args.join(" ")} -> ${r.status}`).toBe(`${args.join(" ")} -> 0`);
+  };
+  const folio = (storage?: typeof TIP): string => {
+    const root = mkdtempSync(join(tmpdir(), "prov-branch-"));
+    const beans = { id: "beans", path: "beans/", graphTypologies: ["beans"], ...(storage ? { storage } : {}) };
+    writeFileSync(join(root, "dth-q.json"), JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "dth-q", directories: [beans] }, null, 2));
+    git(root, "init", "-q", "-b", "main");
+    return root;
+  };
+  const mount = (root: string): string => {
+    const into = join(root, "beans");
+    mkdirSync(join(into, "workflows"), { recursive: true });
+    const p = markerPath(root, "beans");
+    mkdirSync(join(p, ".."), { recursive: true });
+    writeFileSync(p, JSON.stringify({ $schema: MOUNT_MARKER_SCHEMA, id: "beans", branch: TIP.branch, path: "beans", into, tip: "0".repeat(40), files: {} }));
+    return into;
+  };
+
+  test("a mounted beans graph is named; one tracked in the checkout is not", () => {
+    const mounted = folio(TIP);
+    mount(mounted);
+    expect(instancesOnStateBranch(mounted)).toBe("beans");
+    expect(instancesOnStateBranch(folio())).toBeUndefined();
+  });
+
+  test("over a mounted graph, an uncommitted page and log are not findings; tracked, they still are", () => {
+    const root = folio(TIP);
+    mount(root);
+    const s = reportSite(root, HARNESS_ROOT);
+    // The site is the folio's own, never the mounted platform's.
+    expect(s.page.startsWith(root)).toBe(true);
+    const files = outputs(report(), s);
+    expect(files.size).toBeGreaterThan(1);
+    // Nothing committed: everything is stale to the committed-output check...
+    expect(staleness(files, s.assets).stale.length).toBe(files.size);
+    // ...and nothing is owed when the instances are on the state branch.
+    expect(judged(files, instancesOnStateBranch(root), s.assets)).toEqual({ stale: [], orphans: [] });
+    // Tracked instances keep the committed-output check exactly.
+    expect(judged(files, undefined, s.assets)).toEqual(staleness(files, s.assets));
+  });
+
+  test("over a mounted graph, a COMMITTED output that is stale, and a committed orphan, still fire", () => {
+    const root = folio(TIP);
+    mount(root);
+    const s = reportSite(root, HARNESS_ROOT);
+    const files = outputs(report(), s);
+    for (const [p, c] of files) {
+      mkdirSync(join(p, ".."), { recursive: true });
+      writeFileSync(p, c);
+    }
+    const onBranch = instancesOnStateBranch(root);
+    expect(judged(files, onBranch, s.assets)).toEqual({ stale: [], orphans: [] });
+    writeFileSync(s.page, "edited\n");
+    writeFileSync(join(s.assets, "gone.prov.jsonld"), "{}\n");
+    expect(judged(files, onBranch, s.assets)).toEqual({ stale: [s.page], orphans: [join(s.assets, "gone.prov.jsonld")] });
   });
 });

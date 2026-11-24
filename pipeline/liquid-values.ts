@@ -52,7 +52,6 @@ import {
   readDeclaration,
   rootForScope,
 } from "../schemas/kg/cat-harness.js";
-import { safeSegment } from "../src/core/safe-path";
 import { asScalar, formatScalar, resolvePath } from "./render-value";
 import { findContentRepoRoot } from "./repo-root";
 
@@ -161,7 +160,7 @@ export function resolveKey(key: string, scope: ValueScope): Resolution & { raw?:
   if (!inst) return { state: "not-ours" };
   if (inst.passThrough) return { state: "pass-through" };
   const rest = key.slice(inst.prefix.length + 1).split(".");
-  if (rest.length === 0 || rest.some((s) => !SEG.test(s) || !safeSegment(s))) {
+  if (rest.length === 0 || rest.some((s) => !SEG.test(s))) {
     return { state: "unresolved", reason: `"${key}" is not a dotted path under ${inst.prefix}` };
   }
 
@@ -177,54 +176,41 @@ export function resolveKey(key: string, scope: ValueScope): Resolution & { raw?:
     return { state: "unresolved", reason: `${inst.name} declares no scalar field "${rest[0]}"` };
   }
 
-  const [dirId, ...afterDir] = rest as [string, string, ...string[]];
+  const [dirId, ...afterDir] = rest as [string, ...string[]];
   const dir = inst.directories.get(dirId);
   if (!dir) {
     return { state: "unresolved", reason: `${inst.name} declares no directory "${dirId}" (only declared directories are addressable)` };
   }
-  if (afterDir.length < 2) return { state: "unresolved", reason: `"${key}" names an entry but no field inside it` };
+  // The entry may sit in a SUBDIRECTORY of the declared directory:
+  // `{{ qou.computations.qbeta.<entry>.<path> }}` reads
+  // `computations/qbeta/<entry>.witness.json` (qou bean `qou-h59j`, defect 1).
+  // Leading segments are taken as subdirectories only while each names an
+  // existing directory, and the SHALLOWEST match wins, so every flat address
+  // that resolved before resolves to the same file. Segments are already
+  // restricted to `SEG`, so no `..` or `/` can escape the declared directory.
   // A witness, a JSON entry, or a library DATASET entry (`<entry>/values.json`,
   // written by an ingest tool such as `codata-ingest`, bean uyp8).
-  // Try flat `<dir>/<entry>.witness.json` first; if absent, allow nested
-  // subdirectory segments under `<dir>` (e.g. `computations/probes/<entry>.witness.json`),
-  // validating every intermediate segment with `safeSegment` so `..` traversal is impossible.
-  const entryCandidates = (baseDir: string, entrySeg: string): string[] => {
-    const safe = safeSegment(entrySeg);
-    if (!safe) return [];
-    return [join(baseDir, `${safe}.witness.json`), join(baseDir, `${safe}.json`), join(baseDir, safe, "values.json")];
-  };
+  const candidatesIn = (d: string, e: string) => [join(d, `${e}.witness.json`), join(d, `${e}.json`), join(d, e, "values.json")];
+  let file: string | undefined;
   let entry = afterDir[0]!;
-  let path = afterDir.slice(1);
-  let searchDir = dir;
-  let file = entryCandidates(dir, entry).find((f) => existsSync(f));
-  if (!file && afterDir.length >= 3) {
-    let curDir = dir;
-    for (let k = 0; k + 1 < afterDir.length; k++) {
-      const subSeg = safeSegment(afterDir[k]!);
-      if (!subSeg) break;
-      const subDir = join(curDir, subSeg);
-      let isDir = false;
-      try {
-        isDir = existsSync(subDir) && statSync(subDir).isDirectory();
-      } catch {
-        isDir = false;
-      }
-      if (!isDir) break;
-      curDir = subDir;
-      searchDir = curDir;
-      entry = afterDir[k + 1]!;
-      path = afterDir.slice(k + 2);
-      const found = entryCandidates(curDir, entry).find((f) => existsSync(f));
-      if (found) {
-        file = found;
-        break;
-      }
+  let path: string[] = [];
+  let at = dir;
+  for (let i = 0; i < afterDir.length - 1; i++) {
+    const found = candidatesIn(at, afterDir[i]!).find((f) => existsSync(f));
+    if (found) {
+      file = found;
+      entry = afterDir[i]!;
+      path = afterDir.slice(i + 1);
+      break;
     }
+    const sub = join(at, afterDir[i]!);
+    if (!existsSync(sub) || !statSync(sub).isDirectory()) break;
+    at = sub;
   }
   if (!file) {
-    return { state: "unresolved", reason: `no ${entry}.witness.json, ${entry}.json or ${entry}/values.json in ${relative(scope.repoRoot, searchDir)}` };
+    if (afterDir.length < 2) return { state: "unresolved", reason: `"${key}" names an entry but no field inside it` };
+    return { state: "unresolved", reason: `no ${entry}.witness.json, ${entry}.json or ${entry}/values.json in ${relative(scope.repoRoot, dir)} or a subdirectory named by the address` };
   }
-  if (!path.length) return { state: "unresolved", reason: `"${key}" names an entry but no field inside it` };
   const doc = readJson(file);
   if (doc === undefined) return { state: "unresolved", reason: `${relative(scope.repoRoot, file)} is not valid JSON` };
   let raw = resolvePath(doc, path.join("."));
