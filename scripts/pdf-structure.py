@@ -98,6 +98,7 @@ from _pdf_text import join_soft_hyphens  # noqa: E402
 from _text_quality import page_problem  # noqa: E402
 from _pdf_doc_id import (  # noqa: E402
     derive_doc_id,
+    derive_doc_id_from_pdf,
     find_ocr_cache,
     slugify,
 )
@@ -2595,7 +2596,10 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     docinfo = reader.docinfo()
 
     empty = sum(1 for p in pages if len(p.strip()) < 20)
-    doc_id = derive_doc_id(path, meta)
+    # With no arXiv stamp in the extracted meta (OCR text often has none), ask
+    # the PDF itself, as `ingest-document.ts` `bibSlug()` and the OCR writer do,
+    # so all three stage the same document under one directory (#2326).
+    doc_id = derive_doc_id(path, meta) if (meta or {}).get("arxiv") else derive_doc_id_from_pdf(path)
 
     # The title is resolved AFTER the doc id, which is derived from the text
     # walk's metadata and must not move because a better title was found.

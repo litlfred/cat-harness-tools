@@ -96,6 +96,18 @@ def main() -> int:
           by[3]["label"] == "1" and by[10]["label"] == "8" and by[1]["label"] is None)
     check("and reports no conflicts", conflicts["count"] == 0)
 
+    # #2324: under `re.I` alone the Turkish dotless `ı` (U+0131) folded to `i`,
+    # matched RE_ROMAN, and `roman_to_int` raised `KeyError: 'ı'`.
+    check("roman_to_int('ı') is None", L.roman_to_int("ı") is None)
+    check("roman_to_int('xı') is None", L.roman_to_int("xı") is None)
+    check("roman_to_int('XIV') == 14", L.roman_to_int("XIV") == 14)
+    check("roman_to_int('xiv') == 14", L.roman_to_int("xiv") == 14)
+    check("a dotless-ı folio is no folio", L.RE_FOLIO_ALONE.match("xı") is None)
+    check("an upper- or lower-case roman folio still is",
+          L.RE_FOLIO_ALONE.match("- XII -") is not None and L.RE_FOLIO_ALONE.match("xii") is not None)
+    check("a folio between non-breaking spaces still is",
+          L.RE_FOLIO_ALONE.match("\u00a012\u00a0") is not None)
+
     print()
     print("  all checks passed" if rc == 0 else "  FAILURES above")
     return rc
