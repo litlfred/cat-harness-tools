@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { blockQaPath } from "../../../pipeline/qa-paths";
-import { orphanVerdicts, sweepOrphanVerdicts } from "../../../pipeline/orphan-verdict-sweep";
+import { notApplicableReason, orphanVerdicts, rootHasBlocks, sweepOrphanVerdicts } from "../../../pipeline/orphan-verdict-sweep";
 
 function inTmp(run: (root: string) => void): void {
   const root = mkdtempSync(join(tmpdir(), "orphan-sweep-"));
@@ -106,11 +106,12 @@ describe("check:orphan-verdicts, the CLI", () => {
   const CLI = join(import.meta.dir, "..", "..", "..", "pipeline", "orphan-verdict-sweep.ts");
   const run = (cwd: string) => Bun.spawnSync(["bun", "run", CLI], { cwd, stdout: "pipe", stderr: "pipe" });
 
-  it("refuses with exit 2 over an absent results tree, and prints no pass", () => {
+  it("refuses with exit 2 over an absent results tree in a root that HAS blocks, and prints no pass", () => {
     inTmp((root) => {
       // `findContentRepoRoot` walks up from the cwd to a layer root.
       writeFileSync(join(root, "demo.json"), JSON.stringify({ name: "demo" }));
       mkdirSync(join(root, "folio"), { recursive: true });
+      writeFileSync(join(root, "folio", "r.ts"), `export default remark({ label: "rem:r", title: "T" });\n`);
       const r = run(root);
       const out = r.stdout.toString() + r.stderr.toString();
       expect(r.exitCode).toBe(2);
@@ -118,5 +119,63 @@ describe("check:orphan-verdicts, the CLI", () => {
       expect(out).toContain("examined 0 members");
       expect(out).toContain("qa:fetch");
     });
+  });
+
+  it("exits 78, not applicable, in a root that holds no block (a FHIR IG judged with no base)", () => {
+    inTmp((root) => {
+      // A folio directory, so the sweep anchors HERE rather than falling back
+      // to the harness layer, and nothing in it is a block.
+      writeFileSync(join(root, "demo.json"), JSON.stringify({ name: "demo" }));
+      mkdirSync(join(root, "folio"), { recursive: true });
+      writeFileSync(join(root, "folio", "README.md"), "# nothing to judge\n");
+      mkdirSync(join(root, "input", "fsh"), { recursive: true });
+      writeFileSync(join(root, "input", "fsh", "a.fsh"), "Profile: A\n");
+      const r = run(root);
+      const out = r.stdout.toString() + r.stderr.toString();
+      expect(r.exitCode).toBe(78);
+      expect(out).toContain("NOT APPLICABLE");
+      expect(out).not.toContain("✓");
+    });
+  });
+});
+
+/**
+ * A FHIR IG judged with no base (2026-11-19): a FHIR IG site has no block at all, so no
+ * block-QA producer, and the sweep exited 2 ("examined 0") even after
+ * `qa:fetch`. Not applicable (78) there; the vacuity refusal stays for a root
+ * that has blocks.
+ */
+describe("a root with no block-QA population", () => {
+  it("holds no block: not applicable, with the reason", () => {
+    inTmp((root) => {
+      mkdirSync(join(root, "input", "fsh"), { recursive: true });
+      writeFileSync(join(root, "input", "fsh", "a.fsh"), "Profile: A\n");
+      writeFileSync(join(root, "tool.ts"), "export const x = 1;\n");
+      expect(rootHasBlocks(root)).toBe(false);
+      const sweep = sweepOrphanVerdicts(root);
+      expect(notApplicableReason(sweep, { hasBlocks: rootHasBlocks(root), harnessFallbackInContentRoot: false }, root)).toContain("no block-QA producer");
+    });
+  });
+
+  it("holds a block but no verdict was read: NOT excused, the vacuity refusal stays", () => {
+    inTmp((root) => {
+      mkdirSync(join(root, "folio", "ch"), { recursive: true });
+      writeFileSync(join(root, "folio", "ch", "r.ts"), `export default remark({ label: "rem:r", title: "T" });\n`);
+      expect(rootHasBlocks(root)).toBe(true);
+      expect(notApplicableReason(sweepOrphanVerdicts(root), { hasBlocks: true, harnessFallbackInContentRoot: false }, root)).toBeUndefined();
+    });
+  });
+
+  it("holds verdicts and no block: swept, never excused (they are abandoned orphans)", () => {
+    inTmp((root) => {
+      place(root, "gone", "b", { manifest: false });
+      const sweep = sweepOrphanVerdicts(root);
+      expect(sweep.examined).toBe(1);
+      expect(notApplicableReason(sweep, { hasBlocks: false, harnessFallbackInContentRoot: true }, root)).toBeUndefined();
+    });
+  });
+
+  it("a content root with no folio, swept at the harness layer: not applicable even though the harness has blocks", () => {
+    expect(notApplicableReason({ examined: 0 }, { hasBlocks: true, harnessFallbackInContentRoot: true }, "/x/cat-harness")).toContain("qa-sweep:docs");
   });
 });

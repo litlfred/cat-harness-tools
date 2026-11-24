@@ -19,6 +19,7 @@ import { join } from "node:path";
 import type { BeanNode } from "../beans.ts";
 import {
   checkDraftBeans,
+  declaredDefaultNames,
   formatReport,
   hasRecommendationOrDefaultSection,
   resolveDefaultRef,
@@ -335,9 +336,10 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
   });
 
   test("handles missing default branch as undetermined", () => {
-    const beans = [dummyBean({ id: "b1", status: "draft" })];
+    const beans = [dummyBean({ id: "b1", status: "draft", body: "## Recommendation\nOption A.\n" })];
     const report = checkDraftBeans(emptyRoot, {
       beans,
+      env: {},
       gitFn: (args) => {
         if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
           return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
@@ -349,6 +351,116 @@ describe("checkDraftBeans detection logic with mocked beans & git", () => {
 
     expect(report.undetermined).toHaveLength(1);
     expect(report.undetermined[0]).toContain("could not determine default branch ref");
+  });
+
+  test("with no draft DECISION bean, an unnameable default branch is not undetermined (#2460)", () => {
+    // dth-sc's CI checkout: beans in the store, none a draft decision, and no
+    // ref git can name. There is nothing to place against the default branch.
+    const beans = [dummyBean({ id: "b1", status: "draft" }), dummyBean({ id: "b2", status: "todo" })];
+    const asked: string[][] = [];
+    const report = checkDraftBeans(emptyRoot, {
+      beans,
+      env: {},
+      gitFn: (args) => {
+        asked.push(args);
+        if (args[0] === "rev-parse" && args[1] === "--show-toplevel") {
+          return { status: 0, stdout: `${emptyRoot}\n`, stderr: "" };
+        }
+        return { status: 1, stdout: "", stderr: "not found" };
+      },
+    });
+    expect(report.undetermined).toEqual([]);
+    expect(report.findings).toEqual([]);
+    expect(report.draftCount).toBe(1);
+    expect(report.decisionDraftCount).toBe(0);
+    expect(asked.some((a) => a[0] === "symbolic-ref" || a[0] === "fetch")).toBe(false);
+    expect(formatReport(report)).toContain("no branch-only draft decision beans");
+  });
+});
+
+/**
+ * A pull-request checkout as `actions/checkout` makes it: one commit, detached
+ * HEAD, no `origin/HEAD`, no `origin/main` (cat-harness-tools#2460).
+ */
+function ciCheckout(defaultBranch = "main"): { origin: string; checkout: string } {
+  const seed = createTempDir("draft-beans-seed-");
+  git(seed, "init", "-q", "-b", defaultBranch);
+  git(seed, "config", "user.email", "test@example.com");
+  git(seed, "config", "user.name", "test");
+  writeFileSync(join(seed, "f"), "initial\n");
+  git(seed, "add", "f");
+  git(seed, "commit", "-q", "-m", "initial");
+  git(seed, "checkout", "-q", "-b", "feature");
+  writeFileSync(join(seed, "g"), "pr\n");
+  git(seed, "add", "g");
+  git(seed, "commit", "-q", "-m", "pr change");
+  const origin = createTempDir("draft-beans-origin-");
+  git(origin, "clone", "-q", "--bare", seed, join(origin, "repo.git"));
+  const bare = join(origin, "repo.git");
+  git(bare, "symbolic-ref", "HEAD", `refs/heads/${defaultBranch}`);
+  const checkout = createTempDir("draft-beans-ci-");
+  git(checkout, "init", "-q");
+  git(checkout, "remote", "add", "origin", `file://${bare}`);
+  git(checkout, "fetch", "-q", "--no-tags", "--depth=1", "origin", "+refs/heads/feature:refs/remotes/pull/merge");
+  git(checkout, "checkout", "-q", "--detach", "refs/remotes/pull/merge");
+  return { origin: bare, checkout };
+}
+
+describe("resolveDefaultRef in a CI checkout (shallow, detached, no origin/HEAD)", () => {
+  test("the checkout really has none of the local candidates", () => {
+    const { checkout } = ciCheckout();
+    expect(spawnSync("git", ["-C", checkout, "rev-parse", "-q", "--verify", "origin/main"]).status).not.toBe(0);
+    expect(spawnSync("git", ["-C", checkout, "symbolic-ref", "-q", "refs/remotes/origin/HEAD"]).status).not.toBe(0);
+    expect(git(checkout, "rev-parse", "--is-shallow-repository")).toBe("true");
+  });
+
+  test("GITHUB_BASE_REF names the branch, and it is fetched", () => {
+    const { checkout } = ciCheckout("trunk");
+    expect(resolveDefaultRef(checkout, undefined, undefined, { GITHUB_BASE_REF: "trunk" })).toBe("origin/trunk");
+    expect(spawnSync("git", ["-C", checkout, "rev-parse", "-q", "--verify", "origin/trunk"]).status).toBe(0);
+  });
+
+  test("the event payload's repository.default_branch names it when there is no base ref", () => {
+    const { checkout } = ciCheckout("trunk");
+    const event = join(createTempDir("draft-beans-event-"), "event.json");
+    writeFileSync(event, JSON.stringify({ repository: { default_branch: "trunk" } }));
+    expect(resolveDefaultRef(checkout, undefined, undefined, { GITHUB_EVENT_PATH: event })).toBe("origin/trunk");
+  });
+
+  test("with no CI variables, the remote's own HEAD names it", () => {
+    const { checkout } = ciCheckout("trunk");
+    expect(resolveDefaultRef(checkout, undefined, undefined, {})).toBe("origin/trunk");
+  });
+
+  test("an unreadable event payload declares nothing, and the remote still answers", () => {
+    const { checkout } = ciCheckout("main");
+    const event = join(createTempDir("draft-beans-event-"), "event.json");
+    writeFileSync(event, "{not json");
+    expect(declaredDefaultNames({ GITHUB_EVENT_PATH: event })).toEqual([]);
+    expect(resolveDefaultRef(checkout, undefined, undefined, { GITHUB_EVENT_PATH: event })).toBe("origin/main");
+  });
+
+  test("declaredDefaultNames: base ref first, then the declared default, deduplicated", () => {
+    const event = join(createTempDir("draft-beans-event-"), "event.json");
+    writeFileSync(event, JSON.stringify({ repository: { default_branch: "main" } }));
+    expect(declaredDefaultNames({ GITHUB_BASE_REF: "release", GITHUB_EVENT_PATH: event })).toEqual(["release", "main"]);
+    expect(declaredDefaultNames({ GITHUB_BASE_REF: "main", GITHUB_EVENT_PATH: event })).toEqual(["main"]);
+    expect(declaredDefaultNames({})).toEqual([]);
+  });
+
+  test("a draft decision bean in the CI checkout is judged against the fetched default branch", () => {
+    const { checkout } = ciCheckout("main");
+    const defsDir = join(checkout, "beans", "defs");
+    mkdirSync(defsDir, { recursive: true });
+    writeFileSync(
+      join(defsDir, "folio-assistant-r0tm.md"),
+      "---\n# folio-assistant-r0tm\ntitle: 'Decision request'\nstatus: draft\ntype: task\n---\n\n## Recommendation\nOption A.\n",
+    );
+    const report = checkDraftBeans(checkout, { env: { GITHUB_BASE_REF: "main" } });
+    expect(report.defaultBranch).toBe("origin/main");
+    expect(report.undetermined).toEqual([]);
+    expect(report.findings).toHaveLength(1);
+    expect(report.findings[0]!.reason).toContain("uncommitted");
   });
 });
 

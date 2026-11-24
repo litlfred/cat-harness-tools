@@ -47,6 +47,32 @@
  * report: nothing is written, and only a report it already committed is
  * judged.
  *
+ * ## Instances kept on a state branch: derived, not committed
+ *
+ * When the root's `beans` graph is kept on its own branch
+ * (`cat/<instance>/beans`, mounted by `state:mount`), the instances are not
+ * in any commit of the layer, and they move whenever a workflow advances. A
+ * page and logs committed over them would be stale the moment the branch
+ * moved, and no commit to the layer can follow it (WHO dth-pc#3, run
+ * 44489690657: the beans branch copied in with a content-change-review
+ * instance, and the gate asked for PROV outputs no folio commit could keep
+ * current). So under a mounted graph an output the layer has NOT committed
+ * is derived at check time, not a finding: `--check` still builds the whole
+ * report and still fails on a `prov:Activity` that does not validate or on
+ * an internal error, and `prov:qaqc` still writes the outputs for a site
+ * build to publish. An output the layer HAS committed is still judged, stale
+ * or orphaned, as before: cat-harness keeps its beans on a branch too and
+ * commits its logs, which the index gate exists to keep current
+ * (cat-harness-tools#1417). Instances tracked in the checkout are judged
+ * exactly as before.
+ *
+ * ## Records in the earlier shape
+ *
+ * An instance file without `id` and `source` (the earlier
+ * `folio-workflow-instance/v1` shape: `instanceId`, `bpmnPath`, history keyed
+ * by `elementId`) is listed with one `legacy-record` finding and not walked;
+ * its row on the page appears only when one occurs.
+ *
  * Usage:  bun run cat-harness-tools/scripts/prov-qaqc.ts [--check]
  *
  * @module cat-harness/scripts/prov-qaqc
@@ -70,6 +96,7 @@ import { listInstances, workflowStateAbsent } from "../src/workflow/store.js";
 import { roleGraphFor, workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { exportIdentity, publishedIdentity } from "./kg-export.ts";
+import { graphReadPath } from "./graph-read.ts";
 import { subjectIri } from "./lib/subject-iri.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
@@ -105,6 +132,7 @@ export const FINDING_KINDS = [
   "source-moved",
   "source-missing",
   "unaddressed",
+  "legacy-record",
 ] as const;
 export type FindingKind = (typeof FINDING_KINDS)[number];
 
@@ -123,7 +151,41 @@ export const FINDING_MEANING: Readonly<Record<FindingKind, string>> = {
   "source-missing": "the `.bpmn` the instance recorded is gone and no diagram with that name and process id exists; nothing in it can be checked",
   unaddressed:
     "the agent, role or plan has no release address — its owning instance declares no `iriBase`, or no instance declares it — so the PROV-JSONLD record carries it as a literal, not a link (`linked-data` voice, `ld-link-is-the-node-release-address`)",
+  "legacy-record":
+    "the instance file is in the earlier record shape (`instanceId`, `bpmnPath`, history entries keyed by `elementId`), not the one `workflow_start` writes (`id`, `source`, entries keyed by `node`); it is listed, and nothing in it is checked",
 };
+
+/** Kinds whose row the page shows only when one occurs, so a page with none is unchanged by their addition. */
+const SHOWN_WHEN_PRESENT: ReadonlySet<FindingKind> = new Set(["legacy-record"]);
+
+/**
+ * A workflow instance file as read, in either shape. `workflow_start` writes
+ * `id` and `source`; records written before it (the earlier
+ * `folio-workflow-instance/v1` shape) carry `instanceId` and `bpmnPath`, and
+ * their history entries name `elementId`, not `node`.
+ */
+type ReadInstance = InstanceState & { instanceId?: string; bpmnPath?: string };
+
+/** The instance's id in either shape; `""` when it carries neither. */
+export function instanceIdOf(s: ReadInstance): string {
+  return typeof s.id === "string" && s.id ? s.id : typeof s.instanceId === "string" ? s.instanceId : "";
+}
+
+/**
+ * True when `s` is in the shape this report reads: an `id`, a `source`, and a
+ * history whose every entry names its `node`. Anything else is reported as a
+ * `legacy-record` finding instead of being walked, so one old file cannot
+ * stop the report (it used to throw on `a.id.localeCompare`).
+ */
+export function isCurrentShape(s: ReadInstance): boolean {
+  return (
+    typeof s.id === "string" &&
+    s.id !== "" &&
+    typeof s.source === "string" &&
+    Array.isArray(s.history) &&
+    s.history.every((h) => typeof (h as { node?: unknown }).node === "string")
+  );
+}
 
 export interface Finding {
   instance: string;
@@ -372,8 +434,22 @@ export async function buildReport(
   const book = () => (addresses ??= addressBook(repo));
   const instances = new Map<string, InstanceReport[]>();
   const invalid: string[] = [];
-  const all = (opts.instances ?? listInstances(repo)).slice().sort((a, b) => a.id.localeCompare(b.id, "en"));
-  for (const top of all) {
+  const all = (opts.instances ?? listInstances(repo))
+    .map((s, i) => ({ s: s as ReadInstance, key: instanceIdOf(s as ReadInstance) || `(unnamed instance ${i + 1})` }))
+    .sort((a, b) => a.key.localeCompare(b.key, "en"));
+  for (const { s: top, key } of all) {
+    if (!isCurrentShape(top)) {
+      const source = typeof top.source === "string" ? top.source : typeof top.bpmnPath === "string" ? top.bpmnPath : "";
+      const finding: Finding = {
+        instance: key,
+        entry: -1,
+        node: typeof top.processId === "string" ? top.processId : "",
+        kind: "legacy-record",
+        detail: `${key} is in the earlier record shape (no \`id\`/\`source\`, or history entries without \`node\`); not checked`,
+      };
+      instances.set(key, [{ id: key, source, activities: [], checked: 0, findings: [finding] }]);
+      continue;
+    }
     const out: InstanceReport[] = [];
     const walk = async (id: string, s: InstanceState) => {
       const where = await locate(repo, s, candidates);
@@ -464,7 +540,9 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export function renderPage(r: Report): string {
   const t = totals(r);
   const totalFindings = FINDING_KINDS.reduce((n, k) => n + t.byKind[k], 0);
-  const kindRows = FINDING_KINDS.map((k) => `| \`${k}\` | ${t.byKind[k]} | ${FINDING_MEANING[k]} |`).join("\n");
+  const kindRows = FINDING_KINDS.filter((k) => !SHOWN_WHEN_PRESENT.has(k) || t.byKind[k] > 0)
+    .map((k) => `| \`${k}\` | ${t.byKind[k]} | ${FINDING_MEANING[k]} |`)
+    .join("\n");
   const sections = [...r.instances].map(([top, parts]) => {
     const n = parts.reduce((a, p) => a + p.findings.length, 0);
     const acts = parts.reduce((a, p) => a + p.activities.length, 0);
@@ -536,6 +614,33 @@ export function outputs(
   return out;
 }
 
+/**
+ * The branch the root's instances are read from, when the `beans` graph that
+ * holds them is mounted from one (`cat/<instance>/beans`); `undefined` when
+ * they are tracked in the checkout (or the graph is not a branch-kept one).
+ * Under a mounted graph the outputs are derived at check time (the header).
+ */
+export function instancesOnStateBranch(repo: string = REPO): string | undefined {
+  const r = graphReadPath("beans", repo);
+  if (r.state !== "ok" || r.from !== "mount") return undefined;
+  return r.path;
+}
+
+/**
+ * What `--check` judges: stale and orphaned outputs. When the instances are
+ * on a state branch, an output that is not on disk (never committed) is
+ * derived at check time and owed by nobody; one that is on disk is still
+ * judged, and so is an orphan (the header).
+ */
+export function judged(
+  files: Map<string, string>,
+  onBranch: string | undefined,
+  assets: string = ASSETS,
+): { stale: string[]; orphans: string[] } {
+  const r = staleness(files, assets);
+  return onBranch === undefined ? r : { stale: r.stale.filter((p) => existsSync(p)), orphans: r.orphans };
+}
+
 /** Stale and orphaned outputs, relative to what `files` says they should be. */
 export function staleness(files: Map<string, string>, assets: string = ASSETS): { stale: string[]; orphans: string[] } {
   const orphans = existsSync(assets)
@@ -569,19 +674,25 @@ if (import.meta.main) {
     process.exit(1);
   }
   const t = totals(r);
-  const summary = `${r.instances.size} instance(s), ${t.checked} step(s), ${t.activities} activit${t.activities === 1 ? "y" : "ies"}; findings (advisory): ${FINDING_KINDS.map((k) => `${k} ${t.byKind[k]}`).join(", ")}`;
+  const summary = `${r.instances.size} instance(s), ${t.checked} step(s), ${t.activities} activit${t.activities === 1 ? "y" : "ies"}; findings (advisory): ${FINDING_KINDS.filter((k) => !SHOWN_WHEN_PRESENT.has(k) || t.byKind[k] > 0).map((k) => `${k} ${t.byKind[k]}`).join(", ")}`;
   const files = outputs(r);
-  const { stale, orphans } = staleness(files);
+  const onBranch = instancesOnStateBranch();
   if (check) {
+    const { stale, orphans } = judged(files, onBranch);
     if (stale.length || orphans.length) {
       for (const p of stale) console.error(`✗ stale: ${relative(REPO, p)}`);
       for (const p of orphans) console.error(`✗ orphan: ${relative(REPO, p)}`);
       console.error("Run `bun run cat prov:qaqc` and commit the result.");
       process.exit(1);
     }
-    console.log(`✓ PROV-O QA/QC report current: ${summary}`);
+    console.log(
+      onBranch === undefined
+        ? `✓ PROV-O QA/QC report current: ${summary}`
+        : `✓ PROV-O QA/QC report valid, and every committed output current: ${summary} (the instances are on the state branch mounted at ${onBranch}: an output not committed is derived at check time)`,
+    );
     process.exit(0);
   }
+  const { orphans } = staleness(files);
   for (const [p, s] of files) {
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, s);

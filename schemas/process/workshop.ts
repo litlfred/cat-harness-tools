@@ -481,17 +481,64 @@ export type WorkshopPresentation = z.infer<typeof WorkshopPresentationSchema>;
  *
  * | type | what it is | kept under |
  * |---|---|---|
- * | `text` | a write-in of `lines` lines | `…:<field>` |
+ * | `text` | a write-in of `lines` lines (`inline`: its label and one line, side by side) | `…:<field>`, or the key of the field `same` names |
  * | `choice` | one of `options` | `…:<field>` = the option id |
- * | `ticks` | any of `options` | `…:<field>:<option>` = "1" |
- * | `grid` | `rows` × `columns`, each cell a write-in, or a tick where the column says so | `…:<field>:<row>:<col>` |
+ * | `ticks` | any of `options`; an option with `write` has a write-in beside it ("Other: ___") | `…:<field>:<option>` = "1", its write-in `…:<field>:<option>:text` |
+ * | `grid` | `rows` × `columns`, each cell by its column's `cell` (below) | `…:<field>:<row>:<col>` |
  * | `gap` | the gap strip: each of `rows` rated on `options` (the workshop's first assessment scale when absent) | `…:<field>:<row>` = the option id |
+ * | `blanks` | a sentence with blanks, each `___` of `text` a write-in ("A child vaccinated in ___ should be able to ___ in ___.") | `…:<field>:<n>`, n from 1, or the keys of the field `same` names |
+ * | `note` | words printed on the sheet, no answer (a DISCUSS prompt, a rule, a reminder) | nothing |
+ * | `table` | a table printed on the sheet, no answer (the cover's "How the canvas works") | nothing |
+ * | `cards` | cards side by side (`columns`) or one per row (`rows`), each a badge, a title, its words and its own fields | each field as on a sheet, under `…:<field>:<card>:<its field>` |
+ *
+ * A grid column's `cell`: `text` a write-in; `tick` a check box; `label`
+ * the row's printed words (`rows[].values`); `choice` one of the column's (or
+ * the row's) `options`, kept under `…:<row>:<col>`; `ticks` any of them,
+ * under `…:<row>:<col>:<option>`; `option` one radio button, the columns of
+ * one `group` making one choice per row, kept under `…:<row>:<group>` = the
+ * column id (the gap strip's Blocks us now / Needed in 12 months / Can wait).
+ *
+ * Words the sheet prints (`intro`, `note`, `table`, a card's) may carry
+ * `**bold**` and `*italic*`; nothing else is read as markup.
+ *
+ * What the printed page shows around the fields is said by the sheet and its
+ * sections, so the on-screen form looks like the page: a sheet's `kicker`
+ * ("Day 1 · Module 1 · Sheet 1 of 6"), its `header` fields beside the title
+ * (Country, Table) and its `footer`; a section's `number` badge, `minutes`,
+ * `note` ("write, then circle one rating per touchpoint"), `discuss` and
+ * `rules` lines, the `module` it is worked in, its `layout` and `tone`.
  */
-const CanvasOptionSchema = z.object({ id: Id, label: Text }).strict();
-const CanvasRowSchema = z.object({ id: Id, label: Text, hint: Text.optional() }).strict();
-const CanvasFieldBase = { id: Id, label: Text, hint: Text.optional() };
-export const WorkshopCanvasFieldSchema = z.discriminatedUnion("type", [
-  z.object({ ...CanvasFieldBase, type: z.literal("text"), lines: z.number().int().min(1).max(12).default(2) }).strict(),
+const CanvasOptionSchema = z.object({ id: Id, label: Text, write: z.boolean().optional() }).strict();
+const CanvasRowSchema = z
+  .object({
+    id: Id,
+    label: Text,
+    hint: Text.optional(),
+    /** The row's printed words in each `label` column, by column id. */
+    values: z.record(z.string(), Text).optional(),
+    /** The heading rows printed above this one (a layer of the architecture map). */
+    group: z.union([Text, z.array(Text).min(1)]).optional(),
+    /** This row's options for a `choice` column, when they are not the column's. */
+    options: z.array(CanvasOptionSchema).min(2).optional(),
+  })
+  .strict();
+const CanvasColumnSchema = z
+  .object({
+    id: Id,
+    label: Text,
+    cell: z.enum(["text", "tick", "label", "choice", "ticks", "option"]).default("text"),
+    /** A `choice` or `ticks` column's options; a `choice` row may give its own. */
+    options: z.array(CanvasOptionSchema).min(1).optional(),
+    /** The radio group an `option` column belongs to. */
+    group: Id.optional(),
+    /** How wide the column draws. */
+    width: z.enum(["narrow", "wide"]).optional(),
+  })
+  .strict();
+const CanvasFieldBase = { id: Id, label: Text.optional(), hint: Text.optional() };
+const CanvasTone = z.enum(["plain", "box", "warm", "cool", "gap"]);
+const canvasFieldTypes = [
+  z.object({ ...CanvasFieldBase, type: z.literal("text"), lines: z.number().int().min(1).max(12).default(2), inline: z.boolean().optional(), same: Text.optional() }).strict(),
   z.object({ ...CanvasFieldBase, type: z.literal("choice"), options: z.array(CanvasOptionSchema).min(2) }).strict(),
   z.object({ ...CanvasFieldBase, type: z.literal("ticks"), options: z.array(CanvasOptionSchema).min(1) }).strict(),
   z
@@ -499,24 +546,99 @@ export const WorkshopCanvasFieldSchema = z.discriminatedUnion("type", [
       ...CanvasFieldBase,
       type: z.literal("grid"),
       rows: z.array(CanvasRowSchema).min(1),
-      columns: z.array(z.object({ id: Id, label: Text, cell: z.enum(["text", "tick"]).default("text") }).strict()).min(1),
+      columns: z.array(CanvasColumnSchema).min(1),
+      /** The head of the row labels' column ("Capability", "#"). */
+      rowHead: Text.optional(),
+      /** false: no row-label column (each row's label is only its name in the summary). */
+      rowLabels: z.boolean().optional(),
+      /** false: no head row (a short list of rows rated Y / P / N). */
+      heads: z.boolean().optional(),
     })
     .strict(),
   z.object({ ...CanvasFieldBase, type: z.literal("gap"), rows: z.array(CanvasRowSchema).min(1), options: z.array(CanvasOptionSchema).min(2).optional() }).strict(),
+  z.object({ id: Id, label: Text.optional(), hint: Text.optional(), type: z.literal("blanks"), text: Text.regex(/___/, "a blanks field has at least one ___"), same: Text.optional() }).strict(),
+  z.object({ id: Id, label: Text.optional(), type: z.literal("note"), text: Text, tone: z.enum(["discuss", "rules", "muted", "plain", "strong"]).optional() }).strict(),
+  z.object({ id: Id, label: Text.optional(), type: z.literal("table"), heads: z.array(Text).min(1), rows: z.array(z.array(Text).min(1)).min(1) }).strict(),
+] as const;
+const CanvasInnerFieldSchema = z.discriminatedUnion("type", [...canvasFieldTypes]);
+export type WorkshopCanvasInnerField = z.infer<typeof CanvasInnerFieldSchema>;
+const CanvasCardSchema = z
+  .object({
+    id: Id,
+    /** The card's badge ("A", "1", "★"). */
+    badge: Text.optional(),
+    title: Text,
+    text: Text.optional(),
+    /** Under the words, in italics ("Must be true: …", "e.g. …"). */
+    note: Text.optional(),
+    /** A prompt above the card's fields ("DISCUSS: …", "FACILITATOR ASKS: …"), Markdown-light. */
+    lead: Text.optional(),
+    tone: CanvasTone.optional(),
+    fields: z.array(CanvasInnerFieldSchema).optional(),
+  })
+  .strict();
+export const WorkshopCanvasFieldSchema = z.discriminatedUnion("type", [
+  ...canvasFieldTypes,
+  z
+    .object({
+      id: Id,
+      label: Text.optional(),
+      hint: Text.optional(),
+      type: z.literal("cards"),
+      /** `columns`: side by side (the journey's touchpoints); `rows`: a table, one card per row (the propositions A to C). */
+      layout: z.enum(["columns", "rows"]).default("columns"),
+      /** An arrow between cards side by side (issuer → credential → verifier). */
+      arrows: z.boolean().optional(),
+      /** A `rows` table's column heads: badge, title, words, fields (those absent from every card are left out). */
+      heads: z.array(Text).optional(),
+      items: z.array(CanvasCardSchema).min(1),
+    })
+    .strict(),
 ]);
 export type WorkshopCanvasField = z.infer<typeof WorkshopCanvasFieldSchema>;
+
+export const WorkshopCanvasSectionSchema = z
+  .object({
+    id: Id,
+    title: Text.optional(),
+    /** The section's badge, as printed ("1", "★", "!"). */
+    number: Text.optional(),
+    minutes: z.number().int().positive().max(240).optional(),
+    /** Printed after the minutes ("write, then circle one rating per touchpoint"). */
+    note: Text.optional(),
+    /** The DISCUSS line under the title, Markdown-light. */
+    discuss: Text.optional(),
+    /** The RULES line under the title. */
+    rules: Text.optional(),
+    /** The modules the section is worked in; the sheet's when absent. */
+    module: z.array(ModuleId).optional(),
+    /** `stack`: one field under another; `columns`: side by side; `aside`: the first field to the left of the rest; `row`: on one line, wrapping. */
+    layout: z.enum(["stack", "columns", "aside", "row"]).optional(),
+    /** With `columns`: how many fields each column holds, left to right (one field per column when absent). */
+    split: z.array(z.number().int().min(1)).min(2).max(4).optional(),
+    tone: CanvasTone.optional(),
+    fields: z.array(WorkshopCanvasFieldSchema).min(1),
+  })
+  .strict();
+export type WorkshopCanvasSection = z.infer<typeof WorkshopCanvasSectionSchema>;
 
 export const WorkshopCanvasSheetSchema = z
   .object({
     id: Id,
     /** As the room calls it: "Cover", "Sheet 3". */
     label: Text.optional(),
+    /** The band above the title, as printed ("Day 1 · Module 1 · Sheet 1 of 6"). */
+    kicker: Text.optional(),
     title: Text,
-    /** One line under the title: what the sheet is for. */
+    /** One line under the title: what the sheet is for. Markdown-light. */
     intro: Text.optional(),
-    /** The modules whose journey questions are its annex (those not already one of its fields). */
+    /** Write-ins beside the title (Country, Table); `same` shares one key across the sheets. */
+    header: z.array(z.object({ id: Id, label: Text, same: Text.optional() }).strict()).optional(),
+    /** The line at the foot of the page. */
+    footer: Text.optional(),
+    /** The modules the sheet is worked in; with `annex`, whose journey questions are its annex (those not already one of its fields). */
     modules: z.array(ModuleId).optional(),
-    sections: z.array(z.object({ id: Id, title: Text.optional(), fields: z.array(WorkshopCanvasFieldSchema).min(1) }).strict()).min(1),
+    sections: z.array(WorkshopCanvasSectionSchema).min(1),
   })
   .strict();
 export type WorkshopCanvasSheet = z.infer<typeof WorkshopCanvasSheetSchema>;
@@ -528,6 +650,10 @@ export const WorkshopCanvasSchema = z
     description: Text.optional(),
     /** The paper of the PDF it is written out to; A3 landscape when absent. */
     size: z.enum(["A3", "A4"]).default("A3"),
+    /** The words at the top right of every sheet ("DPI-H for Health Workshop" over "Policy-maker track · Day 1 and Day 2"). */
+    masthead: z.object({ title: Text, subtitle: Text.optional() }).strict().optional(),
+    /** false: a sheet carries only its own fields, no annex of the journey's other questions. */
+    annex: z.boolean().optional(),
     /** The cover first, then the sheets, in order. */
     sheets: z.array(WorkshopCanvasSheetSchema).min(1),
   })
@@ -583,20 +709,55 @@ export const WorkshopScheduleSchema = z
   .strict();
 export type WorkshopSchedule = z.infer<typeof WorkshopScheduleSchema>;
 
-/** The keys a canvas field keeps its answer under, after `<workshop>:cv:`: `<sheet>:<field>[:<row>[:<col>]]`. */
+/** The blanks of a `blanks` field's text, in order. */
+export function canvasBlanks(text: string): number {
+  return text.split("___").length - 1;
+}
+
+/**
+ * The keys a canvas field keeps its answer under, after `<workshop>:cv:`:
+ * `<sheet>:<field>[:<row>[:<col>]]`. A field with `same` keeps none of its
+ * own: it shows the keys of the field it names.
+ */
 export function canvasFieldRefs(sheet: string, f: WorkshopCanvasField): string[] {
   const at = `${sheet}:${f.id}`;
   switch (f.type) {
     case "text":
+      return f.same ? [] : [at];
     case "choice":
       return [at];
     case "ticks":
-      return f.options.map((o) => `${at}:${o.id}`);
+      return f.options.flatMap((o) => (o.write ? [`${at}:${o.id}`, `${at}:${o.id}:text`] : [`${at}:${o.id}`]));
     case "grid":
-      return f.rows.flatMap((r) => f.columns.map((c) => `${at}:${r.id}:${c.id}`));
+      return f.rows.flatMap((r) => {
+        const groups = new Set<string>();
+        return f.columns.flatMap((c) => {
+          if (c.cell === "label") return [];
+          if (c.cell === "ticks") return (c.options ?? []).map((o) => `${at}:${r.id}:${c.id}:${o.id}`);
+          if (c.cell === "option") {
+            const g = c.group ?? c.id;
+            if (groups.has(g)) return [];
+            groups.add(g);
+            return [`${at}:${r.id}:${g}`];
+          }
+          return [`${at}:${r.id}:${c.id}`];
+        });
+      });
     case "gap":
       return f.rows.map((r) => `${at}:${r.id}`);
+    case "blanks":
+      return f.same ? [] : Array.from({ length: canvasBlanks(f.text) }, (_, i) => `${at}:${i + 1}`);
+    case "note":
+    case "table":
+      return [];
+    case "cards":
+      return f.items.flatMap((c) => (c.fields ?? []).flatMap((x) => canvasFieldRefs(`${at}:${c.id}`, x)));
   }
+}
+
+/** Every field of a sheet, a card's fields after its card. */
+export function canvasSheetFields(s: WorkshopCanvasSheet): WorkshopCanvasField[] {
+  return s.sections.flatMap((x) => x.fields);
 }
 
 /** `workshop/0.1.0`, as a node kind. */
@@ -680,18 +841,53 @@ export const WorkshopKind = nodeKind(
       const refs = new Set<string>();
       for (const s of w.canvas.sheets) {
         dup(`canvas sheet ${s.id} section`, s.sections.map((x) => x.id));
-        dup(`canvas sheet ${s.id} field`, s.sections.flatMap((x) => x.fields.map((f) => f.id)));
+        dup(`canvas sheet ${s.id} field`, [...(s.header ?? []).map((h) => h.id), ...s.sections.flatMap((x) => x.fields.map((f) => f.id))]);
         for (const m of s.modules ?? []) mod(`canvas sheet ${s.id}`, m);
-        for (const f of s.sections.flatMap((x) => x.fields)) {
-          if (f.type === "choice" || f.type === "ticks") dup(`canvas field ${s.id}:${f.id} option`, f.options.map((o) => o.id));
-          if (f.type === "grid" || f.type === "gap") dup(`canvas field ${s.id}:${f.id} row`, f.rows.map((r) => r.id));
-          if (f.type === "grid") dup(`canvas field ${s.id}:${f.id} column`, f.columns.map((c) => c.id));
-          if (f.type === "gap" && !f.options && !w.assessment?.scales.length) issue(`canvas field ${s.id}:${f.id} is a gap strip with no options, and the workshop has no assessment scale`);
+        for (const x of s.sections) {
+          for (const m of x.module ?? []) mod(`canvas sheet ${s.id} section ${x.id}`, m);
+          if (x.split && x.split.reduce((n, k) => n + k, 0) !== x.fields.length) issue(`canvas sheet ${s.id} section ${x.id} splits ${x.split.reduce((n, k) => n + k, 0)} fields into columns, but has ${x.fields.length}`);
+          if (x.split && x.layout !== "columns") issue(`canvas sheet ${s.id} section ${x.id} has a split, which only a columns layout reads`);
+        }
+        const check = (at: string, f: WorkshopCanvasField) => {
+          if (f.type === "choice" || f.type === "ticks") dup(`canvas field ${at} option`, f.options.map((o) => o.id));
+          if (f.type === "grid" || f.type === "gap") dup(`canvas field ${at} row`, f.rows.map((r) => r.id));
+          if (f.type === "grid") {
+            dup(`canvas field ${at} column`, f.columns.map((c) => c.id));
+            for (const c of f.columns) {
+              if ((c.cell === "ticks" || c.cell === "choice") && !c.options && !(c.cell === "choice" && f.rows.every((r) => r.options))) issue(`canvas field ${at} column ${c.id} is a ${c.cell} column with no options`);
+              if (c.cell === "option" && f.columns.filter((x) => x.cell === "option" && (x.group ?? x.id) === (c.group ?? c.id)).length < 2) issue(`canvas field ${at} column ${c.id} is an option column alone in its group: give two or more the same group`);
+            }
+          }
+          if (f.type === "cards") {
+            dup(`canvas field ${at} card`, f.items.map((c) => c.id));
+            for (const c of f.items) {
+              dup(`canvas field ${at}:${c.id} field`, (c.fields ?? []).map((x) => x.id));
+              for (const x of c.fields ?? []) check(`${at}:${c.id}:${x.id}`, x);
+            }
+          }
+          if (f.type === "gap" && !f.options && !w.assessment?.scales.length) issue(`canvas field ${at} is a gap strip with no options, and the workshop has no assessment scale`);
           // A question's write-in may be a text field, or a write-in cell of a grid.
-          if (f.type === "text") refs.add(`${s.id}:${f.id}`);
-          if (f.type === "grid") for (const r of f.rows) for (const c of f.columns) if (c.cell !== "tick") refs.add(`${s.id}:${f.id}:${r.id}:${c.id}`);
+          if (f.type === "text" && !f.same) refs.add(at);
+          if (f.type === "grid") for (const r of f.rows) for (const c of f.columns) if (c.cell === "text") refs.add(`${at}:${r.id}:${c.id}`);
+        };
+        for (const f of s.sections.flatMap((x) => x.fields)) check(`${s.id}:${f.id}`, f);
+      }
+      // A field that shows another's answer (`same`) names a field of the canvas with as many keys.
+      const keyed = new Map<string, WorkshopCanvasField>();
+      for (const s of w.canvas.sheets) for (const f of s.sections.flatMap((x) => x.fields)) keyed.set(`${s.id}:${f.id}`, f);
+      for (const s of w.canvas.sheets) {
+        for (const h of s.header ?? []) if (h.same) {
+          const t = keyed.get(h.same);
+          if (!t || t.type !== "text" || t.same) issue(`canvas sheet ${s.id} header ${h.id} shows "${h.same}", which is no text field of the canvas`);
+        }
+        for (const f of s.sections.flatMap((x) => x.fields)) {
+          if ((f.type !== "text" && f.type !== "blanks") || !f.same) continue;
+          const t = keyed.get(f.same);
+          if (!t || t.type !== f.type || ("same" in t && t.same)) issue(`canvas field ${s.id}:${f.id} shows "${f.same}", which is no ${f.type} field of the canvas with keys of its own`);
+          else if (f.type === "blanks" && t.type === "blanks" && canvasBlanks(t.text) !== canvasBlanks(f.text)) issue(`canvas field ${s.id}:${f.id} has ${canvasBlanks(f.text)} blanks, but "${f.same}" has ${canvasBlanks(t.text)}`);
         }
       }
+      dup("canvas key", w.canvas.sheets.flatMap((s) => s.sections.flatMap((x) => x.fields.flatMap((f) => canvasFieldRefs(s.id, f)))));
       for (const st of w.steps ?? []) for (const q of st.questions ?? []) {
         if (q.canvas !== undefined && !refs.has(q.canvas)) issue(`step ${st.step} question names canvas field "${q.canvas}", which is no write-in of the canvas (a text field, or a grid's write-in cell)`);
       }

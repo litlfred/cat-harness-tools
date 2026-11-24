@@ -20,6 +20,7 @@ import { resolve } from "path";
 import { findContentRepoRoot } from "./repo-root";
 import {
   WITNESSED_VALUES,
+  getValueRegistry,
   lookupValue,
   type WitnessedValueEntry,
   type WitnessedValueFormat,
@@ -405,6 +406,50 @@ export function substituteValuesInMath(text: string): string {
     const attrs = parseValAttrs(parseInlineAttrs(attrStr ?? ""));
     return renderValue(name, attrs, "math");
   });
+}
+
+/**
+ * Substitute every `:val[…]` in a MARKDOWN source string, for the site
+ * renderer (`render-markdown.ts`). The LaTeX renderer resolves `:val` per
+ * mdast node; the Markdown renderer emits text, so this pass splits the
+ * source into math and prose spans by `$`/`$$` delimiters:
+ *
+ * - inside math, a reference becomes the bare numeral (`substituteValuesInMath`);
+ * - in prose, it becomes the numeral wrapped as inline math (`$…$`), because the
+ *   LaTeX text-mode form (`$v$\\,units`) leaves a literal `\\,` in a web page.
+ *
+ * Without it every `:val[…]` reached the published site as a raw token
+ * (qou bean `qou-h59j`, defect 2). Fenced code is left untouched.
+ */
+export function substituteValuesInMarkdown(md: string): string {
+  if (!md.includes(":val[")) return md;
+  // A renderer run with no registry configured (a repo that has none) keeps
+  // the old behaviour, the visible raw token, rather than crashing the build.
+  try {
+    getValueRegistry();
+  } catch {
+    return md;
+  }
+  const FENCE = /(```[\s\S]*?```)/;
+  return md
+    .split(FENCE)
+    .map((chunk, i) => {
+      if (i % 2 === 1) return chunk; // fenced block
+      return chunk
+        .split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/)
+        .map((seg, j) => {
+          if (j % 2 === 1) return substituteValuesInMath(seg);
+          return seg.replace(MATH_VAL_PATTERN, (_m, name: string, attrStr?: string) => {
+            const attrs = parseValAttrs(parseInlineAttrs(attrStr ?? ""));
+            const out = renderValue(name, attrs, "math");
+            // An unresolved reference comes back as the literal token: keep it
+            // visible, but do not wrap it in math.
+            return out.startsWith(":val[") ? out : `$${out}$`;
+          });
+        })
+        .join("");
+    })
+    .join("");
 }
 
 // ── Directive extraction (for validators / auto-link) ────────────

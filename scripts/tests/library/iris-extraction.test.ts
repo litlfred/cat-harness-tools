@@ -55,6 +55,19 @@ describe("failing pages go to OCR", () => {
     expect(p.steps[1]).toContain("--ocr");
   });
 
+  test("a scan with a usable outline and no text layer: OCR, then pdf-structure --ocr", () => {
+    // mcmullen-braids-hodge-2013: one publisher bookmark, 14 pages, 0 characters, no page "failing".
+    const p = planFor("x.pdf", { outline: 1, outlineUsable: 1, chars: 0, pagesFailing: [], pagesTotal: 14 }, LIB);
+    expect(p.rung).toBe("pdf-ocr+pdf-structure");
+    expect(p.steps.map((s) => s[1]?.split("/").pop())).toEqual(["pdf-ocr.py", "pdf-structure.py"]);
+    expect(p.steps[1]).toContain("--ocr");
+  });
+
+  test("an outline over a real text layer stays on pdf-structure", () => {
+    const p = planFor("x.pdf", { outline: 3, outlineUsable: 3, chars: 9000, pagesFailing: [], pagesTotal: 10 }, LIB);
+    expect(p.rung).toBe("pdf-structure");
+  });
+
   test("most pages failing, no outline: the whole document from OCR", () => {
     const p = planFor("x.pdf", { outline: 0, outlineUsable: 0, chars: 9000, pagesFailing: [[1, "a"], [2, "b"], [3, "c"]], pagesTotal: 4 }, LIB);
     expect(p.rung).toBe("pdf-ocr+pdf-pages");

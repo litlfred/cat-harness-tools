@@ -87,8 +87,18 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     const hub = declaredVisualisers(REPO).find((v) => v.harness === "cat-harness" && v.renderedBy === "skill-docs");
     if (hub !== undefined) {
       expect(resolveFor("cat-harness", "skills")).toMatch(committed(`cat-harness/${hub.id}/index.html`));
-      if (dirs.some((d) => d.instance === "bootstrap" && d.dir.id === "skills")) {
-        expect(resolveFor("bootstrap", "skills")).toBe(autoDocsSkills);
+      const boot = dirs.find((d) => d.instance === "bootstrap" && d.dir.id === "skills");
+      if (boot !== undefined) {
+        // `covers` names only the declaring layer's directories, so the hub
+        // is not another layer's viewer. That layer's `skills` opens the
+        // nested auto-docs view, qualified by its layer (`bootstrap-skills`),
+        // and only where that page was drawn (viewersOf, `subgraphs:
+        // "directory"`); asserted as `toBe(autoDocsSkills)` until 2026-11-22,
+        // a page no rule gives another layer, which only ran once the hub landed.
+        const refs = viewersOf(boot.dir, boot.root, REPO).map((v) => v.ref);
+        expect(refs.filter((r) => committed(`cat-harness/${hub.id}/index.html`).test(r))).toEqual([]);
+        const nested = resolveFor("bootstrap", "skills");
+        if (nested !== undefined) expect(nested).toBe(autoDocsSkills.replace("/skills/skills/", "/skills/bootstrap-skills/"));
       }
     } else {
       expect(resolveFor("cat-harness", "skills")).toBe(autoDocsSkills);

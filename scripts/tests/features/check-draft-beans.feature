@@ -93,9 +93,57 @@ Feature: A draft decision bean must land on the default branch
 
   @test:scripts/tests/check-draft-beans.test.ts::checkDraftBeans_detection_logic_with_mocked_beans_&_git::handles_missing_default_branch_as_undetermined
   Scenario: A default branch that cannot be resolved is undetermined
-    Given one draft bean and git failing every default branch lookup
+    Given one draft decision bean and git failing every default branch lookup
     When the draft beans are checked with no default ref given
     Then one entry is undetermined, saying "could not determine default branch ref"
+
+  @test:scripts/tests/check-draft-beans.test.ts::checkDraftBeans_detection_logic_with_mocked_beans_&_git::with_no_draft_DECISION_bean,_an_unnameable_default_branch_is_not_undetermined_(#2460)
+  Scenario: With no draft decision bean, the default branch is never asked for
+    Given a draft bean that is not a ruling request, a todo bean, and git failing every default branch lookup
+    When the draft beans are checked
+    Then nothing is undetermined and there are no findings
+    And no default branch lookup was made
+
+  @test:scripts/tests/check-draft-beans.test.ts::resolveDefaultRef_in_a_CI_checkout_(shallow,_detached,_no_origin/HEAD)::GITHUB_BASE_REF_names_the_branch,_and_it_is_fetched
+  Scenario: In a CI checkout the pull request's base names the default branch, and it is fetched
+    Given a depth-1 detached checkout with no origin/HEAD and no origin/main, whose remote's default is "trunk"
+    When the default ref is resolved with GITHUB_BASE_REF "trunk"
+    Then it is "origin/trunk", and that ref now exists
+
+  @test:scripts/tests/check-draft-beans.test.ts::resolveDefaultRef_in_a_CI_checkout_(shallow,_detached,_no_origin/HEAD)::the_event_payload's_repository.default_branch_names_it_when_there_is_no_base_ref
+  Scenario: In a CI checkout the event payload's declared default names the default branch
+    Given the same checkout and an event payload declaring default_branch "trunk"
+    When the default ref is resolved
+    Then it is "origin/trunk"
+
+  @test:scripts/tests/check-draft-beans.test.ts::resolveDefaultRef_in_a_CI_checkout_(shallow,_detached,_no_origin/HEAD)::with_no_CI_variables,_the_remote's_own_HEAD_names_it
+  Scenario: With no CI variables the remote's own HEAD names the default branch
+    Given the same checkout and no CI environment
+    When the default ref is resolved
+    Then it is "origin/trunk"
+
+  @test:scripts/tests/check-draft-beans.test.ts::resolveDefaultRef_in_a_CI_checkout_(shallow,_detached,_no_origin/HEAD)::a_draft_decision_bean_in_the_CI_checkout_is_judged_against_the_fetched_default_branch
+  Scenario: A draft decision bean in a CI checkout is judged against the fetched default branch
+    Given a CI checkout holding an uncommitted draft decision bean, and GITHUB_BASE_REF "main"
+    When the draft beans are checked
+    Then the default branch is "origin/main", nothing is undetermined, and the bean is a finding
+
+  @test:scripts/tests/check-draft-beans.test.ts::resolveDefaultRef_in_a_CI_checkout_(shallow,_detached,_no_origin/HEAD)::the_checkout_really_has_none_of_the_local_candidates
+  Scenario: The CI checkout fixture has none of the local candidates
+    Given a depth-1 detached checkout of a pull request's head
+    Then origin/main does not verify, origin/HEAD is unset, and the repository is shallow
+
+  @test:scripts/tests/check-draft-beans.test.ts::resolveDefaultRef_in_a_CI_checkout_(shallow,_detached,_no_origin/HEAD)::an_unreadable_event_payload_declares_nothing,_and_the_remote_still_answers
+  Scenario: An unreadable event payload declares nothing, and the remote's HEAD still answers
+    Given the same checkout and an event payload that is not JSON
+    When the default ref is resolved
+    Then the payload declares no name and the ref is "origin/main"
+
+  @test:scripts/tests/check-draft-beans.test.ts::resolveDefaultRef_in_a_CI_checkout_(shallow,_detached,_no_origin/HEAD)::declaredDefaultNames:_base_ref_first,_then_the_declared_default,_deduplicated
+  Scenario: The pull request's base is trusted before the declared default, each named once
+    Given GITHUB_BASE_REF "release" and an event payload declaring default_branch "main"
+    Then the declared names are "release" then "main"
+    And a base ref equal to the declared default is named once
 
   @test:scripts/tests/check-draft-beans.test.ts::real_git_repo_workflow::catches_unmerged_draft_decision_bean,_then_passes_once_merged_to_main
   Scenario: An unmerged draft decision bean is caught on its branch and passes once merged

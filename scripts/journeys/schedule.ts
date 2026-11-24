@@ -179,3 +179,79 @@ ${sc.intro ? `<div class="jv-cal-intro">${d.md ? d.md(sc.intro) : `<p>${e(sc.int
 </section>
 `;
 }
+
+/** A slot of the schedule this workshop's people sit in: their own track's sessions, and what every track shares. */
+export interface GlanceSlot {
+  day: number;
+  slot: WorkshopScheduleSlot;
+  /** The track's label for a session; the kind's for the rest. */
+  where: string;
+  href?: string;
+}
+
+/** The slots of the days that concern the workshop the page is about, day by day, in time order. */
+export function glanceSlots(d: ScheduleDraw): { day: number; title: string; slots: GlanceSlot[] }[] {
+  const sc = d.schedule;
+  const mine = new Set(sc.tracks.filter((t) => (t.workshop ?? d.owner.workshop.id) === d.here.workshop.id).map((t) => t.id));
+  return sc.days.map((day) => ({
+    day: day.day,
+    title: day.title ?? `Day ${day.day}`,
+    slots: day.slots
+      .filter((x) => x.kind !== "session" || (x.track !== undefined && mine.has(x.track)))
+      .slice()
+      .sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end))
+      .map((x) => {
+        const t = x.track === undefined ? undefined : sc.tracks.find((y) => y.id === x.track);
+        const href = x.module ? moduleHref(d, t?.workshop ?? d.owner.workshop.id, x.module) : undefined;
+        return { day: day.day, slot: x, where: t ? t.label : KIND_LABEL[x.kind], ...(href ? { href } : {}) };
+      }),
+  }));
+}
+
+/** The slots of a module, wherever the schedule places it. */
+export function moduleSlots(d: ScheduleDraw, module: string): GlanceSlot[] {
+  return glanceSlots(d).flatMap((x) => x.slots.filter((s) => s.slot.module === module));
+}
+
+/**
+ * The schedule at a glance, for the top of a page (owner, 2026-11-19: "how do
+ * presenters and participants see schedule? should be towards top"): a tab per
+ * day, the day's sessions of this workshop's track and the shared slots, one
+ * line each (time, module, title, track), and, by this device's clock, the
+ * session on now and the next one marked and named above the list. The full
+ * calendar is linked (`full`). The day shown is the one picked last on this
+ * device, Day 1 until then; the schedule names no dates, so the clock is read
+ * as a time of day only.
+ */
+export function scheduleGlanceHtml(d: ScheduleDraw & { full?: string }): string {
+  const days = glanceSlots(d).filter((x) => x.slots.length);
+  if (!days.length) return "";
+  const id = `${d.id ?? "the-days"}-glance`;
+  const h = d.level ?? 2;
+  const tabs =
+    days.length > 1
+      ? `<div class="jv-glance-tabs" role="group" aria-label="Day">${days.map((x, i) => `<button type="button" class="jv-glance-tab" data-jv-glance-day="${x.day}" aria-pressed="${i === 0 ? "true" : "false"}">${e(x.title)}</button>`).join("")}</div>`
+      : "";
+  const lists = days
+    .map(
+      (x, i) =>
+        `<ol class="jv-glance-day" data-jv-glance-list="${x.day}"${i === 0 ? "" : " hidden"}>${x.slots
+          .map((s) => {
+            const code = s.slot.module ? (s.href ? `<a class="jv-cal-code" href="${e(s.href)}">${e(s.slot.module)}</a> ` : `<span class="jv-cal-code">${e(s.slot.module)}</span> `) : "";
+            return `<li class="jv-glance-slot jv-cal-${s.slot.kind}" data-jv-start="${e(s.slot.start)}" data-jv-end="${e(s.slot.end)}"><span class="jv-glance-time"><time>${e(s.slot.start)}</time>–<time>${e(s.slot.end)}</time></span><span class="jv-glance-what">${code}${e(s.slot.title)}</span><span class="jv-glance-where">${e(s.where)}</span><span class="jv-glance-flag" data-jv-glance-flag></span></li>`;
+          })
+          .join("")}</ol>`,
+    )
+    .join("");
+  const ws = d.here.workshop.id;
+  return `<section class="jv-glance" id="${e(id)}" data-jv-glance="${e(ws)}" aria-labelledby="${e(id)}-h">
+<div class="jv-glance-head"><h${h} id="${e(id)}-h">Schedule</h${h}>${tabs}${d.full ? `<a class="jv-glance-full" href="${e(d.full)}">${e(scheduleTitle(d.schedule))}: full timetable</a>` : ""}</div>
+<p class="jv-glance-now" data-jv-glance-now hidden></p>
+${lists}
+<script>${GLANCE_JS}</script>
+</section>
+`;
+}
+
+/** The glance's day tabs and its now / next marks; the words go through the page's translation table when it has one. */
+const GLANCE_JS = `(function(s){var b=document.currentScript.parentNode,k="jv:glance:"+b.getAttribute("data-jv-glance"),T={};try{var n=document.getElementById("jv-i18n");if(n)T=JSON.parse(n.textContent)}catch(x){}function t(w){return T[w]||w}function d2(n){return(n<10?"0":"")+n}function show(day){[].forEach.call(b.querySelectorAll("[data-jv-glance-list]"),function(l){l.hidden=l.getAttribute("data-jv-glance-list")!==day});[].forEach.call(b.querySelectorAll("[data-jv-glance-day]"),function(x){x.setAttribute("aria-pressed",String(x.getAttribute("data-jv-glance-day")===day))});try{s.setItem(k,day)}catch(x){}mark()}function mark(){var l=b.querySelector("[data-jv-glance-list]:not([hidden])"),out=b.querySelector("[data-jv-glance-now]");if(!l)return;var d=new Date(),now=d2(d.getHours())+":"+d2(d.getMinutes()),on=null,nx=null;[].forEach.call(l.children,function(li){li.classList.remove("is-now","is-next");li.querySelector("[data-jv-glance-flag]").textContent="";var a=li.getAttribute("data-jv-start"),e=li.getAttribute("data-jv-end");if(!on&&a<=now&&now<e)on=li;else if(!nx&&a>now)nx=li});function put(li,w,c){li.classList.add(c);li.querySelector("[data-jv-glance-flag]").textContent=t(w)}if(on)put(on,"Now","is-now");if(nx)put(nx,"Next","is-next");var x=on||nx;if(out){out.hidden=!x;if(x)out.textContent=t(on?"Now":"Next")+": "+x.querySelector(".jv-glance-time").textContent+" · "+x.querySelector(".jv-glance-what").textContent+" · "+x.querySelector(".jv-glance-where").textContent}}[].forEach.call(b.querySelectorAll("[data-jv-glance-day]"),function(x){x.addEventListener("click",function(){show(x.getAttribute("data-jv-glance-day"))})});var p=null;try{p=s.getItem(k)}catch(x){}if(p&&b.querySelector('[data-jv-glance-list="'+p+'"]'))show(p);else mark();setInterval(mark,60000)})(function(){try{return window.localStorage}catch(x){return null}}())`;

@@ -66,6 +66,7 @@ import { findDeclarationFile, layerRootsIn } from "../schemas/kg/cat-harness.js"
 import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
 import { allowedFromNeeds, directionOf, type LayerRule } from "../schemas/kg/layer-direction.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { NOT_APPLICABLE_EXIT, notApplicableLine } from "./lib/not-applicable.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 
@@ -293,6 +294,30 @@ export function analyse(repoRoot = REPO_ROOT): ImportDirectionReport {
   };
 }
 
+/**
+ * A gated instance that holds no code files. By default that is refused (exit 2):
+ * nothing was checked, which is not a pass. With `ifCode` (`--if-code`, which the
+ * per-layer gate passes for a layer's OWN instance), it is not applicable
+ * (exit 78): a layer with no code, such as an IG that holds only FSH, BPMN and
+ * DMN, has no import edge to judge, and that is neither a pass nor a failure.
+ * Undefined when every gated instance holds code.
+ */
+export function codelessGate(
+  gated: Iterable<string>,
+  filesRead: Map<string, number>,
+  ifCode: boolean,
+): { exit: number; message: string } | undefined {
+  const empty = [...gated].filter((g) => (filesRead.get(g) ?? 0) === 0);
+  if (empty.length === 0) return undefined;
+  if (ifCode) {
+    return {
+      exit: NOT_APPLICABLE_EXIT,
+      message: notApplicableLine("check:import-direction", `${empty.map((g) => `'${g}'`).join(", ")} ${empty.length === 1 ? "holds" : "hold"} no code files, so there is no import edge to judge`),
+    };
+  }
+  return { exit: 2, message: `✗ no code files found in gated instance '${empty[0]}' — nothing was checked, which is not a pass.` };
+}
+
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const gated = new Set<string>();
@@ -311,11 +336,10 @@ if (import.meta.main) {
     console.error(`✗ --gate names no declared instance: ${unknownGates.join(", ")}. Nothing was checked for it, which is not a pass.`);
     process.exit(2);
   }
-  for (const g of gated) {
-    if ((r.filesRead.get(g) ?? 0) === 0) {
-      console.error(`✗ no code files found in gated instance '${g}' — nothing was checked, which is not a pass.`);
-      process.exit(2);
-    }
+  const empty = codelessGate(gated, r.filesRead, args.includes("--if-code"));
+  if (empty) {
+    console.error(empty.message);
+    process.exit(empty.exit);
   }
 
   const wrong = r.findings.filter((f) => f.verdict === "wrong-direction");

@@ -196,9 +196,13 @@ export function glossarySchemes(root: string): GlossScheme[] {
   const owners = instanceRoots(root);
   for (const { abs, declaredBy } of declaredGlossaryFiles(root, ".glossary.json")) {
     try {
-      const d = JSON.parse(readFileSync(abs, "utf-8")) as { id?: string; source?: string; terms?: GlossTerm[]; sourceLanguage?: string };
+      const d = JSON.parse(readFileSync(abs, "utf-8")) as { id?: string; source?: string; terms?: GlossTerm[]; sourceLanguage?: string; _generated?: unknown };
       if (!d.terms) continue;
-      const own = schemeOwner(root, { source: d.source, terms: d.terms }, declaredBy, owners);
+      // A generated (extracted) scheme is credited by its sources wherever the
+      // generator hosts it, as the page's own extraction credits it: the
+      // repository boundary in schemeOwner is for a scheme a layer authors.
+      const repositories = d._generated !== undefined ? [resolve(root)] : undefined;
+      const own = schemeOwner(root, { source: d.source, terms: d.terms }, declaredBy, owners, repositories);
       if ("error" in own) continue;
       out.push({ id: d.id ?? basename(abs), terms: d.terms, instance: own.owner, lang: schemeSourceLanguage(d) });
     } catch {

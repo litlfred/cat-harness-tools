@@ -107,6 +107,9 @@
 # (a layer's PR on 2026-11-17: the record of 06:19Z, the answer of 11:29Z,
 # whose record was saved after the PR pinned); judged against it, the PR was
 # charged with what the lower layers fixed in between.
+# The branch-kept graphs it mounted are kept and compared the same way
+# (`state-digest.py`): WHO dth-pc#3 was judged against an answer stored before
+# a beans branch was copied in, and charged with that branch's instance.
 # Re-running ALL jobs (a second attempt) recomputes main exactly, as before.
 # `reuse-stored-main: false` turns the reuse off.
 #
@@ -258,14 +261,17 @@
 # (keyed by the run id), so it never cancels the PR's real run. A caller that
 # adds `labeled` should also skip its `checks` job on such an event and key
 # its OWN concurrency group the same way (a caller-level group keyed by
-# `github.ref` with cancel-in-progress would still cancel the real run):
+# `github.ref` with cancel-in-progress would still cancel the real run), and
+# cancel only on an event that moves the head or starts a tier, as this
+# workflow's own `concurrency` does (a `ready_for_review` that cancels would
+# cancel the full tier the `release` label started on the same head):
 #
 #   on:
 #     pull_request:
 #       types: [opened, synchronize, reopened, ready_for_review, labeled]
 #   concurrency:
 #     group: harness-pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id) || github.ref }}
-#     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+#     cancel-in-progress: ${{ github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'labeled' || github.event.action == 'closed') }}
 #   jobs:
 #     checks:
 #       if: github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview'
@@ -432,9 +438,18 @@ permissions:
 # 42917495047, 2026-11-10) and mailed "Some jobs were not successful".
 # A `labeled` run for any label but `release` is a no-op, in a group of its
 # own: in the PR's group it would cancel the PR's real run.
+# Only an event that moves the head or starts a tier cancels the run in
+# flight: `opened`, `synchronize`, `reopened`, a `release`/`preview` label
+# (`labeled`; any other label is in its own group above) and `closed`. An event
+# that leaves the head where it is (`ready_for_review`, `unlabeled`, `edited`,
+# `converted_to_draft`) waits behind the running run instead, so it never
+# cancels a full tier the `release` label started on the same head: the
+# `ready_for_review` on two downstream layers' PRs did (2026-11-18). Once
+# that run passes, the waiting `ready_for_review` run reuses its verdict
+# ("Already judged?", below). A new head commit still cancels stale runs.
 concurrency:
   group: layer-pr-checks-${{ github.repository }}-${{ (github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id) || github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.event_name == 'push' && github.sha || 'run') }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened' || github.event.action == 'labeled' || github.event.action == 'closed') }}
 
 # The instance, once: the input when given, else (layer mode) the calling
 # repository's name, which is the instance's name for every layer.
@@ -1055,18 +1070,43 @@ jobs:
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           DIR: src
+          SUBDIR: ${{ inputs.path-in-repo }}
         run: |
           # A PR's merge commit: its first parent is the main it merges into,
           # exactly. Anything else (workflow_dispatch): the default branch's tip.
+          #
+          # NO INSTANCE ON MAIN (a downstream base layer's first harness PR,
+          # run 44489605227): the PR that first brings the instance into a
+          # repository, an instance newly added beside others, or a main with
+          # no commits at all. Main has no `<path-in-repo>/<instance>.json`, so
+          # main's side cannot be mounted (the swap stopped with `mv: cannot
+          # stat 'src/<instance>'`, and compare then read `results-base-1
+          # missing`). Main's side is then EMPTY (`absent=true`): nothing is
+          # prepared or run for it, and compare judges the PR side on its
+          # own, so every test and gate on the head must pass outright and
+          # no failure is excused as pre-existing. It is never the stricter
+          # judgment's opposite: a wrongly-read absence can only fail a PR.
           set -euo pipefail
           cd "$DIR"
+          absent=false
           if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
             git checkout -q --detach 'HEAD^1'
+          elif [ -z "$(git ls-remote --heads origin "$DEFAULT_BRANCH")" ]; then
+            # An empty main: no branch to fetch, so no instance on it.
+            absent=true
+            echo "::notice::main ($DEFAULT_BRANCH) has no commits: main's side is empty, and the PR side is judged on its own"
           else
             git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
             git checkout -q --detach FETCH_HEAD
           fi
-          git log -1 --format='base side: %h %s'
+          if [ "$absent" = false ]; then
+            git log -1 --format='base side: %h %s'
+            if [ ! -f "${SUBDIR:-.}/$INSTANCE.json" ]; then
+              absent=true
+              echo "::notice::main has no ${SUBDIR:-.}/$INSTANCE.json: this PR brings the instance in, so main's side is empty, and the PR side is judged on its own (every test and gate must pass)"
+            fi
+          fi
+          echo "absent=$absent" >> "$GITHUB_OUTPUT"
       - name: Is there anything to prepare?
         continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
         id: skip-prep
@@ -1806,6 +1846,9 @@ jobs:
       # The lower layers (`name=sha` words) main's side is mounted with, kept
       # in from.json beside main's answer (stored-pins.py).
       lower: ${{ steps.base-key.outputs.lower }}
+      # The digest of the branch-kept graphs main's side mounts
+      # (state-digest.py), kept in from.json beside main's answer.
+      state: ${{ steps.base-key.outputs.state }}
       cone: ${{ steps.base-key.outputs.cone }}
       shards: ${{ steps.shards.outputs.list }}
       # Whether this job built main's side for its shards. The `run` job reads
@@ -1820,6 +1863,10 @@ jobs:
       # True on the first harness PR: main had no lock, so main's side is
       # the PR's own tree (see the base-root step).
       first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
+      # True when main has no instance at all (layer mode; the caller-base
+      # step): main's side is empty, nothing is prepared or run for it, and
+      # compare judges the PR side on its own, every failure counted.
+      absent: ${{ steps.fa-caller-base.outputs.absent == 'true' }}
       # Whether this push re-records every page-build writer (writer-record-hours);
       # otherwise it records incrementally (cat-harness-tools#1702).
       writer-record-full: ${{ steps.writer-stamp.outputs.full }}
@@ -1919,8 +1966,13 @@ jobs:
           # since main was judged is never charged to the PR. A miss costs
           # runner time only; the base side runs beside the head side. A tip
           # that cannot be read is a miss, never a hit.
-          # The tips this run pinned (the pin step), which both sides mount.
-          state="$(sha256sum < "$RUNNER_TEMP/pin/state.json" | cut -d' ' -f1)"
+          # The tips both sides mount: the pin step's, with what state-pin.sh
+          # serves from the live read (a branch the pin does not name, a beans
+          # branch that moved). The pin file alone missed both: WHO dth-pc#3
+          # (run 44489690657) shared main's answer across a beans branch
+          # copied in after it, and was charged with that branch's instance.
+          state_digest="$(python3 ci/.github/scripts/layer-pr-checks/state-digest.py "$RUNNER_TEMP/pin/state.json" "$RUNNER_TEMP/pin/state-live.json")"
+          state="$state_digest"
           for repo in $([ "$MODE" = "layer" ] && echo ${HARNESS_OWNER}/folio-assistant) "$GITHUB_REPOSITORY"; do
             python3 -c 'import json,sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1])) else 1)' "$RUNNER_TEMP/pin/state.json" "$repo" \
               || state="$state $repo=unreadable-$(date +%s%N)"
@@ -1945,6 +1997,9 @@ jobs:
             # The lower layers this side mounts, kept beside main's answer
             # (from.json) and checked before a stored answer is used.
             echo "lower=${lower# }"
+            # The branch-kept graphs this side mounts, kept beside main's
+            # answer too (from.json, stored-pins.py).
+            echo "state=$state_digest"
           } >> "$GITHUB_OUTPUT"
           # The CI cone's records of the same main (cat-harness-tools#398). A
           # PR restores the newest under the prefix, not this exact key: a
@@ -1954,8 +2009,11 @@ jobs:
       # shards, hours later on a busy day, and the entry may be evicted by
       # then (cat-harness-tools#926). What is restored goes to compare as an
       # artifact (below).
+      # Not when main has no instance: there is no answer to find, and an
+      # empty side is never cached as one (compare).
       - name: Is main's answer already known?
         id: base-lookup
+        if: steps.fa-caller-base.outputs.absent != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
@@ -1979,6 +2037,7 @@ jobs:
         id: stored-lookup
         if: >-
           steps.base-lookup.outputs.cache-hit != 'true' && github.event_name != 'push' &&
+          steps.fa-caller-base.outputs.absent != 'true' &&
           inputs.reuse-stored-main && github.run_attempt == '1'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -2000,9 +2059,10 @@ jobs:
           DIR: ${{ runner.temp }}/base-results
           LOWER: ${{ steps.base-key.outputs.lower }}
           INDEX: ${{ steps.pins.outputs.index }}
+          STATE: ${{ steps.base-key.outputs.state }}
         run: |
           set -euo pipefail
-          python3 ci/.github/scripts/layer-pr-checks/stored-pins.py "$DIR/from.json" "$LOWER" "$INDEX" | tee -a "$GITHUB_OUTPUT"
+          python3 ci/.github/scripts/layer-pr-checks/stored-pins.py "$DIR/from.json" "$LOWER" "$INDEX" "$STATE" | tee -a "$GITHUB_OUTPUT"
       # A PR only: a push computes main's side whatever is cached.
       - name: Hand main's answer to the compare job
         id: base-answer
@@ -2095,6 +2155,7 @@ jobs:
           BASE_HIT: ${{ steps.base-hit.outputs.hit == 'true' }}
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
           PREVIEW: ${{ github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true' }}
+          ABSENT: ${{ steps.fa-caller-base.outputs.absent == 'true' }}
         run: |
           hit=false
           # Why nothing runs, for main's verdict on a push (owner, Q-MQA-2 A):
@@ -2107,6 +2168,11 @@ jobs:
             echo "main's integration run already started in this window: this push runs nothing, and the next window's first push judges it" | tee -a "$GITHUB_STEP_SUMMARY"
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
+          elif [ "$ABSENT" = "true" ]; then
+            # Main has no instance (the caller-base step): its side is empty,
+            # and there is nothing of it to mount, prepare or run.
+            hit=true
+            echo "main has no $INSTANCE: main's side is empty, nothing is prepared for it, and the PR side is judged on its own" | tee -a "$GITHUB_STEP_SUMMARY"
           elif [ "$PREVIEW" = "true" ]; then
             # The preview tier never computes main's side (the header): the
             # cone is judged against main's stored answer, or as unknown.
@@ -2246,7 +2312,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        side: ${{ fromJSON(github.event_name == 'push' && '["base"]' || ((needs.prepare-base.outputs.cached == 'true' || needs.prepare-head.outputs.preview == 'true') && '["head"]' || '["base","head"]')) }}
+        side: ${{ fromJSON(github.event_name == 'push' && '["base"]' || ((needs.prepare-base.outputs.cached == 'true' || needs.prepare-base.outputs.absent == 'true' || needs.prepare-head.outputs.preview == 'true') && '["head"]' || '["base","head"]')) }}
         shard: ${{ fromJSON(needs.prepare-base.outputs.shards) }}
     env:
       SIDE: ${{ matrix.side }}
@@ -2691,6 +2757,16 @@ jobs:
             echo
             echo "Main has no \`index.lock.json\` yet, because this PR adds it, so main cannot be mounted. Main's side was computed from this PR's own tree: nothing below can be new, and every failing gate is listed as the baseline this PR sets. Later PRs are judged against main as usual."
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Say that main has no instance
+        if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.absent == 'true' && github.event_name != 'push'
+        env:
+          SUBDIR: ${{ inputs.path-in-repo }}
+        run: |
+          {
+            echo "### Main has no \`$INSTANCE\`: the PR side is judged on its own"
+            echo
+            echo "Main has no \`${SUBDIR:-.}/$INSTANCE.json\` (this PR brings the instance in, or main is empty), so main's side is empty: nothing was prepared or run for it. Every test and gate on this PR must pass outright; a failure, and a gate that could not determine (exit 2), is NEW, never excused as failing on main. Not applicable (78) and skipped gates are listed and not counted, as always."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Join each side's shards
         id: join
         if: steps.pins-only.outputs.only != 'true'
@@ -2705,7 +2781,9 @@ jobs:
           PIN_AT: ${{ needs.prepare-base.outputs.layers-at }}
           INDEX: ${{ needs.prepare-base.outputs.index }}
           LOWER: ${{ needs.prepare-base.outputs.lower }}
+          STATE: ${{ needs.prepare-base.outputs.state }}
           PREVIEW: ${{ github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true' }}
+          ABSENT: ${{ github.event_name != 'push' && needs.prepare-base.outputs.absent == 'true' }}
         run: |
           set -euo pipefail
           sides="base head"
@@ -2715,12 +2793,22 @@ jobs:
             cp -r "$RUNNER_TEMP/base-results" merged/base
             sides="head"
           fi
+          # Main has no instance: its side is EMPTY, never missing. No test
+          # and no gate ran there, so every head failure is new (compare-gates.py
+          # --no-base also counts head's exit 2).
+          if [ "$ABSENT" = "true" ]; then
+            mkdir -p merged/base
+            printf '<?xml version="1.0" encoding="UTF-8"?>\n<testsuites name="main has no instance" tests="0" failures="0"></testsuites>\n' > merged/base/junit.xml
+            printf '{}\n' > merged/base/gates.json
+            sides="head"
+          fi
           # The preview tier ran the head side only; main's is the stored answer or none.
           [ "$PREVIEW" = "true" ] && sides="head"
           for side in $sides; do
             python3 .github/scripts/layer-pr-checks/merge-shards.py results "$side" "$N" "merged/$side"
           done
-          if [ "$CACHED" != "true" ] && [ "$PREVIEW" != "true" ]; then
+          # An empty side is not main's answer: never kept as one.
+          if [ "$CACHED" != "true" ] && [ "$PREVIEW" != "true" ] && [ "$ABSENT" != "true" ]; then
             mkdir -p "$RUNNER_TEMP/base-results"
             cp merged/base/junit.xml merged/base/gates.json "$RUNNER_TEMP/base-results/"
             # Which main this answer is, for a PR that is judged against it
@@ -2734,6 +2822,9 @@ jobs:
               # The lower layers main's side mounted: a PR uses this answer
               # only when it mounts the same (stored-pins.py).
               "lower": os.environ.get("LOWER", ""),
+              # The branch-kept graphs it mounted (state-digest.py): the same
+              # rule, for the state branches (stored-pins.py).
+              "state": os.environ.get("STATE", ""),
               "run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
           }, open(sys.argv[1], "w"), indent=1)
           PY
@@ -2745,7 +2836,7 @@ jobs:
             cp merged/head/gates.json "$RUNNER_TEMP/timings/gates.json"
           fi
       - name: Keep main's answer for the next run (bean cis2)
-        if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true' && needs.prepare-head.outputs.preview != 'true'
+        if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true' && needs.prepare-base.outputs.absent != 'true' && needs.prepare-head.outputs.preview != 'true'
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -2900,7 +2991,9 @@ jobs:
         id: gates
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview != 'true'
         continue-on-error: true
-        run: python3 .github/scripts/layer-pr-checks/compare-gates.py merged/base/gates.json merged/head/gates.json
+        env:
+          NO_BASE: ${{ needs.prepare-base.outputs.absent == 'true' && '--no-base' || '' }}
+        run: python3 .github/scripts/layer-pr-checks/compare-gates.py $NO_BASE merged/base/gates.json merged/head/gates.json
       # The typecheck runs in the head side's prepare job; it is judged here.
       - name: Verdict
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview != 'true' && (steps.tests.outcome != 'success' || steps.gates.outcome != 'success' || needs.prepare-head.outputs.typecheck == 'failure')

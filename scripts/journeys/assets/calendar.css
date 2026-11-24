@@ -5,8 +5,10 @@
    (journeys.css, light and dark) and on its overview (present.css, the
    presentation frame's light palette): its own tokens, so it reads in either,
    dark only where the page itself turns dark. Below 720px each day stacks
-   into one column in time order, each cell with its own time and track. */
-.jv-cal {
+   into one column in time order, each cell with its own time and track.
+   The same tokens draw the schedule at a glance (`.jv-glance`), near the
+   top of a page. */
+.jv-cal, .jv-glance {
   --cal-paper: #ffffff;
   --cal-ink: #1c1f24;
   --cal-muted: #5c6370;
@@ -24,7 +26,7 @@
   color: var(--cal-ink);
 }
 @media (prefers-color-scheme: dark) {
-  body:not(.jp) .jv-cal {
+  body:not(.jp) .jv-cal, body:not(.jp) .jv-glance {
     --cal-paper: #1d2024;
     --cal-ink: #e8e6e1;
     --cal-muted: #a3a8b1;
@@ -99,4 +101,37 @@ a.jv-cal-code:focus-visible { outline: 2px solid var(--cal-focus); outline-offse
 @media (forced-colors: active) {
   .jv-cal-slot { border: 1px solid CanvasText; }
   .jv-cal-head { border-bottom-color: CanvasText; }
+}
+
+/* The schedule at a glance: a day's sessions of this track and the shared slots, one line each; now and next marked by this device's clock. */
+.jv-glance { margin: 16px 0 20px; padding: 12px 14px; background: var(--cal-paper); border: 1px solid var(--cal-line); border-left: 4px solid var(--cal-t0); border-radius: 8px; }
+.jv-glance-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.jv-glance-head h2, .jv-glance-head h3 { margin: 0; font-size: 18px; }
+.jv-glance-tabs { display: inline-flex; gap: 4px; }
+.jv-glance-tab { font: inherit; font-size: 14px; padding: 3px 12px; border: 1px solid var(--cal-line); border-radius: 999px; background: transparent; color: var(--cal-ink); cursor: pointer; }
+.jv-glance-tab[aria-pressed="true"] { background: var(--cal-t0); border-color: var(--cal-t0); color: #fff; font-weight: 600; }
+.jv-glance-tab:focus-visible, .jv-glance-full:focus-visible { outline: 2px solid var(--cal-focus); outline-offset: 2px; }
+.jv-glance-full { margin-left: auto; font-size: 14px; color: var(--cal-t0); text-decoration: underline; }
+.jp .jv-glance { margin: 0 0 20px; }
+.jv-glance-now { margin: 8px 0 0; font-weight: 700; color: var(--cal-t0); }
+.jv-glance-day[hidden] { display: none; }
+.jv-glance-day { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; column-gap: 12px; }
+.jv-glance-slot { display: contents; }
+.jv-glance-slot > span { padding: 4px 0; border-top: 1px solid var(--cal-line); font-size: 14px; }
+.jv-glance-time { font-variant-numeric: tabular-nums; color: var(--cal-muted); white-space: nowrap; }
+.jv-glance-where { color: var(--cal-muted); white-space: nowrap; }
+.jv-glance-slot.jv-cal-session .jv-glance-what { font-weight: 600; }
+.jv-glance-slot.jv-cal-break > span, .jv-glance-slot.jv-cal-logistics > span { color: var(--cal-muted); }
+.jv-glance-slot.jv-cal-joint .jv-glance-what { color: var(--cal-joint-ink); }
+.jv-glance-flag { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.jv-glance-slot.is-now > span { background: var(--cal-t0-soft); }
+.jv-glance-slot.is-now .jv-glance-flag { color: var(--cal-t0); }
+.jv-glance-slot.is-next .jv-glance-flag { color: var(--cal-muted); }
+.jv-glance .jv-cal-code { font-weight: 700; color: var(--cal-t0); margin-right: 2px; }
+@media (max-width: 720px) {
+  .jv-glance-day { grid-template-columns: auto minmax(0, 1fr); }
+  .jv-glance-where { grid-column: 2; padding-top: 0 !important; border-top: 0 !important; font-size: 13px !important; }
+  .jv-glance-flag { grid-column: 2; border-top: 0 !important; padding-top: 0 !important; }
+  .jv-glance-flag:empty { display: none; }
+  .jv-glance-full { margin-left: 0; }
 }

@@ -58,8 +58,9 @@ import {
 } from "./read.ts";
 import { igProcessPage, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
 import { PRESENT_ASSETS } from "./present-assets.ts";
-import { scheduleFor, scheduleHtml, scheduleTitle } from "./schedule.ts";
-import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
+import { moduleSlots, scheduleFor, scheduleGlanceHtml, scheduleHtml, scheduleTitle } from "./schedule.ts";
+import { canvasPartsOf } from "./canvas-form.ts";
+import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, processActorsLine, type StepPageLinks } from "./dak-links.ts";
 import { imageSize, type ImageSize } from "./image-size.ts";
 
 export const TOOL_ID = "journeys-viewer";
@@ -373,7 +374,7 @@ function page(o: { title: string; up: string; crumbs: Crumb[]; body: string; kin
 <link rel="icon" href="${e(DEFAULT_ICON)}">
 ${IG_BANNER_OPT_OUT}
 ${NAVBAR_LINKED}
-<link rel="stylesheet" href="${o.up}assets/journeys.css">${o.body.includes('class="jv-cal"') ? `\n<link rel="stylesheet" href="${o.up}assets/calendar.css">` : ""}
+<link rel="stylesheet" href="${o.up}assets/journeys.css">${o.body.includes('class="jv-cal"') || o.body.includes('class="jv-glance"') ? `\n<link rel="stylesheet" href="${o.up}assets/calendar.css">` : ""}
 <script src="${o.up}assets/journeys.js" defer></script>
 ${panelHead(o.body, `${o.up}assets/`)}
 </head>
@@ -570,11 +571,14 @@ let figureSeq = 0;
  * links come too, and without one the drawing is highlighted only. The
  * scroll box takes keyboard focus, so a wide drawing scrolls from the keys.
  *
+ * `actors` is the drawing's actors line (`processActorsLine`), carried in
+ * the caption under the drawing; empty for none.
+ *
  * The XML prologue and doctype are dropped. Comments are left as they are:
  * they are harmless inside inline SVG, and a one-pass strip could JOIN the
  * pieces of a nested one (`<!<!---->--`) into a `<!--` that swallows the page.
  */
-export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string, panel?: string): string {
+export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string, panel?: string, actors = ""): string {
   const id = `jv-fig-${++figureSeq}`;
   const body = svg
     .replace(/<\?xml[^>]*\?>/g, "")
@@ -582,7 +586,7 @@ export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, ca
     .trim();
   const hl = [...new Set(tasks ?? [])];
   const attrs = `${panel ? ` data-panel="${e(panel)}"` : ""}${hl.length ? ` data-pt-highlight="${e(hl.join(" "))}"` : ""}`;
-  return `<figure class="bpmn-figure pt-diagram jv-bpmn" id="${id}"${attrs}><div class="jv-bpmn-scroll" tabindex="0" role="group" aria-label="Process drawing, scrolls with the arrow keys">${body}</div><figcaption>${caption}</figcaption></figure>`;
+  return `<figure class="bpmn-figure pt-diagram jv-bpmn" id="${id}"${attrs}><div class="jv-bpmn-scroll" tabindex="0" role="group" aria-label="Process drawing, scrolls with the arrow keys">${body}</div><figcaption>${caption}${actors}</figcaption></figure>`;
 }
 
 /** The task panel's client and styles, for a page that carries a {@link bpmnFigure}; nothing for one that does not. */
@@ -760,7 +764,8 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
       const page = links.processesPage?.(j.instance);
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted: ${r.tasks.map((t) => `<code>${e(t)}</code>`).join(" ")}` : " · the whole process"}${page ? ` · <a href="${e(page)}">processes viewer</a>` : ""}`;
       const panel = links.processPanel?.(j.instance, r.process);
-      return d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite)) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
+      const actors = processActorsLine(corpus, igOf(corpus, j.instance), j.instance, r.process, toSite);
+      return d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite), actors) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
     })
     .join("\n");
   const prev = steps[i - 1];
@@ -914,11 +919,13 @@ function workshopPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
   const scenarios = ws.scenarios.map((id) => journeyById(corpus, w.instance, id));
   const sched = scheduleFor(corpus, w);
   const calendar = sched ? scheduleHtml({ corpus, here: w, owner: sched.owner, schedule: sched.schedule, toWorkshops: "../", md: mdHtml }) : "";
+  // The schedule at a glance, under the title (owner, 2026-11-19), the full calendar further down.
+  const glance = sched ? scheduleGlanceHtml({ corpus, here: w, owner: sched.owner, schedule: sched.schedule, toWorkshops: "../", full: "#the-days" }) : "";
   const body = `<header class="jv-hero">
 <p class="jv-kicker">Workshop · ${e(instanceTitle(corpus, w.instance))}</p>
 <h1>${e(ws.title)}</h1>
 <div class="jv-lede">${mdHtml(ws.description)}</div>
-${ws.audience ? `<p><b>For:</b> ${e(ws.audience)}</p>` : ""}
+${glance}${ws.audience ? `<p><b>For:</b> ${e(ws.audience)}</p>` : ""}
 ${ws.promise ? `<p class="jv-promise">${e(ws.promise)}</p>` : ""}
 ${ws.useCaseStatement ? `<p class="jv-usecase">${e(ws.useCaseStatement)}</p>` : ""}
 <p><a class="jv-btn" href="overview/">Present it: overview and walkthrough</a>${calendar ? ` <a class="jv-btn" href="#the-days">${e(scheduleTitle(sched!.schedule))}</a>` : ""}${ws.sheetsSource ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">${e(ws.sheetsSource.title ?? "Table canvas")}</a>` : ws.sheets?.length ? ` <a class="jv-btn" href="${sheetsAt(corpus, w)}">Printable sheets (${ws.sheets.length})</a>` : ""}</p>
@@ -958,16 +965,35 @@ function modulePage(corpus: JourneyCorpus, w: WorkshopEntry, moduleId: string): 
   const resources = (ws.resources ?? []).filter((r) => (r.modules ?? []).includes(m.id));
   const disc = (ws.discussion ?? []).filter((d) => d.module === m.id);
   const sheet = ws.sheets?.find((s) => s.id === m.sheet);
+  // When the module is taught, from the schedule, and the parts of the canvas worked in it (owner, 2026-11-19).
+  const sched = scheduleFor(corpus, w);
+  const slots = sched ? moduleSlots({ corpus, here: w, owner: sched.owner, schedule: sched.schedule, toWorkshops: "../../" }, m.id) : [];
+  const when = slots.length
+    ? `<p class="jv-when"><b>When:</b> ${slots.map((x) => `Day ${x.day} · <time>${e(x.slot.start)}</time>–<time>${e(x.slot.end)}</time> · ${e(x.where)}`).join("; ")} · <a href="../#the-days-glance">${e(scheduleTitle(sched!.schedule))}</a></p>`
+    : "";
+  const parts = ws.canvas ? canvasPartsOf(ws.canvas, m.id).filter((x) => x.section.title) : [];
+  const partsAt = (anchor: string) => (presentationOf(corpus, w).steps.length && ws.lab ? `../discuss/#${e(anchor)}` : undefined);
+  const partsHtml = parts.length
+    ? `<section class="jv-canvas-parts"><h2>${e(ws.canvas!.title)}: the parts worked in ${e(m.id)}</h2><ul>${parts
+        .map(({ sheet: sh, section: x }) => {
+          const label = `${sh.label ?? sh.title} · ${x.number ? `${x.number} ` : ""}${x.title!.replace(/\*/g, "")}${x.minutes ? ` (${x.minutes} min)` : ""}`;
+          const href = partsAt(`canvas-${sh.id}-${x.id}`);
+          return `<li>${href ? `<a href="${href}">${e(label)}</a>` : e(label)}</li>`;
+        })
+        .join("")}</ul></section>`
+    : "";
   const prev = ws.modules[i - 1];
   const next = ws.modules[i + 1];
   const body = `<header class="jv-hero">
 <p class="jv-kicker">Module ${e(m.id)}${m.day ? ` · day ${m.day}` : ""}${m.durationMinutes ? ` · ${m.durationMinutes} min` : ""} · <a href="../">${e(ws.title)}</a></p>
 <h1>${e(m.title)}</h1>
+${when}
 ${m.carries ? `<p class="jv-carries">${e(m.carries)}</p>` : ""}
 ${m.description ? `<div class="jv-lede">${mdHtml(m.description)}</div>` : ""}
 ${m.objectives?.length ? `<h2>By the end, a participant can</h2><ul class="jv-objectives">${m.objectives.map((o) => `<li>${e(o)}</li>`).join("")}</ul>` : ""}
 ${sheet ? `<p><a class="jv-btn" href="../${sheetsAt(corpus, w, `sheet-${sheet.id}`)}">${e(sheet.label ?? sheet.title)}: ${e(sheet.title)} (${e(sheet.size)})</a></p>` : ""}
 </header>
+${partsHtml}
 <section><h2>The questions, along the journey</h2>${qs.length ? `<ol class="jv-modqs">${qs.map((q) => `<li>${stepLink(q, up)}<div><span class="jv-muted">${e(q.ref?.step.title ?? "")}</span><p>${e(q.text)}</p></div></li>`).join("")}</ol>` : `<p class="jv-muted">No step asks a question in this module.</p>`}</section>
 ${tables.length ? `<section><h2>Tables</h2>${tables.map((t) => tableHtml(t)).join("\n")}</section>` : ""}
 ${disc.length ? `<section><h2>Discussion</h2><ol class="jv-disc">${disc.map((d) => discussionItem(corpus, w, d, up, "../")).join("")}</ol></section>` : ""}

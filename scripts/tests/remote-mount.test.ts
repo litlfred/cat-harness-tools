@@ -267,6 +267,24 @@ describe("mount:remote over fixture repositories", () => {
     expect(readFileSync(join(root, "base/schemas/util.ts"), "utf-8")).toContain("41");
   });
 
+  test("4a. the run's own instance, swapped in at a PR's head, is excused only when asked; the others are still judged", () => {
+    // A layer's PR checks swap the caller's own instance in over its pinned
+    // mount (2026-11-19, separation:cutover's \`mounts\` row).
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    writeFileSync(join(root, "base/schemas/util.ts"), "export const answer = 41;\n");
+    const excused = checkRemote({ instanceRoot: root, excuse: new Set(["base"]) });
+    expect(excused.outcomes.find((o) => o.instance === "base")!.state).not.toBe("missing");
+    expect(excused.outcomes.find((o) => o.instance === "base")!.detail).toContain("own instance");
+    expect(excused.state).toBe(checkRemote({ instanceRoot: root, excuse: new Set(["base"]) }).state);
+    expect(excused.state).not.toBe("missing");
+    // Another instance's edit is still a finding, excuse or not.
+    writeFileSync(join(root, "core/scripts/run.ts"), "export const doubled = 0;\n");
+    expect(checkRemote({ instanceRoot: root, excuse: new Set(["base"]) }).state).toBe("missing");
+    // And with no excuse, the swapped-in instance reads modified as before.
+    expect(checkRemote({ instanceRoot: root }).outcomes.find((o) => o.instance === "base")!.detail).toContain("modified");
+  });
+
   test("4b. --fresh replaces an edited mount, and only what the lock says this mount put there", () => {
     const root = downstream({});
     mountRemote({ instanceRoot: root, urlFor });
@@ -777,30 +795,71 @@ describe("mount trust is recorded, re-judged and scoped (roast `1ygp` L4.2)", ()
     expect(exitCode(c.state)).toBe(1);
   });
 
-  test("25. a refused re-mount leaves the old bytes on disk but NOT presented as mounted; restored consent re-mounts", () => {
+  test("25. a refused re-mount leaves the old bytes on disk and the lock as it was, but NOT presented as mounted; restored consent re-mounts", () => {
     const root = downstream({});
     mountRemote({ instanceRoot: root, urlFor });
+    const lockBefore = readFileSync(join(root, "index.lock.json"), "utf-8");
     editDecl(root, (d) => {
       (d.remoteMounts[0]!.trust as { consent: { ref: string } }).consent.ref = "3".repeat(40);
     });
     const r = mountRemote({ instanceRoot: root, urlFor });
     expect(r.plan.outcomes.find((o) => o.instance === "core")).toMatchObject({ state: "refused" });
+    expect(summarise(r.plan.outcomes).state).toBe("missing");
     // never deleted by the agent...
     expect(existsSync(join(root, "core/scripts/run.ts"))).toBe(true);
-    // ...and never presented as current
-    const lock = readLock(root);
-    expect(lock.instances.find((i) => i.instance === "core")).toBeUndefined();
-    expect(lock.unmounted.find((u) => u.instance === "core")).toMatchObject({ state: "refused", leftOnDisk: { instance: "core", path: "core" } });
-    expect(mountedInstanceRoots(root).has("core")).toBe(false);
+    // ...the lock is not rewritten without it (a downstream layer, 2026-11-18)...
+    expect(readFileSync(join(root, "index.lock.json"), "utf-8")).toBe(lockBefore);
+    // ...and never presented as current: the check re-judges the basis
     const c = checkRemote({ instanceRoot: root });
     expect(c.state).toBe("missing");
-    expect(c.outcomes.find((o) => o.instance === "core")!.detail).toContain("still on disk");
+    expect(c.outcomes.find((o) => o.instance === "core")).toMatchObject({ state: "refused" });
+    expect(c.outcomes.find((o) => o.instance === "core")!.detail).toContain("no longer holds");
     // consent restored: the left-on-disk record says this mount put it there
     editDecl(root, (d) => {
       (d.remoteMounts[0]!.trust as { consent: { ref: string } }).consent.ref = up.sha;
     });
     const again = mountRemote({ instanceRoot: root, urlFor });
     expect(again.plan.outcomes.find((o) => o.instance === "core")).toMatchObject({ state: "mounted" });
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+  });
+
+  // A downstream layer, 2026-11-18: mount:remote rewrote index.lock.json without the
+  // instances it refused to re-mount, so the lock CI replays was partial.
+  test("25b. a refusal of one locked instance writes nothing: the lock keeps every entry, and no other layer is re-laid", () => {
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    const file = join(root, "index.lock.json");
+    const lockBefore = readFileSync(file, "utf-8");
+    // consent for the gitlinked `boot` withdrawn; core and base still consented
+    editDecl(root, (d) => {
+      const o = d.remoteMounts[0]!.overrides as Record<string, { trust: { consent: { ref: string } } }>;
+      o.boot!.trust.consent.ref = "3".repeat(40);
+    });
+    writeFileSync(join(root, "base/schemas/marker.txt"), "not re-laid\n");
+    const r = mountRemote({ instanceRoot: root, urlFor });
+    const by = Object.fromEntries(r.plan.outcomes.map((o) => [o.instance, o.state]));
+    expect(by).toEqual({ core: "missing", base: "missing", boot: "refused" });
+    expect(r.plan.outcomes.find((o) => o.instance === "core")!.detail).toContain("nothing was written");
+    expect(readFileSync(file, "utf-8")).toBe(lockBefore);
+    expect(readLock(root).instances.map((i) => i.instance).sort()).toEqual(["base", "boot", "core"]);
+    // base was not replaced: the bytes it would have removed are still there
+    expect(existsSync(join(root, "base/schemas/marker.txt"))).toBe(true);
+    expect(existsSync(join(root, "boot/schemas/floor.ts"))).toBe(true);
+  });
+
+  test("25c. a locked instance the plan cannot reach (a fetch fails) writes nothing either", () => {
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    const file = join(root, "index.lock.json");
+    const lockBefore = readFileSync(file, "utf-8");
+    const noBoot = (repo: string) => {
+      if (repo === "o/boot") throw new Error("unreachable");
+      return urlFor(repo);
+    };
+    const r = mountRemote({ instanceRoot: root, urlFor: noBoot });
+    expect(r.plan.outcomes.find((o) => o.instance === "boot")).toMatchObject({ state: "could-not-determine" });
+    expect(r.plan.outcomes.find((o) => o.instance === "boot")!.detail).toContain("nothing was written");
+    expect(readFileSync(file, "utf-8")).toBe(lockBefore);
     expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
   });
 

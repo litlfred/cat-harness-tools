@@ -93,6 +93,36 @@ export function buildGlossaryIndex(
 export interface DeftermValidationOptions {
   /** Enable `term-mention-coverage` (warns on bare-text known-term mentions). */
   strict?: boolean;
+  /**
+   * The `blocks` map is in reading order (paper chapters in order, each
+   * chapter's `sections[].blocks[]` in order). Enables `defterm-forward-ref`.
+   * Off by default: a flat-mode map has no meaningful order.
+   */
+  readingOrder?: boolean;
+  /**
+   * Chapter directory names whose definitions are exempt from
+   * `defterm-forward-ref`. A glossary chapter is back matter, so every term
+   * it defines is "later" than every body use by design. Default
+   * `["glossary"]`.
+   */
+  forwardRefExemptDirs?: string[];
+  /**
+   * Block kinds whose OWN prose is exempt from `defterm-forward-ref`. A
+   * `prose` block is pure exposition (chapter overviews, section intros,
+   * transitions), and naming what the next block defines is its job. Default
+   * `["prose"]`. Owner ruling 2026-11-21 (qou thread "Turn the Lean build
+   * green on main", option "Narrow the check").
+   */
+  forwardRefExemptKinds?: string[];
+}
+
+/** Shortest phrase `defterm-forward-ref` will look for in bare prose. */
+const FORWARD_REF_MIN_PHRASE = 4;
+
+function lastPathSegment(dir: string | undefined): string | undefined {
+  if (!dir) return undefined;
+  const parts = dir.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1];
 }
 
 /**
@@ -103,7 +133,7 @@ export interface DeftermValidationOptions {
  * @returns       Validation issues to merge into the main pipeline output.
  */
 export function validateDefterms(
-  blocks: Map<string, { block: Block; md: string | undefined }>,
+  blocks: Map<string, { block: Block; md: string | undefined; dir?: string }>,
   opts: DeftermValidationOptions = {},
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -244,5 +274,71 @@ export function validateDefterms(
     }
   }
 
+  // ── Rule: defterm-forward-ref (warning; reading order only) ──
+  // A term mentioned in prose before the block that defines it, in reading
+  // order. Two forms: a bare-text mention of the term, and a :refterm link
+  // to a block that comes later. Definitions in an exempt chapter (the
+  // glossary, which is back matter) never fire. Bean `qou-ommr`; owner
+  // ruling 2026-11-21: warn only, body-defined terms only.
+  if (opts.readingOrder) {
+    issues.push(...forwardRefIssues(blocks, usageByBlock, opts));
+  }
+
+  return issues;
+}
+
+function forwardRefIssues(
+  blocks: Map<string, { block: Block; md: string | undefined; dir?: string }>,
+  usageByBlock: Map<string, BlockTermUsage>,
+  opts: DeftermValidationOptions,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const exempt = new Set(opts.forwardRefExemptDirs ?? ["glossary"]);
+  const exemptKinds = new Set(opts.forwardRefExemptKinds ?? ["prose"]);
+  const order = [...blocks.keys()];
+  const pos = new Map(order.map((n, i) => [n, i]));
+
+  // slug -> first defining block in reading order, with its visible label.
+  const firstDef = new Map<string, { at: number; name: string; label: string }>();
+  for (const name of order) {
+    for (const [slug, { label }] of usageByBlock.get(name)!.defs) {
+      if (!firstDef.has(slug)) firstDef.set(slug, { at: pos.get(name)!, name, label });
+    }
+  }
+
+  const escape = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const [slug, def] of firstDef) {
+    if (exempt.has(lastPathSegment(blocks.get(def.name)!.dir) ?? "")) continue;
+    // The visible label is the term as the author wrote it; the slug is an
+    // identifier. Match the slug only when there is no label, so
+    // `:defterm[descent homomorphism]{#descent}` does not fire on every
+    // ordinary use of the word "descent".
+    const phrases = [def.label ? def.label.toLowerCase() : slug.replace(/-/g, " ").toLowerCase()]
+      .filter((x) => x.length >= FORWARD_REF_MIN_PHRASE)
+      .map((x) => new RegExp(`(?<![\\w-])${escape(x)}(?![\\w-])`));
+    for (let i = 0; i < def.at; i++) {
+      const name = order[i];
+      if (exemptKinds.has(String((blocks.get(name)!.block as { kind?: unknown }).kind))) continue;
+      const usage = usageByBlock.get(name)!;
+      if (usage.refs.has(slug)) {
+        issues.push({
+          level: "warning",
+          block: name,
+          message: `defterm-forward-ref: :refterm[${slug}] points forward to ${def.name}, which defines it later in reading order`,
+          file: `${name}.md`,
+        });
+        continue;
+      }
+      const hay = usage.plainText.toLowerCase();
+      if (hay && phrases.some((re) => re.test(hay))) {
+        issues.push({
+          level: "warning",
+          block: name,
+          message: `defterm-forward-ref: "${def.label || slug}" is used before ${def.name} defines it (reading order)`,
+          file: `${name}.md`,
+        });
+      }
+    }
+  }
   return issues;
 }

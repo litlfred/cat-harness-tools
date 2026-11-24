@@ -37,6 +37,8 @@ import { wrapRaw } from "./lib/liquid-raw.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { PAGE_LOCALE, declaredPageRoute, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { roleActorResolver } from "./lib/role-actors.ts";
+import { actorsLine, type ActorResolver } from "../src/workflow/diagram-actors.ts";
 import { writeProvenanceListing } from "./provenance-footer.ts";
 import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { linkInlineCode, type CodeRefFinding, type CodeRefResolver, type CodeRefTarget } from "./lib/code-ref-links.ts";
@@ -1325,6 +1327,8 @@ function escapePipes(s: string): string {
  * here rather than only linked — that is the case `adjudication` was in: a
  * skill, a process, and no page showing the second from the first.
  */
+let roleActors: ActorResolver | undefined;
+
 function processesSection(name: string, rows: readonly ProcessRow[]): string[] {
   const own = rows.find((r) => r.stem === name && r.loadError === undefined);
   const runners = rows
@@ -1339,6 +1343,13 @@ function processesSection(name: string, rows: readonly ProcessRow[]): string[] {
     if (own.svg) {
       out.push(`<img src="../../assets/img/workflows/${own.stem}.svg" alt="BPMN diagram: ${own.name.replace(/"/g, "&quot;")}" style="max-width:100%">`);
       out.push("");
+      // The roles and actors its lanes are bound to, under the drawing (owner, 2026-11-23).
+      roleActors ??= roleActorResolver(INSTANCE_ROOT);
+      const actors = actorsLine(
+        (own.laneDetails ?? []).map((l) => ({ ...(l.name ? { name: l.name } : {}), ...(l.roleRef ? { ref: l.roleRef } : {}) })),
+        roleActors,
+      );
+      if (actors) out.push(actors, "");
     }
   }
   if (runners.length) {

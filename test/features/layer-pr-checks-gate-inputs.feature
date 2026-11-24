@@ -40,6 +40,22 @@ Feature: Layer PR checks give gates their inputs and skip what they cannot judge
     And with GATE_JUNIT pointing at "/nonexistent/junit.xml" the arguments are null
     And that reason mentions "absent"
 
+  @test:test/layer-pr-checks-gate-inputs.test.ts::run-gates.py_gate_inputs::site-iris_is_given_the_built_site_and_the_caller's_iriBase
+  Scenario: check:site-iris is given the built site and the caller's iriBase
+    Given GATE_SITE names a built site
+    And the caller's own instance declares an iriBase
+    When run-gates.py computes the arguments for "check:site-iris"
+    Then the arguments are "--site" with that site and "--base" with that iriBase
+    And there is no skip reason
+
+  @test:test/layer-pr-checks-gate-inputs.test.ts::run-gates.py_gate_inputs::site-iris_with_no_built_site_runs_bare,_to_say_not_applicable;_with_a_site_and_no_iriBase_it_is_skipped
+  Scenario: check:site-iris with no built site runs bare and says not applicable
+    Given no GATE_SITE is set
+    When run-gates.py computes the arguments for "check:site-iris"
+    Then there are no arguments and no skip reason
+    And with GATE_SITE set and no declared iriBase the arguments are null
+    And the reason mentions "iriBase"
+
   @test:test/layer-pr-checks-gate-inputs.test.ts::run-gates.py_gate_inputs::a_gate_that_takes_no_input_runs_as_declared
   Scenario: A gate that takes no input runs with no arguments
     Given the gate "check:workflows" and no environment
