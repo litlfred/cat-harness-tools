@@ -39,10 +39,12 @@ name: Folio site publish
 #     That is `index.config.json` `site.publisher` (folio, or ig) when it is
 #     declared, else the declared `site.build` recipe, else the reusable
 #     workflow the repository's own workflows call (`site-publisher.ts`).
-#   - an IG's AST: `site.publishAfter: ["ig-ast-refresh.yml"]` makes the
-#     publish wait for that workflow's run on the same commit, which seeds the
-#     cache the IG site is built from. Otherwise a publish that starts first
-#     finds the cache stale and is refused.
+#   - an IG's AST: the publish waits for the run, on the same commit, of
+#     every workflow that seeds what the site is built from. They are derived
+#     from the publishers the mounted layers declare (`after`;
+#     scripts/site-publish-after.ts), and `site.publishAfter` in
+#     index.config.json adds to them. Otherwise a publish that starts first
+#     finds the cache absent or stale and is refused.
 #   - QA: on a push to main, `layer-qa-publish.yml` (this repository's, at
 #     this commit) publishes the layer's QA results to its qa-reports branch,
 #     unless the repository has no instance declaration (`<repo>.json`) or
@@ -137,40 +139,6 @@ jobs:
     needs: decide
     runs-on: ubuntu-24.04
     steps:
-      - name: Wait for this commit's runs the site is built from
-        # `site.publishAfter` (index.config.json): an IG's ig-ast-refresh.yml
-        # seeds the AST cache on the same push. Read through the API, with the
-        # job token and then without it (the repositories are public), so a
-        # caller need grant no `actions: read`. A run that cannot be read is
-        # said and not waited for: the publish then judges the cache itself.
-        if: ${{ needs.decide.outputs.after != '' && github.event_name == 'push' }}
-        timeout-minutes: 120
-        env:
-          AFTER: ${{ needs.decide.outputs.after }}
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.sha }}
-        run: |
-          set -uo pipefail
-          runs() {
-            local u="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/$1/runs?head_sha=$SHA&per_page=20"
-            curl -fsS -H "Authorization: Bearer $GH_TOKEN" "$u" 2>/dev/null || curl -fsS "$u" 2>/dev/null
-          }
-          for wf in $AFTER; do
-            while :; do
-              if ! body="$(runs "$wf")"; then
-                echo "::notice::the runs of $wf on $SHA could not be read: not waiting for it"
-                break
-              fi
-              open="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(sum(1 for r in json.load(sys.stdin).get("workflow_runs", []) if r.get("status") != "completed"))')"
-              if [ "$open" = "0" ]; then
-                echo "$wf: nothing running on $SHA"
-                break
-              fi
-              echo "$wf: $open run(s) on $SHA not finished; waiting"
-              sleep 30
-            done
-          done
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
@@ -179,6 +147,60 @@ jobs:
           persist-credentials: false
 
       - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@1257da8bbbb8e661391d08b014b16464de19613f # last change to .github/actions/mount-layers
+
+      - name: Wait for this commit's runs the site is built from
+        # An IG's site is built from the AST cache its ig-ast-refresh.yml seeds
+        # on the same push; started together, the publish read the cache
+        # before it existed (smart-pcmt, 2026-11-19). What is waited for is
+        # DERIVED, after the mount, from the publishers the mounted layers
+        # declare (`after`, scripts/site-publish-after.ts), plus
+        # `site.publishAfter` (index.config.json): a repository no longer has
+        # to remember to declare it. On a push and on a manual run alike: a
+        # dispatch on a commit whose refresh is still running waits for it.
+        # Read through the API, with the job token and then without it (the
+        # repositories are public), so a caller need grant no `actions: read`.
+        # A run that cannot be read is said and not waited for: the publish
+        # then judges the cache itself.
+        if: ${{ !inputs.plan }}
+        timeout-minutes: 120
+        env:
+          DECLARED: ${{ needs.decide.outputs.after }}
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          if ! derived="$(bun run cat-harness-tools/scripts/site-publish-after.ts --repo .)"; then
+            echo "::warning::the workflows the site is built from could not be derived: waiting only for site.publishAfter (${DECLARED:-none})"
+            derived=""
+          fi
+          after="$(printf '%s\n' $DECLARED $derived | sort -u | tr '\n' ' ')"
+          runs() {
+            local u="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/$1/runs?head_sha=$SHA&per_page=20"
+            curl -fsS -H "Authorization: Bearer $GH_TOKEN" "$u" 2>/dev/null || curl -fsS "$u" 2>/dev/null
+          }
+          for wf in $after; do
+            while :; do
+              if ! body="$(runs "$wf")"; then
+                echo "::notice::the runs of $wf on $SHA could not be read: not waiting for it"
+                break
+              fi
+              state="$(printf '%s' "$body" | python3 -Ic 'import json,sys
+          r=json.load(sys.stdin).get("workflow_runs", [])
+          o=sum(1 for x in r if x.get("status") != "completed")
+          print(o, (r[0].get("conclusion") or "-") if r else "none")')"
+              open="${state%% *}" last="${state#* }"
+              if [ "$open" = "0" ]; then
+                case "$last" in
+                  none) echo "$wf: no run on $SHA; the site is built from what it last seeded" ;;
+                  success|skipped) echo "$wf: finished on $SHA ($last)" ;;
+                  *) echo "::warning::$wf finished on $SHA as $last: the site is built from what it last seeded, and refused if that is not good enough" ;;
+                esac
+                break
+              fi
+              echo "$wf: $open run(s) on $SHA not finished; waiting"
+              sleep 30
+            done
+          done
 
       - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:

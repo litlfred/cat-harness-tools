@@ -35,7 +35,7 @@
  */
 import { escHtml } from "../thin-page.ts";
 import { renderViewPages, VIEW_SEGMENTS } from "./present-views.ts";
-import { scheduleFor, scheduleHtml } from "./schedule.ts";
+import { scheduleFor, scheduleGlanceHtml, scheduleHtml } from "./schedule.ts";
 import { demoScreensOf, DEVICE_GLYPH, type DemoScreen, type DemoSource } from "./screens.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
@@ -43,7 +43,7 @@ import { screenExamples } from "../../schemas/process/device-screen.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
 import { blockFor, fromSite, journeyById, lookup, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
-import { artifactPage, DAK_ATTR, dakGroups, linkedProcessDrawing, type DakGroup } from "./dak-links.ts";
+import { artifactPage, DAK_ATTR, dakGroups, linkedProcessDrawing, processActorsLine, type DakGroup } from "./dak-links.ts";
 import {
   bpmnFigure,
   childrenOf,
@@ -792,7 +792,9 @@ ${pic}
     : "";
   const sched = scheduleFor(corpus, p.w);
   const calendar = sched ? `<div class="jp-card jp-pad jp-cal-wrap">${scheduleHtml({ corpus, here: p.w, owner: sched.owner, schedule: sched.schedule, toWorkshops: "../../", level: 3, md: mdHtml })}</div>` : "";
-  const body = `<section class="jp-hero">
+  // The schedule at a glance, first on the page (owner, 2026-11-19: "should be towards top"); the full calendar further down.
+  const glance = sched ? scheduleGlanceHtml({ corpus, here: p.w, owner: sched.owner, schedule: sched.schedule, toWorkshops: "../../", level: 3, full: "#the-days" }) : "";
+  const body = `${glance}<section class="jp-hero">
 <div class="jp-hero-in">
 <span class="jp-kicker">${icon("route")} The story in one sentence</span>
 <h2>${e(pr.story ?? storyOf(ws.description))}</h2>
@@ -816,7 +818,7 @@ ${countriesPanel(p)}`;
     root,
     toWorkshop,
     view: "overview",
-    ...(calendar ? { head: `<link rel="stylesheet" href="${root}assets/calendar.css">` } : {}),
+    ...(calendar || glance ? { head: `<link rel="stylesheet" href="${root}assets/calendar.css">` } : {}),
     title: `${pr.name ?? ws.title} — overview`,
     ...(pr.presenterNote ? { note: pr.presenterNote } : {}),
     ...(first ? { next: walk(first) } : {}),
@@ -1132,7 +1134,8 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted` : " · the whole process"}`;
       const vw = d ? viewBoxWidth(d.svg) : undefined;
       const panel = links.processPanel?.(s.journey.instance, r.process);
-      const fig = d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite)).replace("<figure ", `<figure${vw ? ` style="--vw:${vw}px"` : ""} `) : "";
+      const actors = processActorsLine(corpus, pr, s.journey.instance, r.process, siteRoot);
+      const fig = d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite), actors).replace("<figure ", `<figure${vw ? ` style="--vw:${vw}px"` : ""} `) : "";
       return `<div class="jp-box jp-proc">${head}${d ? `${zoom}${fig}` : `<p class="jp-small jp-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`}</div>`;
     })
     .join("");

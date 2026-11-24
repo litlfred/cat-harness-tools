@@ -51,6 +51,34 @@ export function leanPackagesConfigured(): boolean {
 
 let configured = false;
 
+/** Has the "registry never configured" warning been emitted this process? */
+let warnedUnconfigured = false;
+
+/**
+ * Say once, on stderr, that a registry lookup ran before any folio configured
+ * the registry.
+ *
+ * Every lookup below returns `undefined` (or an empty list) in that state, which
+ * a caller cannot tell apart from "this package does not exist". qou bean
+ * `qou-i2ed` is the cost: two qou checkers scored 425 `lean.ref`s with no
+ * sibling `.lean` against nothing, and reported clean. `formal-ref.ts` already
+ * warns this way for the resolver; this is the same guard on the registry, so
+ * the sites that read it directly are covered too. One warning per process, on
+ * stderr, so a sweep's own output and a pipeline's JSON on stdout stay intact.
+ */
+function warnUnconfiguredOnce(site: string): void {
+  if (configured || warnedUnconfigured) return;
+  warnedUnconfigured = true;
+  console.warn(
+    `[lean-packages] ${site} ran before configureLeanPackages(), so every ` +
+      "lean.ref package lookup answers 'not found'. That is NOT the same as " +
+      "'no such package': results that depend on it are unchecked, not clean. " +
+      "Import `configureLeanPackages` from `pipeline/lean-formal-ref` and call " +
+      "it with the folio's package list, or ask `leanPackagesConfigured()` " +
+      "if your code can legitimately proceed without the registry.",
+  );
+}
+
 export function configureLeanPackages(packages: readonly LeanPackage[]) {
   configured = true;
   configuredPackages = packages;
@@ -62,21 +90,30 @@ export function configureLeanPackages(packages: readonly LeanPackage[]) {
 export const LEAN_PACKAGES: readonly LeanPackage[] = new Proxy([] as LeanPackage[], {
   // `Reflect.get` reads an arbitrary key off the injected array without
   // reopening its element type.
-  get: (_target, prop) => Reflect.get(configuredPackages, prop),
-  ownKeys: () => Reflect.ownKeys(configuredPackages),
+  get: (_target, prop) => {
+    warnUnconfiguredOnce("LEAN_PACKAGES");
+    return Reflect.get(configuredPackages, prop);
+  },
+  ownKeys: () => {
+    warnUnconfiguredOnce("LEAN_PACKAGES");
+    return Reflect.ownKeys(configuredPackages);
+  },
   getOwnPropertyDescriptor: (_, prop) => Reflect.getOwnPropertyDescriptor(configuredPackages, prop),
   has: (_, key) => key in configuredPackages,
 });
 
 export function leanPackageByName(name: string): LeanPackage | undefined {
+  warnUnconfiguredOnce("leanPackageByName");
   return byName.get(name);
 }
 
 export function leanPackageByPaperDir(dir: string): LeanPackage | undefined {
+  warnUnconfiguredOnce("leanPackageByPaperDir");
   return byPaperDir.get(dir);
 }
 
 export function isLeanPackageName(name: string): boolean {
+  warnUnconfiguredOnce("isLeanPackageName");
   return byName.has(name);
 }
 

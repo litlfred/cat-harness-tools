@@ -32,6 +32,7 @@
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts --check
  */
+import { actorsLine, type ActorResolver } from "../src/workflow/diagram-actors.ts";
 import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { escapeAngles, linkProse } from "./lib/link-prose.ts";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -1216,6 +1217,8 @@ export function processPage(
   instances: InstancesRead = NO_INSTANCES,
   unlinked: (ref: string) => void = () => {},
   iriOf: (r: ProcessRow) => string | undefined = processIri,
+  /** Where a lane's Role (or actor) has a page, for the drawing's actors line; unlinked without one. */
+  actorOf?: ActorResolver,
 ): string {
   const iri = iriOf(row);
   const byId = new Map(rows.map((r) => [r.id, r]));
@@ -1321,6 +1324,13 @@ export function processPage(
         panelHref: panelFile(row.stem),
       }),
     );
+    // The roles and actors its lanes are bound to, under the drawing (owner,
+    // 2026-11-23): the one line every BPMN figure carries.
+    const actors = actorsLine(
+      row.laneDetails.map((l) => ({ ...(l.name ? { name: l.name } : {}), ...(l.roleRef ? { ref: l.roleRef } : {}) })),
+      actorOf,
+    );
+    if (actors) L.push("", actors);
   } else {
     L.push("_No rendered diagram — run `bun run cat render:bpmn`._");
   }
@@ -1564,7 +1574,11 @@ if (import.meta.main) {
   const unlinked = new Map<string, { title: string; refs: UnlinkedRef[] }>();
   for (const r of rows.filter((x) => x.loadError === undefined)) {
     const refs = new Set<string>();
-    pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, all, skillPages, presented.get(r.file), instances, (x) => refs.add(x)));
+    pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, all, skillPages, presented.get(r.file), instances, (x) => refs.add(x), processIri, (ref) => {
+      const href = ctx.roleHref(ref);
+      const title = ctx.roleTitle(ref);
+      return href || title ? { ...(href ? { href } : {}), ...(title ? { title } : {}) } : undefined;
+    }));
     // QA (owner, 2026-10-31): a reference the prose makes that no page can
     // answer is reported, never left as silent plain text.
     for (const x of refs) {

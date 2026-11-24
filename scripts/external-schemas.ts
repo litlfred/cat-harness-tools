@@ -16,7 +16,7 @@
  * @covers external-schema
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import {
   EXTERNAL_SCHEMA_TAG,
   ExternalSchemaSchema,
@@ -33,6 +33,7 @@ import { layerRootsIn } from "../schemas/kg/instance-roots.js";
 import { workflowFiles } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
+import { gateOwnsFile } from "./lib/gate-own.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // Read from the DECLARATION rather than hardcoded, and the reason this
@@ -379,12 +380,27 @@ export const COMPOSED_DERIVERS: ReadonlySet<string> = new Set(["dcmi-terms", "w3
  * layer this root mounts at another pin reads as new; neither is a defect of the
  * record. A registry at the root itself, and every harness root, are judged as before.
  */
-export function composedTermsNotOursReason(registry: string, repoRoot: string): string | null {
+export function composedTermsNotOursReason(
+  registry: string,
+  repoRoot: string,
+  // input-site: env CAT_GATE_OWN_PATHS,CAT_GATE_FOREIGN_PATHS #949cc29c — passed to gateOwnsFile; the values are the whole of what they contribute
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string | null {
+  const rel = relative(repoRoot, registry).split(sep).join("/");
+  // A layer's PR checks name the caller's own layer directories (`gate-own.ts`).
+  // A record in another layer's registry is that layer's, judged by its own CI
+  // (owner ruling 2026-11-05, "Move the checks"). In layer mode the checks
+  // compose the platform index, a HARNESS root, so the content-root rule below
+  // never fired there, and a FHIR IG's PR read eight terms only the index's
+  // other layers use as stale (2026-11-19).
+  if (gateOwnsFile(rel, env) === false) {
+    return `the record is in ${rel}, not one of this run's own layers (CAT_GATE_OWN_PATHS); its composed terms are judged by that layer's own CI`;
+  }
   if (rootProfile(repoRoot) !== "content") return null;
-  if (!relative(repoRoot, registry).includes("/")) return null;
+  if (!rel.includes("/")) return null;
   return (
     `a content root (no .github/workflows/code-quality-gates.yml) and the record is a mounted layer's ` +
-    `(${relative(repoRoot, registry)}); its terms are derived from every instance the harness index mounts, not this checkout's`
+    `(${rel}); its terms are derived from every instance the harness index mounts, not this checkout's`
   );
 }
 

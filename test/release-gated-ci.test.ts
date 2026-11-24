@@ -10,6 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse } from "yaml";
+import { HEAD_EVENT } from "../scripts/workflow-pins.ts";
 
 const ROOT = resolve(import.meta.dir, "..");
 const wf = (name: string) => parse(readFileSync(join(ROOT, ".github/workflows", name), "utf8"));
@@ -26,6 +27,34 @@ const NOOP_GROUP = "(github.event.action == 'labeled' && github.event.label.name
 // (owner, 2026-11-14, card "Preview QA" A; `scripts/preview-qa.ts`).
 const RELEASE_OR_PREVIEW_LABEL = "(github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview')";
 const NOOP_GROUP_LAYER = "(github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id)";
+
+// Only an event that moves the head, starts a tier or closes the PR cancels the
+// run in flight: the `ready_for_review` on two downstream layers' PRs
+// (2026-11-18) cancelled the full tier the `release` label had started on the
+// same head. The same clause as the caller's (workflow-pins.ts).
+const cancelsOn = (expr: string, action: string, event = "pull_request") =>
+  // Evaluate the expression for one event: the clause is plain `==`/`!=`/`&&`/`||`.
+  Function(`return ${expr.replace(/^\$\{\{|\}\}$/g, "").replace(/github\.event_name/g, JSON.stringify(event)).replace(/github\.event\.action/g, JSON.stringify(action)).replace(/'/g, '"')}`)() as boolean;
+const HEAD_MOVES = ["opened", "synchronize", "reopened", "labeled", "closed"];
+const HEAD_STAYS = ["ready_for_review", "unlabeled", "edited", "converted_to_draft"];
+
+describe("a run in flight is cancelled only by an event that moves the head or starts a tier", () => {
+  for (const name of ["layer-pr-checks.yml", "pr-tests.yml"]) {
+    test(name, () => {
+      const expr = String(wf(name).concurrency["cancel-in-progress"]);
+      expect(expr).toContain(HEAD_EVENT);
+      for (const a of HEAD_MOVES) expect({ a, cancels: cancelsOn(expr, a) }).toEqual({ a, cancels: true });
+      for (const a of HEAD_STAYS) expect({ a, cancels: cancelsOn(expr, a) }).toEqual({ a, cancels: false });
+      // A push to main is never cancelled while it runs.
+      expect(cancelsOn(expr, "", "push")).toBe(false);
+    });
+  }
+
+  test("the caller snippet in layer-pr-checks.yml's header says the same", () => {
+    const text = readFileSync(join(ROOT, ".github/workflows/layer-pr-checks.yml"), "utf8");
+    expect(text).toContain(`#     cancel-in-progress: \${{ github.event_name == 'pull_request' && ${HEAD_EVENT} }}`);
+  });
+});
 
 describe("pr-tests.yml (this repository's own checks)", () => {
   const doc = wf("pr-tests.yml");

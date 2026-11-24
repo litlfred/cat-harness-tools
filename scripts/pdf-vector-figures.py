@@ -66,6 +66,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import os
 import re
 import sys
@@ -121,9 +122,28 @@ def union(rs: list[tuple]) -> tuple:
     return (min(r[0] for r in rs), min(r[1] for r in rs), max(r[2] for r in rs), max(r[3] for r in rs))
 
 
+# Grid used only to decide which pairs are worth testing with `touches`. It
+# partitions the work, not the answer: every pair that touches shares a cell,
+# so the components are the same at any grid size (checked against the
+# all-pairs loop on 3,982 library pages, zero differences). No verdict reads it.
+GRID_CELLS = 64
+
+
 def components(rects: list[tuple]) -> list[list[int]]:
-    """Connected components under `touches`, by union-find. Ordered by first member."""
-    parent = list(range(len(rects)))
+    """Connected components under `touches`, by union-find. Ordered by first member.
+
+    The all-pairs loop this replaces was exact and quadratic:
+    `arxiv-2211.13362v2` page 8 draws 244,798 paths, and the loop ran more
+    than fifty minutes without finishing. Here each rectangle is tested only
+    against rectangles sharing a grid cell, and within a cell only until it
+    first touches each component -- one hit is enough to union. Same predicate,
+    same partition; that page now takes under a second. No cap and no
+    tolerance: a page is grouped in full.
+    """
+    n = len(rects)
+    if n == 0:
+        return []
+    parent = list(range(n))
 
     def find(i: int) -> int:
         while parent[i] != i:
@@ -131,14 +151,56 @@ def components(rects: list[tuple]) -> list[list[int]]:
             i = parent[i]
         return i
 
-    for i in range(len(rects)):
-        for j in range(i + 1, len(rects)):
-            if touches(rects[i], rects[j]):
-                ri, rj = find(i), find(j)
-                if ri != rj:
-                    parent[max(ri, rj)] = min(ri, rj)
+    finite = [v for r in rects for v in r if math.isfinite(v)]
+    lo_x = min(finite[0::4] + finite[2::4], default=0.0)
+    hi_x = max(finite[0::4] + finite[2::4], default=0.0)
+    lo_y = min(finite[1::4] + finite[3::4], default=0.0)
+    hi_y = max(finite[1::4] + finite[3::4], default=0.0)
+    # Square cells sized by the longer side: a drawing thin in one direction
+    # would otherwise get cells far thinner than its paths, and every path
+    # would cross all of them.
+    step_x = step_y = max(hi_x - lo_x, hi_y - lo_y) / GRID_CELLS or 1.0
+
+    def cell(v: float, lo: float, step: float) -> int:
+        if not math.isfinite(v):
+            return 0 if v < 0 else GRID_CELLS - 1
+        return max(0, min(GRID_CELLS - 1, int((v - lo) / step)))
+
+    # cell -> {component key -> members}. Keys go stale as components merge;
+    # each visit folds stale keys into their current root.
+    grid: dict[tuple, dict[int, list[int]]] = {}
+    for i, a in enumerate(rects):
+        cells = [
+            (cx, cy)
+            for cx in range(cell(a[0], lo_x, step_x), cell(a[2], lo_x, step_x) + 1)
+            for cy in range(cell(a[1], lo_y, step_y), cell(a[3], lo_y, step_y) + 1)
+        ]
+        for c in cells:
+            bucket = grid.get(c)
+            if not bucket:
+                continue
+            folded: dict[int, list[int]] = {}
+            for key, members in bucket.items():
+                root = find(key)
+                if root in folded:
+                    folded[root].extend(members)
+                else:
+                    folded[root] = members
+            grid[c] = folded
+            for root, members in folded.items():
+                if find(root) == find(i):
+                    continue
+                for j in members:
+                    if touches(a, rects[j]):
+                        ri, rj = find(i), find(root)
+                        if ri != rj:
+                            parent[max(ri, rj)] = min(ri, rj)
+                        break
+        for c in cells:
+            grid.setdefault(c, {}).setdefault(i, []).append(i)
+
     groups: dict[int, list[int]] = {}
-    for i in range(len(rects)):
+    for i in range(n):
         groups.setdefault(find(i), []).append(i)
     return [groups[k] for k in sorted(groups)]
 

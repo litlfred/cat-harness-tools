@@ -310,3 +310,49 @@ describe("corpus", () => {
     }
   }, CORPUS_TIMEOUT);
 });
+
+describe("grouping is exact and does not grow with the square of the page", () => {
+  // `arxiv-2211.13362v2` page 8 draws 244,798 paths, and the all-pairs
+  // grouping ran more than fifty minutes on it without finishing. The grid
+  // only decides which pairs are tested, so the partition must equal the
+  // all-pairs one on any input, including zero-height rules and rectangles
+  // that span the whole drawing.
+  const PY = `
+import importlib.util, json, random, sys, time
+spec = importlib.util.spec_from_file_location("vf", sys.argv[1])
+vf = importlib.util.module_from_spec(spec); spec.loader.exec_module(vf)
+def pairs(rects):
+    n = len(rects); parent = list(range(n))
+    def find(i):
+        while parent[i] != i: i = parent[i]
+        return i
+    for i in range(n):
+        for j in range(i + 1, n):
+            if vf.touches(rects[i], rects[j]):
+                a, b = find(i), find(j)
+                if a != b: parent[max(a, b)] = min(a, b)
+    g = {}
+    for i in range(n): g.setdefault(find(i), []).append(i)
+    return [g[k] for k in sorted(g)]
+rng = random.Random(7); same = True
+for trial in range(40):
+    rects = []
+    for _ in range(rng.randint(1, 300)):
+        x, y = rng.uniform(0, 600), rng.uniform(0, 800)
+        w, h = rng.choice([0, rng.uniform(0, 40), rng.uniform(0, 400)]), rng.choice([0, rng.uniform(0, 40)])
+        rects.append((x, y, x + w, y + h))
+    same = same and vf.components(rects) == pairs(rects)
+dense = [(i * 0.001, 0.0, i * 0.001 + 5.0, 5.0) for i in range(200000)]
+t = time.time(); comps = vf.components(dense); took = time.time() - t
+print(json.dumps({"same": same, "denseComponents": len(comps), "took": took}))
+`;
+
+  test("the same partition as all-pairs, and 200,000 overlapping paths in seconds", () => {
+    const proc = Bun.spawnSync(["python3", "-c", PY, join(REPO, "cat-harness-tools/scripts/pdf-vector-figures.py")]);
+    expect(proc.exitCode).toBe(0);
+    const r = JSON.parse(proc.stdout.toString());
+    expect(r.same).toBe(true);
+    expect(r.denseComponents).toBe(1);
+    expect(r.took).toBeLessThan(60);
+  }, 120_000);
+});

@@ -129,6 +129,7 @@ import {
 import { declarationChain, resolveInstanceGraph } from "../schemas/kg/harness-config.ts";
 import { explicitInstanceRoot, HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { GATE_OWN_PATHS_ENV } from "../scripts/lib/gate-own.ts";
+import { exitNotApplicable } from "../scripts/lib/not-applicable.ts";
 import { buildQaResult, writeQaResult } from "../scripts/qa-results.ts";
 import { GLOSSARY_SUBJECT_KIND } from "../scripts/kg-qa-report.ts";
 import { parsePoEntries, type PoEntry } from "./po-inject.ts";
@@ -1028,9 +1029,21 @@ export function absentLayers(root: string): string[] {
 
 function mainFor(root: string, argv: readonly string[]): number {
   const check = argv.includes("--check");
+  // A root that declares no `translation-sources` directory translates nothing,
+  // so there is no glossary to judge: not applicable (78, `lib/not-applicable.ts`),
+  // the same fact for every run. A declaration that cannot be READ, or a
+  // declared directory that is absent, is still "could not determine" (2).
+  let declared: string | undefined;
+  try {
+    declared = directoryForGraph(root, "translation-sources");
+  } catch (e) {
+    console.error(`translation-glossary: ${root}'s declaration could not be read (${(e as Error).message}) — nothing can be determined (exit 2)`);
+    return 2;
+  }
+  if (declared === undefined) exitNotApplicable("translation-glossary", `${root} declares no \`translation-sources\` directory, so it translates nothing and has no glossary to judge`);
   const translations = translationsOf(root);
   if (translations === undefined || !existsSync(translations)) {
-    console.error(`translation-glossary: ${root} declares no \`translation-sources\` directory — nothing can be determined (exit 2)`);
+    console.error(`translation-glossary: ${root} declares a \`translation-sources\` directory that is not on disk — nothing can be determined (exit 2)`);
     return 2;
   }
   const pattern = cataloguePatternOf(root);

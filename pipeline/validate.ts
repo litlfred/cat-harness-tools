@@ -1003,11 +1003,18 @@ export async function validateObjects(
   }
 
   // Phase 4: Glossary-term validation (defterm/refterm rules)
-  const defBlocks = new Map<string, { block: Block; md: string | undefined }>();
-  for (const [name, { block }] of allBlocks) {
-    defBlocks.set(name, { block, md: mdCache.get(name) });
+  const defBlocks = new Map<string, { block: Block; md: string | undefined; dir?: string }>();
+  for (const [name, { block, dir }] of allBlocks) {
+    defBlocks.set(name, { block, md: mdCache.get(name), dir });
   }
-  issues.push(...validateDefterms(defBlocks, { strict: opts.strict }));
+  // allBlocks is filled chapter by chapter in section order, so in chapter
+  // and paper mode it is reading order; flat mode has none.
+  issues.push(
+    ...validateDefterms(defBlocks, {
+      strict: opts.strict,
+      readingOrder: manifestKind === "chapter" || manifestKind === "paper",
+    }),
+  );
 
   // Phase 5: Witnessed-value directive validation (:val[name] rules)
   issues.push(...validateValueDirectives(defBlocks, { strict: opts.strict }));

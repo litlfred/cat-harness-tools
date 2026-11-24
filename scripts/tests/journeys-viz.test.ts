@@ -934,7 +934,7 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(discuss).toContain('<input type="radio" name="policy:cv:s1:gap:viewer" value="no" data-jv-store');
     // The journey question that is a canvas cell keeps its answer there, on the walkthrough too, moving it from its own key and its older one.
     const was = `data-jv-was="${Q_TRUST} policy:q:P2:0"`;
-    expect(discuss).toContain(`name="policy:cv:s1:rights:anchor:today" rows="1" data-jv-text ${was}`);
+    expect(discuss).toContain(`name="policy:cv:s1:rights:anchor:today" data-jv-text ${was}`);
     expect(page("walkthrough/P2/index.html")).toContain(`name="policy:cv:s1:rights:anchor:today" rows="2" data-jv-text ${was}`);
     expect(page("walkthrough/P2/index.html")).not.toContain(`name="${Q_TRUST}"`);
     // The sheet's annex: its modules' other journey questions, answered under their own keys.
