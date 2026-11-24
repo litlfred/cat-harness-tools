@@ -27,8 +27,6 @@ import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
 import { diagramActorsLine, type ActorResolver } from "../src/workflow/diagram-actors.ts";
 import { roleActorResolver } from "./lib/role-actors.ts";
-import { listInstances } from "../src/workflow/store.js";
-import { workPlanFindings, workPlanOf } from "../schemas/sdlc/work-plan.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
 import { instanceRepositories, type InstanceRepository } from "../schemas/kg/instance-repositories.ts";
 import type { WebPage, WebPageNode } from "../schemas/ui/webpage.ts";
@@ -59,9 +57,9 @@ import { declaredSubgraphNode } from "./kg-export.ts";
 import { TODO_GRAPH_SITE_PATH, TODO_SITE_DIR, serialiseJsonld, todoDocument, todoGraphDocument, todoPageSitePath, todoSitePath } from "./todo-graph.ts";
 import { isLegacyTodoPage, isTodoPage, todoPageHtml } from "./todo-page.ts";
 import { KG_RENDER_ASSET, kgRenderScript } from "./thin-page.ts";
-import { beanDefsDir, beanFindings, blockEdges, blockedBy, blocksOf, readBeans } from "./beans.js";
+import { beanDefsDir, readBeans } from "./beans.js";
 import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.js";
-import { milestoneRollup } from "./milestone-rollup.js";
+import { beanIndexOf } from "./lib/bean-index.js";
 import { BURNDOWN_SCHEMA, DEFAULT_BURNDOWN_DAYS, buildBurndownFeed, burndownTargets, fetchBeanHistory, type BurndownFeed } from "./bean-burndown-feed.ts";
 import { snapshotsFromGit } from "./epic-burndown.ts";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
@@ -539,20 +537,6 @@ const BEANS_COUNT_ASSET = join(OUT_DIR, "assets", "beans", "count.json");
 /** The board's burn-down feed, written by a publish build only (`--burndown-history`). */
 const BEANS_BURNDOWN_ASSET = join(OUT_DIR, "assets", "beans", "burndown.json");
 
-/**
- * How much of a bean's body the projection carries.
- *
- * Enough for a sticky's preview and no more. A reader who wants the argument
- * follows `editHref` to the file, which is the same affordance every other
- * node gets.
- *
- * **Measured at this length, 2026-09-20:** 239 beans project to 235 KB raw and
- * **62 KB gzipped** — 0.26 KB per bean against the todo index's 1.5 KB per
- * todo, so the per-item cost is already the lower of the two. The number is
- * recorded because the next person to change this constant should be changing
- * a measurement rather than a guess.
- */
-const BEAN_BODY_PREVIEW = 400;
 const emittedQa = new Set<string>();
 
 /** Every published witness JSON currently on disk, for orphan detection. */
@@ -2060,92 +2044,27 @@ function processHierarchy(): Record<string, string[]> {
   // `file` is rewritten to its path ON THE BRANCH that keeps it, and the
   // branch travels once as `fileRef` (with `fileWeb`, the repository that
   // holds it) — never re-derived in the client. See `branch-kept-href.ts`.
-  const beanForge = beansRead?.[0] ? branchKeptLocation(repoRootFor(INSTANCE_ROOT), beansRead[0].file, REPO_WEB) : undefined;
-  const beans = beansRead === null ? null : beansRead.map((b) => {
-    const at = branchKeptLocation(repoRootFor(INSTANCE_ROOT), b.file, REPO_WEB);
-    if (beanForge && (at.ref !== beanForge.ref || at.web !== beanForge.web)) {
-      throw new Error(`bean ${b.id} is kept at ${at.web}@${at.ref}, the store at ${beanForge.web}@${beanForge.ref}: one store, one branch`);
-    }
-    return { ...b, file: at.path };
+  // The projection itself is `lib/bean-index.ts`, shared with `beans-board.ts`
+  // so a folio's own board is built by the same code (one answer to "what
+  // does the work plan hold").
+  const beanIndex = beansRead === null ? null : beanIndexOf(beansRead, {
+    repoRoot: repoRootFor(INSTANCE_ROOT),
+    repoWeb: REPO_WEB,
+    sourceBranch: SOURCE_BRANCH,
+    // A proposal path is checkout-relative (`cat-harness/docs/proposals/x.md`),
+    // and the board's own `fileWeb` is the work-item store's repository, which
+    // does not hold it. The declaring layer's repository does (as edit links).
+    proposalHref: (path: string): string => {
+      const at = declaredEditLocation(path);
+      return at.repo ? `https://github.com/${at.repo}/blob/main/${at.source}` : `${REPO_WEB}/blob/main/${path}`;
+    },
   });
-  // `null` is "no bean store", which is NOT the same as a store with nothing
-  // in it, and rendering them alike is how a consumer reports a clean run over
-  // a repository it never looked at. A folio with no work plan simply gets no
-  // projection; the board reads the absent file as "no store" rather than as
-  // an empty one.
+  const beans = beanIndex === null ? null : beanIndex.beans;
   if (beans === null) {
     console.log(`  · assets/beans/index.json — no bean store`);
   } else {
-    // ONE edge set over both declarations (bean `vhqq`): until then this read
-    // `blocking:` only and published 7 of the store's 83 edges, because 60
-    // beans declare the block from the blocked end with `blocked_by:`.
-    const { edges, dangling } = blockEdges(beans);
-    const blockers = blockedBy(beans);
-    const blocks = blocksOf(beans);
-    // WORK PLANS (work item folio-assistant-exrp, owner 2026-11-05: "Epic is
-    // the plan"). An epic or milestone that names the process it runs, read
-    // from its `process:` / `proposal:` tags, and the layers that name it
-    // as their plan. Joined HERE, so the board renders a plan's process and
-    // its runs without reading the layer store itself. A layer store
-    // that cannot be read gives no runs, and the plan says so (`runs: null`)
-    // rather than showing none.
-    let instancesRead: ReturnType<typeof listInstances> | null;
-    try {
-      instancesRead = listInstances(repoRootFor(INSTANCE_ROOT));
-    } catch {
-      instancesRead = null;
-    }
-    const runsOf = (id: string) =>
-      instancesRead === null
-        ? null
-        : instancesRead
-            .filter((i) => i.plan === id)
-            .map((i) => ({ id: i.id, processId: i.processId, status: i.status, at: i.tokens, updatedAt: i.updatedAt }));
-    // The proposal's link, resolved HERE from the declarations: a proposal
-    // path is checkout-relative (`cat-harness/docs/proposals/x.md`), and the
-    // board's own `fileWeb` is the work-item store's repository, which does
-    // not hold it. The declaring layer's repository does (as edit links).
-    const proposalHref = (path: string): string => {
-      const at = declaredEditLocation(path);
-      return at.repo ? `https://github.com/${at.repo}/blob/main/${at.source}` : `${REPO_WEB}/blob/main/${path}`;
-    };
-    const planField = (id: string, tags: readonly string[] | undefined) => {
-      const plan = workPlanOf(tags);
-      if (plan === undefined) return {};
-      return {
-        plan: {
-          ...plan,
-          ...(plan.proposal !== undefined ? { proposalHref: proposalHref(plan.proposal) } : {}),
-          runs: runsOf(id),
-        },
-      };
-    };
-    const items = beans.map((b) => ({
-      id: b.id,
-      title: b.title,
-      status: b.status,
-      type: b.type,
-      priority: b.priority,
-      parent: b.parent,
-      // Present only on a work plan: what it runs, where it came from, and
-      // the instances running under it. Absent is "not a plan", never "a
-      // plan with nothing known".
-      ...planField(b.id, b.tags),
-      // Both directions, resolved once. A client given only `blocking` would
-      // have to invert the whole set to answer "what is holding THIS bean up",
-      // which is the question a board is actually asked. Both from the edge
-      // set, so a block declared at EITHER end appears at both.
-      blocking: blocks.get(b.id) ?? [],
-      blockedBy: blockers.get(b.id) ?? [],
-      createdAt: b.createdAt,
-      // Published as a FACT, with no age computed from it. See `beanFindings`.
-      updatedAt: b.updatedAt,
-      preview: b.body.trim().slice(0, BEAN_BODY_PREVIEW),
-      // Repo-relative, and the renderer derives BOTH a view and an edit URL
-      // from it. Shipping two absolute URLs per bean would put the forge's URL
-      // shape in the data 283 times over, and they would then have to agree.
-      file: b.file,
-    }));
+    const { edges, dangling } = beanIndex!;
+    const items = (beanIndex!.document as { items: unknown[] }).items;
     mkdirSync(dirname(BEANS_ASSET), { recursive: true });
     // Indented for the merge reason the todo index documents at length: a
     // minified projection is one line, git merges by line, and two branches
@@ -2154,45 +2073,7 @@ function processHierarchy(): Record<string, string[]> {
     emit(
       BEANS_ASSET,
       JSON.stringify(
-        {
-        $schema: "folio-bean-index/v1",
-        // OPEN beans, the same number `count.json` gives the icon row and the
-        // board's "open" (bean `v215`): it was `items.length`, every bean
-        // ever filed, so the tile read 943 beside the icon row's 541. Not
-        // `findings` either: a finding is a defect ABOUT the work plan, not
-        // an item on it. See `schemas/ui/tile-count.ts` for why the number is
-        // declared here rather than inferred by the reader.
-        ...tileCounts({ beans: [openBeanCount(beans), OPEN_BEANS_UNIT] }),
-        // The forge, so `work-plan.js` composes its links from DATA rather
-        // than carrying one layer's address in shared client code. Same
-        // reason `editHref` is composed here, one level further on.
-        repoWeb: REPO_WEB,
-        // The repository and branch every `file` below is a path on.
-        fileWeb: beanForge?.web ?? REPO_WEB,
-        fileRef: beanForge?.ref ?? SOURCE_BRANCH,
-        items,
-        // The edges themselves, `blocker → blocked`, with the key(s) that
-        // declared each. A dangling edge stays here AND is a
-        // `blocking-unknown` finding: reported, never dropped.
-        edges,
-        findings: beanFindings(beans),
-        // A work plan filed under the wrong type, or a proposal with no
-        // process: reported, never fatal (`schemas/sdlc/work-plan.ts`).
-        planFindings: workPlanFindings(beans),
-        // The milestone rollup, COMPUTED HERE so the board renders a number
-        // it does not derive. The board already loads every bean's `parent`,
-        // `type` and `status`, so it could compute the closure client-side —
-        // and that is exactly what makes it worth not doing: a second
-        // implementation of one definition is free to disagree with the
-        // terminal report, which `milestone:status` prints from the SAME
-        // function. One definition, one writer, and a renderer that renders.
-        //
-        // `orphanOpen` travels with it on purpose: the three shares describe
-        // well under half the open work (241 of 390, 2026-10-03), and a board
-        // showing three percentages without that denominator invites the
-        // reading that they add up to the repository.
-        plan: milestoneRollup(beans),
-      },
+        beanIndex!.document,
         null,
         2,
       ) + "\n",
