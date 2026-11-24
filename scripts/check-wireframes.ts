@@ -1,6 +1,7 @@
 /**
- * Every declared harness visualiser has a wireframe, and every wireframe has
- * passed its mechanical checks at BOTH a web and a mobile viewport.
+ * Every wireframe has passed its mechanical checks at BOTH a web and a mobile
+ * viewport, and which declared harness visualisers no wireframe covers is
+ * reported as an advisory note.
  *
  * Reads:
  *
@@ -20,19 +21,26 @@
  *   candidate `.html`, and `checks/report.json` written by `wireframe:check`
  *   (the Tool `wireframe-check`).
  *
- * Fails on:
+ * Fails on (a broken artefact, never an optional one):
  *
- * - a declared visualiser that no wireframe covers
  * - a wireframe with no intent, or no candidate
  * - a candidate with no check report
  * - a candidate whose report lacks a viewport, or holds a `fail`
+ * - an `index.json` entry naming a ref that no declaration declares
+ *
+ * Advisory, never a gap: a declared visualiser that no wireframe covers. The
+ * owner ruled on 2026-11-24 that "not everything needs a wireframe, certainly
+ * not a red": one new visualiser declared without one (cat-harness#1366) had
+ * failed this writer inside `qa:refresh` and with it every downstream gate. It
+ * is reported as a note in the sidecar (`uncovered`) and the judge output, and
+ * neither the judge nor the writer exits non-zero on it.
  *
  * Usage:
- *   bun run cat check:wireframes            # report, write the sidecar, exit 1 on any gap
+ *   bun run cat check:wireframes            # report, write the sidecar, exit 1 on any gap (uncovered is advisory)
  *   bun run cat check:wireframes -- --json  # print the sidecar document
  *   bun run cat check:wireframes:check      # JUDGE: compute and judge, write nothing (the gate)
  *
- * Judge mode (`--check`): 0 no gap · 1 any gap · 2 no visualiser
+ * Judge mode (`--check`): 0 no gap (advisories allowed) · 1 any gap · 2 no visualiser
  * declared (could not determine), an unknown flag, or the run threw.
  *
  * @module scripts/check-wireframes
@@ -76,6 +84,7 @@ type Report = { topic?: string; use?: string; surface?: string; candidates: { fi
 export interface WireframeReport {
   declared: string[];
   covered: { ref: string; wireframe: string }[];
+  /** ADVISORY (owner, 2026-11-24): a declared visualiser no wireframe covers. Reported, never a gap. */
   uncovered: { ref: string }[];
   unknownRef: { wireframe: string; ref: string }[];
   incomplete: { wireframe: string; problem: string }[];
@@ -281,8 +290,13 @@ export function checkWireframes(
   return r;
 }
 
+/**
+ * The findings that fail: every family but `covered`, `notJudged` and the
+ * advisory `uncovered` (owner, 2026-11-24: "not everything needs a wireframe,
+ * certainly not a red").
+ */
 export function wireframeGaps(r: WireframeReport): number {
-  return r.uncovered.length + r.unknownRef.length + r.incomplete.length + r.missingViewport.length + r.failing.length;
+  return r.unknownRef.length + r.incomplete.length + r.missingViewport.length + r.failing.length;
 }
 
 /** The sidecar document for a report. Pure, so the judge and the writer render ONE computation. */
@@ -293,7 +307,10 @@ export function wireframesDocument(r: WireframeReport): QaResult {
     subject: { kind: "corpus", id: "harness-visualiser-wireframes" },
     families: {
       covered: { summary: "A declared visualiser with a wireframe whose checks pass at both viewports.", entries: r.covered },
-      uncovered: { summary: "A declared visualiser that no wireframe covers.", entries: r.uncovered },
+      uncovered: {
+        summary: "ADVISORY, not a gap: a declared visualiser that no wireframe covers. Not every visualiser needs a wireframe (owner, 2026-11-24).",
+        entries: r.uncovered,
+      },
       "unknown-ref": { summary: "index.json names a ref that no declaration declares: a stale or mistyped mapping.", entries: r.unknownRef },
       incomplete: { summary: "A wireframe missing its intent, its candidate or its check report.", entries: r.incomplete },
       "missing-viewport": {
@@ -311,8 +328,8 @@ export function wireframesDocument(r: WireframeReport): QaResult {
 
 /**
  * The judgement over a report — bean `bo44`'s four states. `unknown` when no
- * visualiser is declared (nothing was checked); `finding` on any gap, since
- * every family but `covered` is one.
+ * visualiser is declared (nothing was checked); `finding` on any gap
+ * ({@link wireframeGaps}); an uncovered visualiser alone stays `ok`.
  */
 export function judgeWireframes(r: WireframeReport): Judgement {
   return judgementOf({ failing: wireframeGaps(r), undetermined: r.declared.length === 0 });
@@ -330,7 +347,7 @@ if (import.meta.main) {
     } catch (e) {
       process.exit(concludeJudgement({ gate: GATE, judgement: "error", detail: (e as Error).message }));
     }
-    for (const u of jr.uncovered) console.error(`  ✗ no wireframe: ${u.ref}`);
+    for (const u of jr.uncovered) console.error(`  · note: no wireframe covers ${u.ref} (advisory, not a gap)`);
     for (const u of jr.unknownRef) console.error(`  ✗ ${u.wireframe}: covers an undeclared ref ${u.ref}`);
     for (const i of jr.incomplete) console.error(`  ✗ ${i.wireframe}: ${i.problem}`);
     for (const m of jr.missingViewport) console.error(`  ✗ ${m.wireframe}/${m.candidate}: no ${m.viewport} check`);
@@ -340,7 +357,7 @@ if (import.meta.main) {
       concludeJudgement({
         gate: GATE,
         judgement: judgeWireframes(jr),
-        detail: `${jr.covered.length}/${jr.declared.length} declared visualiser(s) covered, ${wireframeGaps(jr)} gap(s)`,
+        detail: `${jr.covered.length}/${jr.declared.length} declared visualiser(s) covered, ${wireframeGaps(jr)} gap(s), ${jr.uncovered.length} advisory note(s)`,
         committed: { root: INSTANCE_ROOT, stem: "wireframes", fresh: wireframesDocument(jr), writer: GATE },
       }),
     );
@@ -355,7 +372,7 @@ if (import.meta.main) {
   else {
     writeQaResult(INSTANCE_ROOT, "wireframes", doc);
     console.log(`wireframes: ${r.covered.length}/${r.declared.length} declared visualiser(s) covered`);
-    for (const u of r.uncovered) console.log(`  ✗ no wireframe: ${u.ref}`);
+    for (const u of r.uncovered) console.log(`  · note: no wireframe covers ${u.ref} (advisory, not a gap)`);
     for (const u of r.unknownRef) console.log(`  ✗ ${u.wireframe}: covers an undeclared ref ${u.ref}`);
     for (const i of r.incomplete) console.log(`  ✗ ${i.wireframe}: ${i.problem}`);
     for (const m of r.missingViewport) console.log(`  ✗ ${m.wireframe}/${m.candidate}: no ${m.viewport} check`);

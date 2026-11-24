@@ -390,7 +390,9 @@ export interface RootFacts {
  * - it reads state graphs and no state branch is mounted (`readsState`).
  *
  * Anything else a content root's writer does stays judged: a real content gap
- * (an L1 entry with no manifest, a surface with no wireframe) is a failure.
+ * (an L1 entry with no manifest, a wireframe with no check report) is a
+ * failure. A surface with no wireframe is not: `check:wireframes` reports it as
+ * an advisory and exits 0 (owner, 2026-11-24), so it cannot fail the refresh.
  */
 export function notApplicableWriters(writers: readonly QaWriter[], facts: RootFacts): NotApplicable[] {
   if (facts.profile !== "content") return [];

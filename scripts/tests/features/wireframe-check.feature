@@ -99,3 +99,22 @@ Feature: Wireframe check inputs
     Given the shared "archimate-pages" wireframe and dth-sfp's own wireframe of "dth-sfp/archimate"
     When the wireframes are checked
     Then "dth-sfp/archimate" is covered by dth-sfp's own, and the other archimate visualisers by the shared one
+
+  @test:scripts/tests/wireframe-check.test.ts::an_uncovered_visualiser_is_advisory_(owner,_2026-11-24)::a_declared_visualiser_no_wireframe_covers_is_a_note,_not_a_gap:_exit_0
+  Scenario: An uncovered visualiser is an advisory and exits 0
+    Given a passing wireframe "beans" covering "cat-harness/beans", and "cat-harness/software-libraries" declared with no wireframe
+    When the wireframes are checked
+    Then "cat-harness/software-libraries" is reported as uncovered, in a sidecar family marked advisory
+    And it counts as no gap, and the judgement exits 0
+
+  @test:scripts/tests/wireframe-check.test.ts::an_uncovered_visualiser_is_advisory_(owner,_2026-11-24)::a_wireframe_with_no_intent_or_no_candidate_stays_red
+  Scenario: A wireframe with no intent or no candidate stays red
+    Given wireframe "beans" with no intent.md, and another with no candidate .html
+    When the wireframes are checked
+    Then each is incomplete, and the judgement exits 1
+
+  @test:scripts/tests/wireframe-check.test.ts::an_uncovered_visualiser_is_advisory_(owner,_2026-11-24)::a_candidate_with_no_check_report,_a_missing_viewport_or_a_failing_check_stays_red
+  Scenario: A missing report, a missing viewport or a failing check stays red
+    Given wireframe "beans" with no checks report, one checked at web only, and one whose mobile no-overflow check failed
+    When the wireframes are checked
+    Then each is reported as incomplete, missing a viewport or failing, and the judgement exits 1
