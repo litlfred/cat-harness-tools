@@ -46,3 +46,11 @@ Feature: QA axes and one vocabulary for counts
   @test:schemas/sdlc/qa-axis.test.ts::QaDeclarationSchema::accepts_writers_and_axes,_refuses_a_twice-declared_writer_and_an_unknown_axis
   Scenario: What an instance may declare
     Then writers and axes are accepted, a writer id twice and an axis outside the list are refused
+
+  @test:schemas/sdlc/qa-axis.test.ts::the_instance_declaration_carries_`qa`_and_a_visualiser's_`sections`::a_section_names_another_visualiser_of_the_same_harness
+  Scenario: A visualiser's sections name other visualisers of its harness
+    Then a section naming a declared visualiser is accepted, and one naming itself or nothing is refused
+
+  @test:schemas/sdlc/qa-axis.test.ts::the_instance_declaration_carries_`qa`_and_a_visualiser's_`sections`::`qa`_is_read_through_its_own_schema
+  Scenario: The declaration's qa is checked
+    Then a declared axis on the list is accepted and one outside it refused

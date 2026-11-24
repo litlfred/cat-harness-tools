@@ -61,3 +61,26 @@ describe("QaDeclarationSchema", () => {
     expect(QaDeclarationSchema.safeParse({ axes: ["nope"] }).success).toBe(false);
   });
 });
+
+describe("the instance declaration carries `qa` and a visualiser's `sections`", () => {
+  const mk = (sections: string[], qa?: unknown) => ({
+    name: "x",
+    directories: [],
+    visualisers: [
+      { id: "qa", renderedBy: "state-viewer", coversKinds: ["qa"], sections },
+      { id: "health", renderedBy: "state-viewer", coversKinds: ["health"] },
+    ],
+    ...(qa ? { qa } : {}),
+  });
+  test("a section names another visualiser of the same harness", async () => {
+    const { CatHarnessDeclarationSchema } = await import("../kg/cat-harness");
+    expect(CatHarnessDeclarationSchema.safeParse(mk(["health"])).success).toBe(true);
+    expect(CatHarnessDeclarationSchema.safeParse(mk(["qa"])).success).toBe(false);
+    expect(CatHarnessDeclarationSchema.safeParse(mk(["nope"])).success).toBe(false);
+  });
+  test("`qa` is read through its own schema", async () => {
+    const { CatHarnessDeclarationSchema } = await import("../kg/cat-harness");
+    expect(CatHarnessDeclarationSchema.safeParse(mk(["health"], { axes: ["lean"] })).success).toBe(true);
+    expect(CatHarnessDeclarationSchema.safeParse(mk(["health"], { axes: ["x"] })).success).toBe(false);
+  });
+});
