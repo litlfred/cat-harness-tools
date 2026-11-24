@@ -96,6 +96,7 @@ Feature: The light checks of a layer PR run in one job
   Scenario: Every step of prepare-head after the tier continues on error on the fast tier only
     Given the steps of prepare-head
     Then each step after "Which tier" continues on error when "steps.tier.outputs.full == 'false'", or already did
+    And the two checkouts of the PR side's merge ref also continue on a pull request, for "pr-open-late" to judge
     And neither the tier step nor the verdict step continues on error
 
   @test:test/layer-pr-checks-job-graph.test.ts::the_advisory_fast_tier::a_fast-tier_step_that_can_go_red_has_an_id,_so_the_verdict_can_name_it

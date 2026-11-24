@@ -63,6 +63,7 @@
     "test/layer-pr-checks-live-labels.test.ts",
     "test/layer-pr-checks-no-instance-base.test.ts",
     "test/layer-pr-checks-stored-pins.test.ts",
+    "test/layer-pr-gone.test.ts",
     "test/layer-ready-reuse.test.ts",
     "test/layer-state-pin.test.ts",
     "test/release-gated-ci.test.ts"
