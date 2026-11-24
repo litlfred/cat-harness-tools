@@ -140,6 +140,7 @@
     "schemas/sdlc/node-view-coverage.ts",
     "schemas/sdlc/python-deps.ts",
     "schemas/sdlc/qa-attestations.ts",
+    "schemas/sdlc/qa-axis.ts",
     "schemas/sdlc/qa-report.ts",
     "schemas/sdlc/qa-review.ts",
     "schemas/sdlc/red-flag.ts",

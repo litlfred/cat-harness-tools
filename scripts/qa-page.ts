@@ -37,7 +37,7 @@
  * @module scripts/qa-page
  */
 
-import { QA_AXES, QA_AXIS_TITLES, QA_FORMAT_RULES, type QaAxis, type QaDeclaration } from "../schemas/sdlc/qa-axis.ts";
+import { QA_AXES, QA_AXIS_TITLES, QA_FORMAT_RULES, type QaDeclaration } from "../schemas/sdlc/qa-axis.ts";
 import type { InstanceSubject } from "./state-visualizer.ts";
 
 /** Where one layer's QA results are, for the browser to read. */

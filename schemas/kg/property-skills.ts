@@ -93,6 +93,11 @@ export const PROPERTY_SKILLS = {
     skills: [],
     gap: "no skill edits `jsonldPrefixes` yet: the rule (declare a vocabulary in the layer that owns it; the published context is generated from what documents use, flattened over `needs`) is documented only in the schema (jsonld-prefixes.ts)",
   },
+  // Owner, 2026-11-24 ("build integrated page into platform"): the QA writers and axes an instance declares — schemas/sdlc/qa-axis.ts.
+  qa: {
+    skills: [],
+    gap: "no skill edits `qa` yet: the rule (each writer names its axis and the files it writes; a declared axis with nothing published shows as unknown, never zero) is documented only in the schema (qa-axis.ts, QaDeclarationSchema)",
+  },
   remoteGraphs: { skills: ["library-ingestion", "materialize-remote"] },
   associatedHarnesses: { skills: ["associate-harness"] },
   // Issue #1719. Both name a large-datasets skill, as `remoteGraphs` already
