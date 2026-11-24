@@ -13,7 +13,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { UsageError, parseArgs, resolveRun } from "../wireframe-check.mjs";
-import { checkWireframes, renderedByKeys } from "../check-wireframes.ts";
+import { checkWireframes, judgeWireframes, renderedByKeys, wireframeGaps, wireframesDocument } from "../check-wireframes.ts";
+import { JUDGEMENT_EXIT } from "../qa-results.ts";
+
+const exitOf = (j: keyof typeof JUDGEMENT_EXIT) => JUDGEMENT_EXIT[j];
 
 /** An index-shaped checkout: one layer holding an as-is wireframe and a design proposal. */
 const ROOT = mkdtempSync(join(tmpdir(), "wireframe-check-"));
@@ -221,5 +224,76 @@ describe("a wireframe covers every visualiser a writer draws (renderedBy:<tool>)
     const r = checkWireframes(ROOT, [{ dir: shared, prefix: "cat-harness-tools/" }, { dir: own, prefix: "dth-sfp/" }], [], RENDERERS);
     expect(r.covered).toContainEqual({ ref: "dth-sfp/archimate", wireframe: "dth-sfp/archimate" });
     expect(r.covered).toContainEqual({ ref: "dth-hrh/archimate", wireframe: "cat-harness-tools/archimate-pages" });
+  });
+});
+
+describe("an uncovered visualiser is advisory (owner, 2026-11-24)", () => {
+  /** A wireframe directory with whatever of intent, candidate and report it is given. */
+  const wireframe = (
+    dir: string,
+    topic: string,
+    covers: string[],
+    opts: { intent?: boolean; candidate?: boolean; report?: { viewport: string; criterion: string; result: string }[] } = {},
+  ) => {
+    mkdirSync(join(dir, topic), { recursive: true });
+    if (opts.intent !== false) writeFileSync(join(dir, topic, "intent.md"), "intent");
+    if (opts.candidate !== false) put(join(dir, topic, "as-is.html"));
+    if (opts.report !== undefined) {
+      mkdirSync(join(dir, topic, "checks"), { recursive: true });
+      writeFileSync(join(dir, topic, "checks", "report.json"), JSON.stringify({ topic, candidates: [{ file: "as-is.html", entries: opts.report }] }));
+    }
+    writeFileSync(join(dir, "index.json"), JSON.stringify({ wireframes: { [topic]: { covers } } }));
+  };
+  const pass = ["web", "mobile"].map((viewport) => ({ viewport, criterion: "renders", result: "pass" }));
+  const RENDERERS = new Map([
+    ["cat-harness/beans", "state-visualizer"],
+    ["cat-harness/software-libraries", "software-libraries-page"],
+  ]);
+
+  test("a declared visualiser no wireframe covers is a note, not a gap: exit 0", () => {
+    const dir = join(ROOT, "advisory-uncovered");
+    wireframe(dir, "beans", ["cat-harness/beans"], { report: pass });
+    const r = checkWireframes(ROOT, [{ dir, prefix: "" }], [], RENDERERS);
+    expect(r.uncovered).toEqual([{ ref: "cat-harness/software-libraries" }]);
+    expect(wireframeGaps(r)).toBe(0);
+    expect(exitOf(judgeWireframes(r))).toBe(0);
+    // Still reported in the sidecar, marked advisory.
+    const fam = wireframesDocument(r).families.uncovered!;
+    expect(fam.count).toBe(1);
+    expect(fam.summary).toMatch(/^ADVISORY/);
+  });
+
+  test("a wireframe with no intent or no candidate stays red", () => {
+    const noIntent = join(ROOT, "advisory-no-intent");
+    wireframe(noIntent, "beans", ["cat-harness/beans"], { intent: false, report: pass });
+    const a = checkWireframes(ROOT, [{ dir: noIntent, prefix: "" }], [], RENDERERS);
+    expect(a.incomplete).toContainEqual({ wireframe: "beans", problem: "no intent.md" });
+    expect(exitOf(judgeWireframes(a))).toBe(1);
+
+    const noCandidate = join(ROOT, "advisory-no-candidate");
+    wireframe(noCandidate, "beans", ["cat-harness/beans"], { candidate: false });
+    const b = checkWireframes(ROOT, [{ dir: noCandidate, prefix: "" }], [], RENDERERS);
+    expect(b.incomplete).toContainEqual({ wireframe: "beans", problem: "no candidate .html" });
+    expect(exitOf(judgeWireframes(b))).toBe(1);
+  });
+
+  test("a candidate with no check report, a missing viewport or a failing check stays red", () => {
+    const noReport = join(ROOT, "advisory-no-report");
+    wireframe(noReport, "beans", ["cat-harness/beans"]);
+    const a = checkWireframes(ROOT, [{ dir: noReport, prefix: "" }], [], RENDERERS);
+    expect(a.incomplete.some((i) => i.problem.startsWith("no checks/report.json"))).toBe(true);
+    expect(exitOf(judgeWireframes(a))).toBe(1);
+
+    const webOnly = join(ROOT, "advisory-web-only");
+    wireframe(webOnly, "beans", ["cat-harness/beans"], { report: [pass[0]!] });
+    const b = checkWireframes(ROOT, [{ dir: webOnly, prefix: "" }], [], RENDERERS);
+    expect(b.missingViewport).toEqual([{ wireframe: "beans", candidate: "as-is.html", viewport: "mobile" }]);
+    expect(exitOf(judgeWireframes(b))).toBe(1);
+
+    const failing = join(ROOT, "advisory-failing");
+    wireframe(failing, "beans", ["cat-harness/beans"], { report: [pass[0]!, { viewport: "mobile", criterion: "no-overflow", result: "fail" }] });
+    const c = checkWireframes(ROOT, [{ dir: failing, prefix: "" }], [], RENDERERS);
+    expect(c.failing).toEqual([{ wireframe: "beans", candidate: "as-is.html", viewport: "mobile", criterion: "no-overflow" }]);
+    expect(exitOf(judgeWireframes(c))).toBe(1);
   });
 });
