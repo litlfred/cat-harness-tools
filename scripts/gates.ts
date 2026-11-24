@@ -1904,7 +1904,7 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     script: "separation:cutover:check",
     kind: "report",
     reason:
-      "A ONE-EVENT QUESTION, asked of a repository that has just left the monorepo: is its cutover complete (kg-separation stage 13)? Five of its six conditions are gates CI already runs (`remote-mount --check`, `check:declaration-resolution`'s parts, `check:import-direction`, `check:reference-direction`), and the sixth, `site`, is a full site build it runs only with `--site`; without it the run is `not-run` and exits 2 by design. So as a step it would either repeat gates or build the site twice. Run it, with `--site`, in the separated repository at its cutover",
+      "A ONE-EVENT QUESTION, asked of a repository that has just left the monorepo: is its cutover complete (kg-separation stage 13)? Five of its six conditions are gates CI already runs (`remote-mount --check`, `check:declaration-resolution`'s parts, `check:import-direction`, `check:reference-direction`), and the sixth, `site`, is a full site build it runs only with `--site`; without it the run is `not-run` and exits 2 by design (in an instance root, or a run naming its own layers in `CAT_GATE_OWN_INSTANCES`, `site` is `not-applicable` instead: that layer builds its own site in its own CI). So as a step it would either repeat gates or build the site twice. Run it, with `--site`, in the separated repository at its cutover",
   },
   {
     script: "post-merge:regen:check",

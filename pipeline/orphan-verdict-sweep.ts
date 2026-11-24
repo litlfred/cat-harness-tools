@@ -58,12 +58,27 @@
  * the empty case is excused: a verdict found in such a root is still swept,
  * and is an abandoned orphan.
  *
+ * ## A mounted layer, in a run that judges another layer, is not applicable
+ *
+ * A layer's PR checks compose the platform index and run from its root, naming
+ * the caller's own layers (`CAT_GATE_OWN_PATHS`, `scripts/lib/gate-own.ts`).
+ * The index declares no folio, so the sweep falls back to the harness layer —
+ * a MOUNT, whose verdicts are its own CI's subject, not this run's (WHO
+ * smart-base#340, run 45376498276: "examined 0 members" at
+ * `cat-harness/test/results/block-qa`). When the swept root is not one of the
+ * run's own layers and none of the run's own layers holds a block, no verdict
+ * this run could be asked about exists: exit 78. Fetching the mount's verdicts
+ * would judge another layer's corpus on this layer's PR. An own layer that
+ * holds blocks keeps the refusal: its verdicts are this run's question, and
+ * the sweep did not read them.
+ *
  * @module pipeline/orphan-verdict-sweep
  * @covers qa
  */
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
+import { GATE_OWN_PATHS_ENV, gateOwnsFile } from "../scripts/lib/gate-own";
 import { BLOCK_QA_RESULTS_DIR, BLOCK_QA_SUFFIX, blockOfQaPath } from "./qa-paths";
 import { walkBlocks } from "./qa-utils";
 import type { FolioContribution } from "../schemas/content/contributions";
@@ -155,6 +170,13 @@ export interface SweepRootFacts {
    * harness index's `qa:refresh` (`qa-sweep:docs`), never here.
    */
   harnessFallbackInContentRoot: boolean;
+  /**
+   * The run names its own layers (`CAT_GATE_OWN_PATHS`) and the swept root is
+   * not one of them: `swept` is its path relative to the run's root, and
+   * `ownWithBlocks` lists the run's own layer paths that hold a block. Absent
+   * when the run names no own layer, or the swept root is its own.
+   */
+  foreignInScopedRun?: { swept: string; own: readonly string[]; ownWithBlocks: readonly string[] };
 }
 
 /**
@@ -168,6 +190,10 @@ export interface SweepRootFacts {
  */
 export function notApplicableReason(sweep: Pick<OrphanSweep, "examined">, facts: SweepRootFacts, root: string): string | undefined {
   if (sweep.examined > 0) return undefined;
+  const foreign = facts.foreignInScopedRun;
+  if (foreign && foreign.ownWithBlocks.length === 0) {
+    return `the sweep landed on ${foreign.swept}, a layer this run mounts but does not judge (its block verdicts are its own CI's subject), and this run's own layer(s) ${foreign.own.join(", ")} hold no block manifest, so no verdict here could be orphaned`;
+  }
   if (facts.harnessFallbackInContentRoot) {
     return `this content root declares no folio, so the sweep fell back to the harness layer at ${root}, whose block verdicts only the harness index's \`qa:refresh\` (\`qa-sweep:docs\`) produces; this root has no block-QA producer`;
   }
@@ -186,6 +212,24 @@ export function notApplicableReason(sweep: Pick<OrphanSweep, "examined">, facts:
 export function rootHasBlocks(root: string, contributedBuilders?: ReadonlyMap<string, string>): boolean {
   for (const _ of walkBlocks(root, { includeUnlabelled: true, verify: false, contributedBuilders })) return true;
   return false;
+}
+
+/**
+ * {@link SweepRootFacts.foreignInScopedRun} for a sweep of `root` in a run from
+ * `runRoot`: `undefined` when the run names no own layer
+ * (`gateOwnsFile` undefined) or the swept root is the run's own.
+ */
+export function scopedRunFacts(
+  root: string,
+  runRoot: string,
+  hasBlocks: (dir: string) => boolean,
+  // input-site: env CAT_GATE_OWN_PATHS,CAT_GATE_FOREIGN_PATHS #949cc29c — passed to gateOwnsFile and read for the own layer directories; the values are the whole of what they contribute
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): SweepRootFacts["foreignInScopedRun"] {
+  const swept = relative(runRoot, root) || ".";
+  if (gateOwnsFile(swept, env) !== false) return undefined;
+  const own = (env[GATE_OWN_PATHS_ENV] ?? "").split(",").map((x) => x.trim().replace(/^\.\/+/, "").replace(/\/+$/, "") || ".").filter(Boolean);
+  return { swept, own, ownWithBlocks: own.filter((d) => hasBlocks(join(runRoot, d))) };
 }
 
 if (import.meta.main) {
@@ -207,9 +251,10 @@ if (import.meta.main) {
     const { rootProfile } = await import("../scripts/lib/root-gate-set");
     const { resolve } = await import("node:path");
     const harnessFallbackInContentRoot = resolve(root) === resolve(HARNESS_ROOT) && rootProfile(contributionsRoot()) === "content";
+    const foreignInScopedRun = scopedRunFacts(root, process.cwd(), (d) => rootHasBlocks(d, contributions.contributedBuilders()));
     const na = notApplicableReason(
       sweep,
-      { harnessFallbackInContentRoot, hasBlocks: harnessFallbackInContentRoot || rootHasBlocks(root, contributions.contributedBuilders()) },
+      { harnessFallbackInContentRoot, foreignInScopedRun, hasBlocks: harnessFallbackInContentRoot || rootHasBlocks(root, contributions.contributedBuilders()) },
       root,
     );
     if (na !== undefined) exitNotApplicable("check:orphan-verdicts", na);

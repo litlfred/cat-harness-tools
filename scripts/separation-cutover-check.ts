@@ -28,7 +28,10 @@
  * only with `--site`; WITHOUT it the `site` condition is `not-run`, and a run
  * with a condition not run is not "complete" — exit 2. In an INSTANCE root
  * (the root declares its own instance) `site` is `not-applicable` without
- * `--site` instead, which does not block exit 0 (Q-NA-1 B).
+ * `--site` instead, which does not block exit 0 (Q-NA-1 B). The same holds
+ * for a run that names its own layers (`CAT_GATE_OWN_INSTANCES`, a layer's PR
+ * checks composed into the index): the root is the index, but the subject is
+ * the caller's layer, and it builds its own site in its own CI.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/separation-cutover-check.ts [--root <checkout>] [--site]
@@ -41,7 +44,7 @@ import { extname, join, relative, resolve } from "node:path";
 import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.js";
 
 import { checkDeclarationResolution } from "./check-declaration-resolution.ts";
-import { GATE_OWN_PATHS_ENV } from "./lib/gate-own.ts";
+import { GATE_OWN_PATHS_ENV, gateOwnInstances } from "./lib/gate-own.ts";
 import { analyse as importDirection } from "./check-import-direction.ts";
 import { analyse as referenceDirection } from "./check-reference-direction.ts";
 
@@ -76,8 +79,18 @@ export interface CutoverReport {
  * The layers a checkout TRACKS, by declared name. A remote mount is
  * gitignored, so a layer with no tracked file is a layer this repository
  * consumes rather than one it owns.
+ *
+ * A run that names its own layers (`CAT_GATE_OWN_INSTANCES`, `gate-own.ts`)
+ * is answered by that list instead. A layer's PR checks compose the platform
+ * index and run from ITS root, where the caller is a checkout of its own laid
+ * in, untracked by the index: read from the index's tracked files the caller
+ * was not own at all ("own instance(s): none", WHO smart-base#340), so every
+ * finding in it counted as a mounted layer's, never as the run's.
  */
-export function ownInstances(root: string): string[] {
+// input-site: env CAT_GATE_OWN_INSTANCES #7d4b0407 — passed to gateOwnInstances; the value is the whole of what it contributes
+export function ownInstances(root: string, env: Readonly<Record<string, string | undefined>> = process.env): string[] {
+  const named = gateOwnInstances(env);
+  if (named) return [...named].sort();
   const out: string[] = [];
   for (const r of layerRootsIn(root)) {
     const name = findDeclarationFile(r)?.replace(/\.json$/, "");
@@ -241,7 +254,8 @@ export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?:
   const root = resolve(rootArg);
   const decl = findDeclarationFile(root);
   const instance = decl?.replace(/\.json$/, "");
-  const own = new Set(ownInstances(root));
+  const named = gateOwnInstances(opts.env);
+  const own = new Set(ownInstances(root, opts.env));
   const conditions: ConditionResult[] = [];
 
   // mounts
@@ -321,7 +335,23 @@ export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?:
   }
 
   // site
-  if (!opts.site && instance !== undefined) {
+  if (!opts.site && named) {
+    // A layer's PR checks, composed into the index (WHO smart-base#340,
+    // run 45376498276): the root is the index, whose site is not this run's
+    // subject, and the subject is the caller's layer, which builds and
+    // publishes its own site in its own CI (and `check:site-iris` judges a
+    // site this run built, GATE_SITE). Not applicable without `--site`, the
+    // instance-root answer (Q-NA-1 B) for the same reason; `--site` still
+    // builds a root that declares an instance. Never a pass: the line says
+    // so, and an index run naming no own layer is still not-run.
+    conditions.push({
+      id: "site",
+      state: "not-applicable",
+      by: "build-instance-site --no-mount",
+      summary: `not applicable here: this run judges ${[...named].sort().join(", ")}, which build their own site in their own CI; pass --site to build the root's anyway`,
+      findings: [],
+    });
+  } else if (!opts.site && instance !== undefined) {
     // An instance root (smart-ips-pilgrimage, the root declaring its own
     // instance) is not the platform index this condition was written for:
     // its own CI builds and publishes its site. Without `--site` the

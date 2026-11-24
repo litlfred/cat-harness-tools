@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CONDITIONS, cutoverExitCode, judgedLayerDirs, monorepoPathFindings, monorepoPathsCondition, ownInstances, type CutoverReport } from "../separation-cutover-check.ts";
+import { CONDITIONS, checkCutover, cutoverExitCode, formatCutover, judgedLayerDirs, monorepoPathFindings, monorepoPathsCondition, ownInstances, type CutoverReport } from "../separation-cutover-check.ts";
 
 const made: string[] = [];
 afterAll(() => {
@@ -78,7 +78,50 @@ describe("ownInstances — what the repository tracks, as opposed to what it mou
     writeFileSync(join(root, ".gitignore"), "layer/\n");
     spawnSync("git", ["init", "-q"], { cwd: root });
     spawnSync("git", ["add", "-A"], { cwd: root });
-    expect(ownInstances(root).sort()).toEqual(["downstream", "tracked"]);
+    expect(ownInstances(root, {}).sort()).toEqual(["downstream", "tracked"]);
+  });
+
+  // WHO smart-base#340, run 45376498276: a layer's PR checks run from the
+  // index's root, where the caller is an untracked checkout of its own, so the
+  // tracked-file reading said "own instance(s): none".
+  test("a run that names its own layers (CAT_GATE_OWN_INSTANCES) is answered by them", () => {
+    const root = mkdtempSync(join(tmpdir(), "cutover-own-"));
+    made.push(root);
+    spawnSync("git", ["init", "-q"], { cwd: root });
+    expect(ownInstances(root, { CAT_GATE_OWN_INSTANCES: "smart-base, other" })).toEqual(["other", "smart-base"]);
+    expect(ownInstances(root, { CAT_GATE_OWN_INSTANCES: "" })).toEqual([]);
+  });
+});
+
+// The `site` condition in a layer-mode run (WHO smart-base#340): the root is
+// the index, which declares no instance, and the subject is the caller's layer.
+describe("site — a run that names its own layers", () => {
+  function indexRoot(): string {
+    const root = mkdtempSync(join(tmpdir(), "cutover-site-"));
+    made.push(root);
+    spawnSync("git", ["init", "-q"], { cwd: root });
+    return root;
+  }
+  const site = (r: CutoverReport) => r.conditions.find((c) => c.id === "site")!;
+
+  test("own layers named, no --site: not applicable, saying whose site it is — never a pass", () => {
+    const r = checkCutover(indexRoot(), { env: { CAT_GATE_OWN_INSTANCES: "smart-base", CAT_GATE_OWN_PATHS: "smart-base" } });
+    expect(r.instance).toBeUndefined();
+    expect(r.own).toEqual(["smart-base"]);
+    expect(site(r).state).toBe("not-applicable");
+    expect(site(r).summary).toContain("smart-base");
+    expect(formatCutover(r)).toContain("not applicable here");
+  });
+
+  test("no own layer named: the index's site is still not-run, exit 2", () => {
+    const r = checkCutover(indexRoot(), { env: {} });
+    expect(site(r).state).toBe("not-run");
+    expect(cutoverExitCode(r)).toBe(2);
+  });
+
+  test("own layers named WITH --site: the site is still asked for, and an index root has none to build", () => {
+    const r = checkCutover(indexRoot(), { site: true, env: { CAT_GATE_OWN_INSTANCES: "smart-base" } });
+    expect(site(r).state).toBe("could-not-determine");
   });
 });
 
