@@ -574,6 +574,21 @@ function stripInlineCode(line: string): string {
 }
 
 /**
+ * Remove `<…>` autolinks and inline tags until none is left. One pass can
+ * leave a token that two adjacent fragments rebuild (`<<a>b>` → `<b>`), so it
+ * repeats to a fixed point.
+ */
+function stripAngleTokens(line: string): string {
+  let prev: string;
+  let cur = line;
+  do {
+    prev = cur;
+    cur = cur.replace(/<[^>\s]+>/g, "");
+  } while (cur !== prev);
+  return cur;
+}
+
+/**
  * Direct LLM tells — phrases that should NEVER appear in published
  * scholarly prose. These produce few false-positives in practice;
  * any hit is a likely ai-slop violation.
@@ -964,8 +979,7 @@ export function checkScholarlyDefault(
         }
       }
 
-      const cleanedLine = stripInlineCode(lineNoMathOrUrls)
-        .replace(/<[^>\s]+>/g, "")
+      const cleanedLine = stripAngleTokens(stripInlineCode(lineNoMathOrUrls))
         .replace(/:(?:refterm|defterm)\[([^\]]*)\]\{#[^}]*\}/g, "$1");
 
       if (
