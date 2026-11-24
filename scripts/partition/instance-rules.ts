@@ -423,6 +423,7 @@ export const RULES: Rule[] = [
       "schemas/library/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
       "schemas/content/pinned-terminology.ts",       // declared-path-literal: a partition plan names modules by path. The pinned list shape the licence check reads (bean `7wou`)
       "schemas/sdlc/read-projections.ts",         // declared-path-literal: a partition plan names modules by path. Projected reads (#1291): layer discovery and the declaration walks report how they use a file
+      "schemas/sdlc/qa-axis.ts",                  // declared-path-literal: a partition plan names modules by path. The QA axes and an instance's `qa` declaration, read by the declaration schema itself; imports only zod
 
       "schemas/kg/property-skills.ts",          // declaration key → its edit skills (issue #1146)
       "schemas/kg/dependency-order.ts",         // the ONE resolve-then-walk: flatten, ancestors, conflicts (bean `a1lq`)
