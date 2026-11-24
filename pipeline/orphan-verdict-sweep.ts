@@ -63,8 +63,8 @@
  * A layer's PR checks compose the platform index and run from its root, naming
  * the caller's own layers (`CAT_GATE_OWN_PATHS`, `scripts/lib/gate-own.ts`).
  * The index declares no folio, so the sweep falls back to the harness layer —
- * a MOUNT, whose verdicts are its own CI's subject, not this run's (WHO
- * smart-base#340, run 45376498276: "examined 0 members" at
+ * a MOUNT, whose verdicts are its own CI's subject, not this run's (a DAK IG
+ * in layer mode, run 45376498276: "examined 0 members" at
  * `cat-harness/test/results/block-qa`). When the swept root is not one of the
  * run's own layers and none of the run's own layers holds a block, no verdict
  * this run could be asked about exists: exit 78. Fetching the mount's verdicts

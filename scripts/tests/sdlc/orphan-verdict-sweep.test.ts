@@ -181,25 +181,25 @@ describe("a root with no block-QA population", () => {
 });
 
 /**
- * A layer's PR checks, composed into the index (WHO smart-base#340, run
+ * A layer's PR checks, composed into the index (a DAK IG in layer mode, run
  * 45376498276): the sweep ran from the index root, fell back to the MOUNTED
  * harness layer and examined 0 verdicts. That mount is not the run's subject.
  */
 describe("a run that names its own layers (CAT_GATE_OWN_PATHS)", () => {
-  const env = { CAT_GATE_OWN_PATHS: "smart-base", CAT_GATE_FOREIGN_PATHS: "cat-harness,cat-harness-tools" };
+  const env = { CAT_GATE_OWN_PATHS: "the-caller", CAT_GATE_FOREIGN_PATHS: "cat-harness,cat-harness-tools" };
   const noBlocks = () => false;
 
   it("swept a mounted layer and the own layer holds no block: not applicable, naming both", () => {
     const facts = scopedRunFacts("/fa/cat-harness", "/fa", noBlocks, env);
-    expect(facts).toEqual({ swept: "cat-harness", own: ["smart-base"], ownWithBlocks: [] });
+    expect(facts).toEqual({ swept: "cat-harness", own: ["the-caller"], ownWithBlocks: [] });
     const why = notApplicableReason({ examined: 0 }, { hasBlocks: true, harnessFallbackInContentRoot: false, foreignInScopedRun: facts }, "/fa/cat-harness");
     expect(why).toContain("cat-harness");
-    expect(why).toContain("smart-base");
+    expect(why).toContain("the-caller");
   });
 
   it("an own layer holds blocks: NOT excused — its verdicts are this run's question and were not read", () => {
-    const facts = scopedRunFacts("/fa/cat-harness", "/fa", (d) => d === "/fa/smart-base", env);
-    expect(facts?.ownWithBlocks).toEqual(["smart-base"]);
+    const facts = scopedRunFacts("/fa/cat-harness", "/fa", (d) => d === "/fa/the-caller", env);
+    expect(facts?.ownWithBlocks).toEqual(["the-caller"]);
     expect(notApplicableReason({ examined: 0 }, { hasBlocks: true, harnessFallbackInContentRoot: false, foreignInScopedRun: facts }, "/fa/cat-harness")).toBeUndefined();
   });
 
@@ -209,7 +209,7 @@ describe("a run that names its own layers (CAT_GATE_OWN_PATHS)", () => {
   });
 
   it("the swept root is the run's own, or the run names no own layer: no excuse from this rule", () => {
-    expect(scopedRunFacts("/fa/smart-base", "/fa", noBlocks, env)).toBeUndefined();
+    expect(scopedRunFacts("/fa/the-caller", "/fa", noBlocks, env)).toBeUndefined();
     expect(scopedRunFacts("/fa/cat-harness", "/fa", noBlocks, {})).toBeUndefined();
     expect(notApplicableReason({ examined: 0 }, { hasBlocks: true, harnessFallbackInContentRoot: false }, "/fa/cat-harness")).toBeUndefined();
   });

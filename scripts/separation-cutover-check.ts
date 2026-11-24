@@ -84,7 +84,7 @@ export interface CutoverReport {
  * is answered by that list instead. A layer's PR checks compose the platform
  * index and run from ITS root, where the caller is a checkout of its own laid
  * in, untracked by the index: read from the index's tracked files the caller
- * was not own at all ("own instance(s): none", WHO smart-base#340), so every
+ * was not own at all ("own instance(s): none", a DAK IG in layer mode, run 45376498276), so every
  * finding in it counted as a mounted layer's, never as the run's.
  */
 // input-site: env CAT_GATE_OWN_INSTANCES #7d4b0407 — passed to gateOwnInstances; the value is the whole of what it contributes
@@ -336,7 +336,7 @@ export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?:
 
   // site
   if (!opts.site && named) {
-    // A layer's PR checks, composed into the index (WHO smart-base#340,
+    // A layer's PR checks, composed into the index (a DAK IG in layer mode,
     // run 45376498276): the root is the index, whose site is not this run's
     // subject, and the subject is the caller's layer, which builds and
     // publishes its own site in its own CI (and `check:site-iris` judges a

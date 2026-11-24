@@ -81,19 +81,19 @@ describe("ownInstances — what the repository tracks, as opposed to what it mou
     expect(ownInstances(root, {}).sort()).toEqual(["downstream", "tracked"]);
   });
 
-  // WHO smart-base#340, run 45376498276: a layer's PR checks run from the
+  // a DAK IG in layer mode, run 45376498276: a layer's PR checks run from the
   // index's root, where the caller is an untracked checkout of its own, so the
   // tracked-file reading said "own instance(s): none".
   test("a run that names its own layers (CAT_GATE_OWN_INSTANCES) is answered by them", () => {
     const root = mkdtempSync(join(tmpdir(), "cutover-own-"));
     made.push(root);
     spawnSync("git", ["init", "-q"], { cwd: root });
-    expect(ownInstances(root, { CAT_GATE_OWN_INSTANCES: "smart-base, other" })).toEqual(["other", "smart-base"]);
+    expect(ownInstances(root, { CAT_GATE_OWN_INSTANCES: "the-caller, other" })).toEqual(["other", "the-caller"]);
     expect(ownInstances(root, { CAT_GATE_OWN_INSTANCES: "" })).toEqual([]);
   });
 });
 
-// The `site` condition in a layer-mode run (WHO smart-base#340): the root is
+// The `site` condition in a layer-mode run (a DAK IG in layer mode, run 45376498276): the root is
 // the index, which declares no instance, and the subject is the caller's layer.
 describe("site — a run that names its own layers", () => {
   function indexRoot(): string {
@@ -105,11 +105,11 @@ describe("site — a run that names its own layers", () => {
   const site = (r: CutoverReport) => r.conditions.find((c) => c.id === "site")!;
 
   test("own layers named, no --site: not applicable, saying whose site it is — never a pass", () => {
-    const r = checkCutover(indexRoot(), { env: { CAT_GATE_OWN_INSTANCES: "smart-base", CAT_GATE_OWN_PATHS: "smart-base" } });
+    const r = checkCutover(indexRoot(), { env: { CAT_GATE_OWN_INSTANCES: "the-caller", CAT_GATE_OWN_PATHS: "the-caller" } });
     expect(r.instance).toBeUndefined();
-    expect(r.own).toEqual(["smart-base"]);
+    expect(r.own).toEqual(["the-caller"]);
     expect(site(r).state).toBe("not-applicable");
-    expect(site(r).summary).toContain("smart-base");
+    expect(site(r).summary).toContain("the-caller");
     expect(formatCutover(r)).toContain("not applicable here");
   });
 
@@ -120,7 +120,7 @@ describe("site — a run that names its own layers", () => {
   });
 
   test("own layers named WITH --site: the site is still asked for, and an index root has none to build", () => {
-    const r = checkCutover(indexRoot(), { site: true, env: { CAT_GATE_OWN_INSTANCES: "smart-base" } });
+    const r = checkCutover(indexRoot(), { site: true, env: { CAT_GATE_OWN_INSTANCES: "the-caller" } });
     expect(site(r).state).toBe("could-not-determine");
   });
 });
