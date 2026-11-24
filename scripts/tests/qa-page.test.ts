@@ -118,7 +118,9 @@ async function runScript(answers: Array<[string, unknown | number]>, decl?: QaDe
   const document = { querySelectorAll: () => [box], createElement: (t: string) => node(t), createTextNode: (t: string) => ({ t, kids: [] }) };
   const fetch = async (u: string) => {
     urls.push(u);
-    const hit = answers.find(([k]) => u.includes(k));
+    // A key that is a whole origin matches by host, never as a substring of
+    // the URL; any other key is a path fragment of the entry.
+    const hit = answers.find(([k]) => (/^https:\/\/[^/]+$/.test(k) ? new URL(u).origin === k : u.includes(k)));
     const v = hit?.[1] ?? 404;
     return typeof v === "number" ? { ok: false, status: v, json: async () => ({}) } : { ok: true, status: 200, json: async () => v };
   };
@@ -153,7 +155,7 @@ describe("the page script", () => {
   test("one tile per axis from the listing alone: no tree API call, other roots ignored", async () => {
     const r = await runScript([[`main/${MOUNT.ref}/manifest.json`, MANIFEST]]);
     const t = r.text();
-    expect(r.urls.some((u) => u.includes("api.github.com"))).toBe(false);
+    expect(r.urls.some((u) => new URL(u).hostname === "api.github.com")).toBe(false);
     expect(r.urls).toHaveLength(1);
     expect(t).toContain("Knowledge graph fail 2 records: 1 fail · 0 unknown · 1 pass · 2 n/a");
     expect(t).toContain("Rendering warn 1 record: 1 warn · 4 pass");
@@ -195,7 +197,7 @@ describe("the page script", () => {
   test("an entry with no listing falls back to the tree listing, and says so", async () => {
     const r = await runScript([
       [`main/${MOUNT.ref}/manifest.json`, { written_at: "x" }],
-      ["api.github.com", { tree: [{ type: "blob", path: "kg-qa/tools/a.kg-qa.json" }] }],
+      ["https://api.github.com", { tree: [{ type: "blob", path: "kg-qa/tools/a.kg-qa.json" }] }],
     ]);
     expect(r.text()).toContain("predates the published listing");
     expect(r.text()).toContain("Knowledge graph unknown 1 record: 1 not counted");
