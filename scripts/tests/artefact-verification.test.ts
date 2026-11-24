@@ -7,13 +7,13 @@
  * while the page it generated could not run (PR #805).
  */
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { deriveArtefactChecks, deriveUncheckedGenerators, report } from "../check-artefact-verification.ts";
+import { deriveArtefactChecks, deriveUncheckedGenerators, mountedLayers, partialScriptTable, report } from "../check-artefact-verification.ts";
 
 function repo(scripts: Record<string, string>, files: Record<string, string> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "artefact-"));
@@ -113,10 +113,78 @@ describe("a checkout holding part of the declared table", () => {
     expect(r.undeclared).toEqual(["new:check"]);
   });
 
+  // A FHIR IG judged with no base: a composed CONTENT root mounts only the layers it
+  // needs, so a check whose declaring layer it lacks is absent, not stale.
+  test("which roots hold a partial table: an own declaration, or a content root; the harness index does not", () => {
+    const content = mkdtempSync(join(tmpdir(), "artefact-partial-"));
+    writeFileSync(join(content, "index.config.json"), "{}");
+    expect(partialScriptTable(content)).toContain("content root");
+
+    const own = mkdtempSync(join(tmpdir(), "artefact-partial-"));
+    writeFileSync(join(own, "acme.json"), JSON.stringify({ name: "acme", directories: [] }));
+    expect(partialScriptTable(own)).toContain("acme.json");
+
+    const harness = mkdtempSync(join(tmpdir(), "artefact-partial-"));
+    mkdirSync(join(harness, ".github", "workflows"), { recursive: true });
+    writeFileSync(join(harness, ".github", "workflows", "code-quality-gates.yml"), "name: gates\n");
+    expect(partialScriptTable(harness)).toBeUndefined();
+  });
+
   test("without a partial table the same entry is stale, as before", () => {
     const r = report(checks, d, []);
     expect(r.stale).toEqual(["index-only:check"]);
     expect(r.excusedStale).toEqual([]);
+  });
+});
+
+// A no-base layer-mode run: the composed harness index is a HARNESS
+// root, so its table is judged whole, yet it mounts one caller at a time and
+// none of the content layers that declare check:figures, check:as-drawn or
+// check:l1-coverage. Those read stale there; `declaredBy` names their layers.
+describe("a check only content layers declare", () => {
+  const checks = [{ check: "a:check", script: "a.ts", classification: "no-parsing" as const }];
+  const d = {
+    _comment: "",
+    verified: { "a:check": "x", "folio:figures": "y" },
+    none: { "gone:check": "reason" },
+    declaredBy: { "folio:figures": ["folio-a", "folio-b"] },
+  };
+
+  test("is absent, not stale, where none of its declaring layers is mounted", () => {
+    const r = report(checks, d, [], undefined, new Set(["cat-harness", "acme-ig"]));
+    expect(r.notMounted).toEqual(["folio:figures"]);
+    expect(r.stale).toEqual(["gone:check"]);
+  });
+
+  test("is stale where a declaring layer is mounted and the check is gone", () => {
+    const r = report(checks, d, [], undefined, new Set(["folio-b"]));
+    expect(r.stale).toEqual(["folio:figures", "gone:check"]);
+    expect(r.notMounted).toEqual([]);
+  });
+
+  test("unknown mounts excuse nothing", () => {
+    expect(report(checks, d, []).stale).toEqual(["folio:figures", "gone:check"]);
+  });
+
+  test("the mounted layers are read off the declarations at the root", () => {
+    const root = mkdtempSync(join(tmpdir(), "artefact-mounted-"));
+    mkdirSync(join(root, "acme"));
+    writeFileSync(join(root, "acme", "acme.json"), JSON.stringify({ name: "acme", directories: [] }));
+    mkdirSync(join(root, "plain"));
+    expect([...mountedLayers(root)]).toEqual(["acme"]);
+  });
+
+  test("the REAL declaration: each `declaredBy` entry is a declared check naming at least one layer", () => {
+    const real = JSON.parse(readFileSync(join(import.meta.dir, "..", "artefact-verification.json"), "utf-8")) as {
+      verified: Record<string, string>;
+      none: Record<string, string>;
+      declaredBy?: Record<string, string[]>;
+    };
+    for (const [check, layers] of Object.entries(real.declaredBy ?? {})) {
+      expect(Object.hasOwn(real.verified, check) || Object.hasOwn(real.none, check)).toBe(true);
+      expect(layers.length).toBeGreaterThan(0);
+    }
+    expect(Object.keys(real.declaredBy ?? {})).toContain("check:figures");
   });
 });
 

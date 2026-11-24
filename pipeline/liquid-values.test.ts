@@ -32,6 +32,14 @@ beforeAll(() => {
     join(demo, "computations", "codata-masses.witness.json"),
     JSON.stringify({ commitSha: "abc123", scriptHash: "def456", data: { m_e_MeV: "0.51099895069" } }),
   );
+  mkdirSync(join(demo, "computations", "qbeta", "deep"), { recursive: true });
+  writeFileSync(join(demo, "computations", "qbeta", "probe-x.witness.json"), JSON.stringify({ data: { v: "1.25" } }));
+  writeFileSync(join(demo, "computations", "qbeta", "deep", "probe-y.witness.json"), JSON.stringify({ data: { v: "2.5" } }));
+  // A flat witness named like a subdirectory: the flat file must still win,
+  // so no address that resolved before the subdirectory walk changes file.
+  mkdirSync(join(demo, "computations", "shadow"), { recursive: true });
+  writeFileSync(join(demo, "computations", "shadow.witness.json"), JSON.stringify({ data: { v: "flat" } }));
+  writeFileSync(join(demo, "computations", "shadow", "data.witness.json"), JSON.stringify({ v: "nested" }));
   mkdirSync(join(demo, "stray"), { recursive: true });
   writeFileSync(join(demo, "stray", "x.witness.json"), JSON.stringify({ data: { v: 1 } }));
   writeDeclaration(demo, {
@@ -63,6 +71,24 @@ describe("addressing", () => {
       commitSha: "abc123",
       scriptHash: "def456",
     });
+  });
+
+  test("a witness in a SUBDIRECTORY of a declared directory resolves (qou-h59j)", () => {
+    const r = resolveKey("demo.computations.qbeta.probe-x.data.v", scope);
+    expect(r.state === "resolved" && r.text).toBe("1.25");
+    if (r.state === "resolved") expect(r.provenance.file).toBe("demo/computations/qbeta/probe-x.witness.json");
+    const deep = resolveKey("demo.computations.qbeta.deep.probe-y.data.v", scope);
+    expect(deep.state === "resolved" && deep.text).toBe("2.5");
+  });
+
+  test("a flat entry shadowing a subdirectory name still resolves to the flat file", () => {
+    const r = resolveKey("demo.computations.shadow.data.v", scope);
+    expect(r.state === "resolved" && r.text).toBe("flat");
+  });
+
+  test("a subdirectory with no such entry is unresolved, not a crash", () => {
+    expect(resolveKey("demo.computations.qbeta.nope.data.v", scope).state).toBe("unresolved");
+    expect(resolveKey("demo.computations.qbeta.probe-x", scope).state).toBe("unresolved");
   });
 
   test("a declaration scalar resolves: {{ demo.version }}", () => {

@@ -27,13 +27,13 @@
  * what it has and says what it lacks, never a hard-coded stand-in.
  */
 import { escHtml } from "../thin-page.ts";
-import { journeyById, lookup, processName, type JourneyCorpus } from "./read.ts";
+import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
 import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, TOOL_ID, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
 import { scheduleFor, scheduleGlanceHtml } from "./schedule.ts";
-import { annexOf, canvasFormHtml, canvasModel, canvasSummaryItems, type AnnexQuestion } from "./canvas-form.ts";
+import { annexOf, canvasFormHtml, canvasModel, canvasSummaryItems, type AnnexQuestion, type CanvasAppendix, type CanvasAppendixBox } from "./canvas-form.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import {
   avatar,
@@ -494,12 +494,59 @@ function canvasForm(p: Presentation, a: At, ids?: readonly string[]): string {
   })}</div>`;
 }
 
-/** The button that writes the canvas out as an editable, pre-filled PDF, and (once a page) the model it writes from. */
-function canvasPdf(p: Presentation, withModel = true): string {
+/**
+ * What the canvas PDF appends after the sheets (owner, 2026-11-19: "the PDF
+ * export should also append the BPMN, architecture views. if they labeled them
+ * w/ their country systems they should use those"): the application
+ * components How it works lets the table mark and name, the architecture
+ * panel, every ArchiMate view How it works shows, and the drawing of every
+ * process the taught steps are carried out by, written beside the discussion
+ * (`discuss/figures/`) for the button to fetch. The PDF writer swaps in the
+ * table's own names (`assets/canvas-pdf.js`).
+ */
+export function pdfAppendix(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): { data?: CanvasAppendix; files: PageFile[] } {
+  const w = p.w.workshop;
+  if (!w.canvas) return { files: [] };
+  const a = at(1, links);
+  const pr = w.presentation ?? {};
+  const box = (x: ArchimateElementLink): CanvasAppendixBox => ({ name: x.name, ...(x.type === MARKABLE ? { slug: elementSlug(x) } : {}) });
+  const systems = markableElements(p, links).map((x) => ({ name: x.name, slug: elementSlug(x), have: elementKey(w.id, x, "have"), local: elementKey(w.id, x, "name") }));
+  const ap = pr.architecture ? links.archimateArchitecture?.(p.w.instance, pr.architecture) : undefined;
+  const panel = ap
+    ? {
+        title: pr.architecture!.title ?? "Architecture: the countries on one trust foundation",
+        countries: ap.countries.map((c) => c.name),
+        rows: ap.rows.map((r) => ({ layer: r.layer.name, cells: r.cells.map((c) => c.map(box)) })),
+        ...(ap.shared ? { shared: { group: ap.shared.group.name, members: ap.shared.members.map(box) } } : {}),
+      }
+    : undefined;
+  const figures: CanvasAppendix["figures"] = [];
+  const files: PageFile[] = [];
+  for (const v of viewsOf(p)) {
+    const t = links.archimateView?.(v.instance, v.model, v.view);
+    if (t) figures.push({ kind: "archimate", title: v.label ?? t.name, src: a.siteRoot + t.svg });
+  }
+  const seen = new Set<string>();
+  for (const s of p.steps)
+    for (const r of s.step.realisedBy ?? []) {
+      const k = `${s.journey.instance}\0${r.process}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const d = processDrawing(corpus, s.journey.instance, r.process);
+      if (!d) continue;
+      const path = `figures/process-${files.length + 1}.svg`;
+      files.push({ path: `discuss/${path}`, content: d.svg });
+      figures.push({ kind: "bpmn", title: processName(corpus, s.journey.instance, r.process) ?? r.process, src: path });
+    }
+  return { data: { systems, ...(panel ? { panel } : {}), figures }, files };
+}
+
+/** The button that writes the canvas out as an editable, pre-filled PDF, and (once a page) the model it writes from, with its appendix. */
+function canvasPdf(p: Presentation, withModel = true, appendix?: CanvasAppendix): string {
   const ws = p.w.workshop;
   if (!ws.canvas) return "";
-  const model = canvasModel(ws.id, ws.canvas, journeyQuestions(p), ws.assessment?.scales[0]?.options);
-  return `<div class="jp-cv-pdf jp-noprint"><button type="button" class="jp-btn-dark" data-jp-canvas-pdf>${icon("file")} Download the ${e(ws.canvas.title)} (editable PDF, ${e(ws.canvas.size ?? "A3")})</button><span class="jp-small">Filled in with this browser’s answers; every field stays editable in a PDF reader.</span>${withModel ? `<script type="application/json" data-jp-canvas-model>${jsonInHtml(model)}</script>` : ""}</div>`;
+  const model = { ...canvasModel(ws.id, ws.canvas, journeyQuestions(p), ws.assessment?.scales[0]?.options), ...(appendix ? { appendix } : {}) };
+  return `<div class="jp-cv-pdf jp-noprint"><button type="button" class="jp-btn-dark" data-jp-canvas-pdf>${icon("file")} Download the ${e(ws.canvas.title)} (editable PDF, ${e(ws.canvas.size ?? "A3")})</button><span class="jp-small">Filled in with this browser’s answers; every field stays editable in a PDF reader.${appendix?.figures.length || appendix?.systems.length ? " After the sheets: our systems, the architecture, the ArchiMate views and the business processes, with every application component under the name we gave it on How it works." : ""}</span>${withModel ? `<script type="application/json" data-jp-canvas-model>${jsonInHtml(model)}</script>` : ""}</div>`;
 }
 
 /** The discussion's head: the gap report's script, the sheets' styles when it carries the Table sheets, and the canvas PDF writer when the workshop has a canvas. */
@@ -556,7 +603,7 @@ ${cards ? `<div class="jp-dqs">${cards}</div>` : ""}
 ${ws.promise ? `<section class="jp-promise"><b>The scope promise.</b> ${e(ws.promise)}</section>` : ""}
 ${byModule ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("message", "jp-indigo")} The journey’s questions, module by module</h3><div class="jp-dms">${byModule}</div></section>` : ""}
 ${tables}
-${ws.canvas ? `<section class="jp-card jp-pad jp-cv-wrap" id="canvas"><h3 class="jp-h">${icon("clipboard", "jp-indigo")} ${e(ws.canvas.title)}</h3>${ws.canvas.description ? `<p class="jp-small">${e(ws.canvas.description)}</p>` : ""}${canvasPdf(p)}${canvasForm(p, a)}</section>` : ""}
+${ws.canvas ? `<section class="jp-card jp-pad jp-cv-wrap" id="canvas"><h3 class="jp-h">${icon("clipboard", "jp-indigo")} ${e(ws.canvas.title)}</h3>${ws.canvas.description ? `<p class="jp-small">${e(ws.canvas.description)}</p>` : ""}${canvasPdf(p, true, pdfAppendix(corpus, p, links).data)}${canvasForm(p, a)}</section>` : ""}
 ${gap}
 ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}
 ${sheetsPanel(corpus, p)}`;
@@ -577,6 +624,8 @@ export interface LabSummaryItem {
   value?: string;
   /** The heading a choice is counted under ("Governance"). */
   group?: string;
+  /** A choice shown on its own line with the option chosen (a canvas answer), not counted. */
+  each?: true;
 }
 export interface LabSummarySection {
   id: string;
@@ -627,6 +676,7 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
   const scales = ws.assessment?.scales ?? [];
   const summary: LabSummarySection[] = [];
   const useCaseText = labUseCaseText(p, lab);
+  const appendix = pdfAppendix(corpus, p, links).data;
   const model = gapReportModel(p, (s) => walkHref(a, s));
 
   const radios = (name: string, options: { id: string; label: string }[], label: string, more = false) =>
@@ -700,7 +750,7 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
       for (const g of canvasSummaryItems(ws.id, ws.canvas, scales[0]?.options)) if (st.canvas.includes(g.sheet.id)) items.push(...g.items);
       const qs = journeyQuestions(p);
       for (const sh of ws.canvas.sheets.filter((x) => st.canvas!.includes(x.id))) for (const q of annexOf(sh, qs, ws.canvas)) items.push({ label: `${q.step} · ${q.text}`, name: q.key, type: "text" });
-      out.push(canvasPdf(p, st.id === lab.steps.find((x) => x.canvas?.length)?.id), canvasForm(p, a, st.canvas));
+      out.push(canvasPdf(p, st.id === lab.steps.find((x) => x.canvas?.length)?.id, appendix), canvasForm(p, a, st.canvas));
     }
     if (st.matrix) out.push(matrixHtml(corpus, p, a, mod));
     for (const m of st.modules ?? []) {
@@ -754,7 +804,7 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
     });
   }
   const takeaways = p.steps.filter((s) => s.step.policy);
-  const summaryBody = `${canvasPdf(p, !lab.steps.some((x) => x.canvas?.length))}<div class="jp-lab-sum-act jp-noprint"><button type="button" class="jp-btn-line" data-jp-lab-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-lab-csv>${icon("file")} Download CSV</button></div>
+  const summaryBody = `${canvasPdf(p, !lab.steps.some((x) => x.canvas?.length), appendix)}<div class="jp-lab-sum-act jp-noprint"><button type="button" class="jp-btn-line" data-jp-lab-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-lab-csv>${icon("file")} Download CSV</button></div>
 <p class="jp-small">Assembled from every step, <b>in this browser only</b>: nothing is sent anywhere.</p>
 <script type="application/json" data-jp-lab-model>${jsonInHtml(summary)}</script>
 <div class="jp-lab-sum" data-jp-lab-summary></div>
@@ -1093,6 +1143,7 @@ export function renderViewPages(corpus: JourneyCorpus, p: Presentation, links: S
   const cat = catalogueOf(corpus, p);
   for (const b of cat?.blocks.keys() ?? []) out.push({ path: `how/${b}/index.html`, content: howPage(corpus, p, links, b) });
   out.push({ path: "discuss/index.html", content: discussPage(corpus, p, links) });
+  out.push(...pdfAppendix(corpus, p, links).files);
   if (hasSheets(p)) {
     // The sheets are a panel of the discussion (owner, 2026-11-17); the old address redirects to it.
     for (const f of canvasFiles(canvasOf(corpus, p.w))) out.push({ path: `discuss/${f.path}`, content: f.content });

@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { landingMountedNotOwned } from "../lib/mounted-landing.ts";
+import { landingMountedNotOwned, landingNotTheCallers } from "../lib/mounted-landing.ts";
 
 const made: string[] = [];
 afterAll(() => {
@@ -43,5 +43,24 @@ describe("landingMountedNotOwned", () => {
     expect(landingMountedNotOwned(checkout("folio", lock), "who-iris")).toBeUndefined();
     expect(landingMountedNotOwned(checkout("folio", "{ bad"), "smart-base")).toBeUndefined();
     expect(landingMountedNotOwned(checkout("folio", lock), undefined)).toBeUndefined();
+  });
+});
+
+// A FHIR IG judged with no base: in layer mode the checks compose the
+// platform index, whose landing is one of its own layers, not the caller's.
+describe("landingNotTheCallers", () => {
+  const own = (v: string) => ({ CAT_GATE_OWN_INSTANCES: v });
+  test("a run naming its own layers, the landing not among them: not applicable", () => {
+    expect(landingNotTheCallers("index-landing", own("the-caller"))).toContain("judged by its own CI");
+  });
+  test("the landing is the caller's own: judged", () => {
+    expect(landingNotTheCallers("the-caller", own("the-caller,its-sibling"))).toBeUndefined();
+  });
+  test("a run naming no own layers (local, the index's own gates): judged as before", () => {
+    expect(landingNotTheCallers("index-landing", {})).toBeUndefined();
+    expect(landingNotTheCallers("index-landing", own(" , "))).toBeUndefined();
+  });
+  test("no instance landing: nothing to excuse", () => {
+    expect(landingNotTheCallers(undefined, own("the-caller"))).toBeUndefined();
   });
 });

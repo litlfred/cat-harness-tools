@@ -43,7 +43,7 @@ import { screenExamples } from "../../schemas/process/device-screen.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
 import { blockFor, fromSite, journeyById, lookup, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
-import { artifactPage, DAK_ATTR, dakGroups, linkedProcessDrawing, type DakGroup } from "./dak-links.ts";
+import { artifactPage, DAK_ATTR, dakGroups, linkedProcessDrawing, processActorsLine, type DakGroup } from "./dak-links.ts";
 import {
   bpmnFigure,
   childrenOf,
@@ -1134,7 +1134,8 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted` : " · the whole process"}`;
       const vw = d ? viewBoxWidth(d.svg) : undefined;
       const panel = links.processPanel?.(s.journey.instance, r.process);
-      const fig = d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite)).replace("<figure ", `<figure${vw ? ` style="--vw:${vw}px"` : ""} `) : "";
+      const actors = processActorsLine(corpus, pr, s.journey.instance, r.process, siteRoot);
+      const fig = d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite), actors).replace("<figure ", `<figure${vw ? ` style="--vw:${vw}px"` : ""} `) : "";
       return `<div class="jp-box jp-proc">${head}${d ? `${zoom}${fig}` : `<p class="jp-small jp-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`}</div>`;
     })
     .join("");

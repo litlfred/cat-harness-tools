@@ -9,6 +9,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  backwardPins,
   formatReport,
   mainReading,
   newFailureCounts,
@@ -111,10 +112,23 @@ describe("reading 3: the latest main push", () => {
     expect(mainReading(runs)).toEqual({ sha: "new", verdict: "green" });
   });
   test("red names the failed workflow; a running one is pending", () => {
-    expect(mainReading([run({ id: 1, name: "Main QA", head_sha: "a", conclusion: "failure" })]).verdict).toBe("red: Main QA");
-    expect(mainReading([run({ id: 1, name: "Main QA", head_sha: "a", status: "in_progress", conclusion: null })]).verdict).toBe(
+    expect(mainReading([run({ id: 1, name: "Main QA", event: "push", head_sha: "a", conclusion: "failure" })]).verdict).toBe("red: Main QA");
+    expect(mainReading([run({ id: 1, name: "Main QA", event: "push", head_sha: "a", status: "in_progress", conclusion: null })]).verdict).toBe(
       "pending: Main QA",
     );
+  });
+  // litlfred/smart-base#454: the reading the standing re-pin shares. A
+  // cancelled run is no verdict (layer-main-qa: "nothing is touched"), and a
+  // run on main's sha that is not a push (a Merge guard workflow_run) is not
+  // main's verdict.
+  test("a cancelled run, or a run that is not a push, does not make main red", () => {
+    const runs = [
+      run({ id: 1, workflow_id: 1, name: "PR checks", event: "push", head_sha: "a", conclusion: "success", created_at: minutesAgo(30) }),
+      run({ id: 2, workflow_id: 2, name: "Merge guard", event: "workflow_run", head_sha: "a", conclusion: "cancelled", created_at: minutesAgo(20) }),
+      run({ id: 3, workflow_id: 3, name: "Release", event: "push", head_sha: "a", conclusion: "cancelled", created_at: minutesAgo(25) }),
+    ];
+    expect(mainReading(runs)).toEqual({ sha: "a", verdict: "green" });
+    expect(mainReading([runs[2]!]).verdict).toBe("pending: every push run on it was cancelled");
   });
 });
 
@@ -444,5 +458,18 @@ describe("the labelled queue (--queue)", () => {
   test("--queue is a flag of the CLI, beside --json", () => {
     expect(parseArgs(["--queue", "--repo", "o/a", "--json"])).toMatchObject({ queue: true, json: true, repos: ["o/a"] });
     expect(parseArgs(["--repo", "o/a"]).queue).toBe(false);
+  });
+});
+
+describe("a PR that moves a pin backwards is flagged (smart-base#454)", () => {
+  const ch = (instance: string, from: string | null, sha: string) => ({ instance, repository: `litlfred/${instance}`, sha, from });
+  // `isAncestor(repo, a, b)`: a is an ancestor of b.
+  const anc = (pairs: Record<string, boolean | undefined>) => (_r: string, a: string, b: string) => pairs[`${a}<${b}`];
+  test("a new sha that is an ancestor of the old one is backwards; forward, new and unreadable are not", () => {
+    const back = backwardPins(
+      [ch("who-iris", "bc7e", "1ae6"), ch("cat-harness-tools", "286f", "6e99"), ch("added", null, "aaaa"), ch("unknown", "x", "y")],
+      anc({ "1ae6<bc7e": true, "6e99<286f": false }),
+    );
+    expect(back.map((p) => p.instance)).toEqual(["who-iris"]);
   });
 });

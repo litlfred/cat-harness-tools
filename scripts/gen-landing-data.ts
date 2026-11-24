@@ -43,7 +43,7 @@ import { readLandingStickies } from "./ensure-landing-sticky.js";
 import { isExternalLink } from "../schemas/content/landing-sticky.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { landingMountedNotOwned } from "./lib/mounted-landing.ts";
+import { landingMountedNotOwned, landingNotTheCallers } from "./lib/mounted-landing.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /**
@@ -132,7 +132,8 @@ const check = process.argv.includes("--check");
 // the committed-currency check is not applicable there. The writer still runs.
 if (check) {
   const landing = resolveLandingInstance(CHECKOUT);
-  const why = landingMountedNotOwned(CHECKOUT, landing.kind === "instance" ? landing.name : undefined);
+  const landingName = landing.kind === "instance" ? landing.name : undefined;
+  const why = landingMountedNotOwned(CHECKOUT, landingName) ?? landingNotTheCallers(landingName);
   if (why !== undefined) exitNotApplicable("landing:data:check", why);
   // A layer that declares the file `builtAtPublish` (owner, 2026-11-13, "3y":
   // generated at publish, not committed) has no committed copy to judge; the

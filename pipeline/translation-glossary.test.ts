@@ -391,8 +391,15 @@ describe("the CLI: one finding per line, exit 0 / 1 / 2", () => {
     expect(r.out).toContain("✗ fr override «Immunization»: who fixes «Vaccination»");
     expect(r.code).toBe(1);
   });
-  test("cannot determine: an undeclared instance, or an unknown locale, exits 2", () => {
-    expect(run(["--check", "--instance", acme("cli-bare", false)], base).code).toBe(2);
+  test("not applicable: an instance that declares no translation-sources directory exits 78", () => {
+    const r = run(["--check", "--instance", acme("cli-bare", false)], base);
+    expect(r.code).toBe(78);
+    expect(r.out).toContain("NOT APPLICABLE");
+  });
+  test("cannot determine: a declared translations directory not on disk, or an unknown locale, exits 2", () => {
+    const gone = acme("cli-gone");
+    rmSync(join(gone, "translations"), { recursive: true, force: true });
+    expect(run(["--check", "--instance", gone], base).code).toBe(2);
     expect(run(["--check", "--instance", acme("cli-loc"), "--locale", "xx"], base).code).toBe(2);
   });
   test("a layer the instance needs is not on disk: exits 2, naming it, rather than judging its glossary as the instance's own", () => {
