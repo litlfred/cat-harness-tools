@@ -577,6 +577,7 @@
     "qa:fetch": "bun run cat-harness-tools/scripts/qa-store.ts fetch",
     "qa:prune": "bun run cat-harness-tools/scripts/qa-store.ts prune",
     "qa:publish": "bun run cat-harness-tools/scripts/qa-store.ts publish",
+    "qa:page:standalone": "bun run cat-harness-tools/scripts/qa-page-standalone.ts",
     "qa:working-copy": "bun run cat-harness-tools/scripts/qa-working-copy.ts",
     "qa:verify-moved": "bun run cat-harness-tools/scripts/qa-verify-moved.ts",
     "raci": "bun run cat-harness-tools/scripts/raci-chart.ts",
