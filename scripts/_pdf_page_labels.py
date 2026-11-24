@@ -36,7 +36,11 @@ from typing import NamedTuple
 from _pdf_headings import Line
 
 ROMAN = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
-RE_ROMAN = re.compile(r"^(?=[ivxlcdm]+$)m{0,3}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$", re.I)
+# `re.ASCII`: under Unicode case folding `re.I` lets the Turkish dotless `ı`
+# (U+0131) match `i`, and `roman_to_int` then raised `KeyError: 'ı'` at
+# `ROMAN[a]` and took the whole page-label pass down with it (#2324,
+# arXiv:1904.12095v2).
+RE_ROMAN = re.compile(r"^(?=[ivxlcdm]+$)m{0,3}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$", re.I | re.ASCII)
 
 
 def roman_to_int(s: str) -> int | None:
@@ -100,10 +104,13 @@ def pdf_labels(path: str) -> dict[int, str]:
 
 # ---------------------------------------------------------------- source 2: printed numbers
 
+# The roman class is case-sensitive and spelled in both cases, for the same `ı`
+# as `RE_ROMAN` (#2324). Not `re.ASCII` on the whole pattern: that would also
+# narrow `\s`, and a folio set between non-breaking spaces would stop matching.
 # A page-number token, alone on its line or at either end of a running head:
 # "12", "- 12 -", "Page 12", "p. 12", "12 of 40", "xii", "Chapter 3 | 41".
 RE_FOLIO_ALONE = re.compile(
-    r"^[\s\-–—|•·]*(?:page\s+|p\.\s*)?(?P<n>\d{1,4}|[ivxlcdm]{1,8})(?:\s+of\s+\d{1,4})?[\s\-–—|•·]*$", re.I)
+    r"^[\s\-–—|•·]*(?:page\s+|p\.\s*)?(?P<n>\d{1,4}|(?-i:[ivxlcdmIVXLCDM]{1,8}))(?:\s+of\s+\d{1,4})?[\s\-–—|•·]*$", re.I)
 RE_FOLIO_EDGE = re.compile(r"^(?P<a>\d{1,4})\s*[|•·]\s+\S|\S\s+[|•·]\s*(?P<b>\d{1,4})$")
 # Top/bottom share of the page searched for folios. 9% missed arXiv/LaTeX
 # folios set at 9.1% from the edge (2508.21620v2, 2607.20636v1).
