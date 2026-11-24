@@ -86,6 +86,7 @@ import { findContentRepoRoot } from "./repo-root";
 import { awaitingRebase, awaitingRebaseNote, serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
+import { NarrativeSlotSchema } from "../schemas/content/narrative.ts";
 import type { ImagesSidecar } from "../schemas/content/document-image.ts";
 import { VECTOR_FIGURES_FILE, type VectorFigure, type VectorFiguresSidecar } from "../schemas/content/vector-figure.ts";
 import { buildTabularNodes, tableBlockId, tabularShapeOf } from "./tabular-nodes.ts";
@@ -899,6 +900,38 @@ function node(doc: Record<string, unknown>, subgraphStart?: string): string {
   return `${JSON.stringify(clean, null, 2)}\n`;
 }
 
+/**
+ * Keep the document's narrative across a regeneration.
+ *
+ * `manifest.jsonld` is one of the narrative-bearing files
+ * (`scripts/narratives.ts`): its top-level `narrative` is the account of the
+ * whole document, drafted and confirmed through `bun run cat narratives`
+ * exactly as an image description is. Nothing derives it, so a rebuild that
+ * wrote the manifest from the structure alone deleted every one, confirmed
+ * ones included. The narrative on disk is carried into the new manifest after
+ * `provenance`, unchanged, when it is a well-formed slot; a malformed one is
+ * left out, and `check:l1-complete`'s `narrative-review` reports the file that
+ * still holds it.
+ */
+export function carryManifestNarrative(
+  files: Array<{ path: string; content: string }>,
+  previous: Record<string, unknown> | undefined,
+): void {
+  if (!previous || !("narrative" in previous)) return;
+  if (!NarrativeSlotSchema.safeParse(previous.narrative).success) return;
+  const at = files.findIndex((f) => f.path === "manifest.jsonld");
+  if (at < 0) return;
+  const doc = JSON.parse(files[at]!.content) as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(doc)) {
+    if (k === "narrative") continue;
+    out[k] = v;
+    if (k === "provenance") out.narrative = previous.narrative;
+  }
+  if (!("narrative" in out)) out.narrative = previous.narrative;
+  files[at] = { path: "manifest.jsonld", content: `${JSON.stringify(out, null, 2)}\n` };
+}
+
 function readJson<T>(path: string): T | undefined {
   if (!existsSync(path)) return undefined;
   try {
@@ -1158,6 +1191,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
     if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance, subgraphStart));
+    carryManifestNarrative(files, readJson<Record<string, unknown>>(join(dir, "manifest.jsonld")));
     return { state: "built", rung, files };
   }
 

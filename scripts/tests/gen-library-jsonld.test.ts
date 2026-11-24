@@ -34,6 +34,7 @@ import {
   libraryInstanceOf,
   libraryEntriesIn,
   unknownArgument,
+  carryManifestNarrative,
 } from "../../pipeline/gen-library-jsonld";
 import { CONTENT_CONTEXT } from "../../schemas/kg/jsonld.ts";
 import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
@@ -938,5 +939,38 @@ describe("tables transcribed from a paged entry's pages are blocks (who-iris#224
     expect(block).toBeDefined();
     expect(JSON.parse(block!.content).narrative).toEqual(narrative);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("a regeneration keeps the document's narrative", () => {
+  const generated = () => [
+    { path: "manifest.jsonld", content: `${JSON.stringify({ "@id": "m", title: "T", provenance: "ingested", meta: {} }, null, 2)}\n` },
+    { path: "sections/sec-000.jsonld", content: "{}\n" },
+  ];
+  const narrative = [
+    {
+      text: "A brief.\n\nThe extended summary.",
+      lang: "en",
+      state: "draft",
+      drafted_by: { kind: "script", id: "scripts/summarize-library.py" },
+    },
+  ];
+
+  test("the manifest on disk's narrative is carried, after provenance, unchanged", () => {
+    const files = generated();
+    carryManifestNarrative(files, { "@id": "m", narrative });
+    const doc = JSON.parse(files[0]!.content);
+    expect(doc.narrative).toEqual(narrative);
+    expect(Object.keys(doc)).toEqual(["@id", "title", "provenance", "narrative", "meta"]);
+    expect(files[1]!.content).toBe("{}\n");
+  });
+
+  test("no narrative on disk, or a malformed one, changes nothing", () => {
+    for (const previous of [undefined, { "@id": "m" }, { narrative: { text: "bare", state: "draft" } }]) {
+      const files = generated();
+      const before = files[0]!.content;
+      carryManifestNarrative(files, previous as Record<string, unknown> | undefined);
+      expect(files[0]!.content).toBe(before);
+    }
   });
 });
