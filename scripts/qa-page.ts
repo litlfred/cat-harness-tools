@@ -411,6 +411,7 @@ export const QA_PAGE_JS = String.raw`(function () {
     }
     var tiles = el("ul", null, "sv-qa-tiles");
     box.appendChild(tiles);
+    var secs = [];
     for (i = 0; i < names.length; i++) {
       var gr = groups[names[i]];
       var t = cfg.titles[gr.axis] || { title: gr.axis === "unclassified" ? "Unclassified" : gr.axis, about: gr.axis === "unclassified" ? "Records no writer, format or path places on an axis." : "" };
@@ -424,8 +425,17 @@ export const QA_PAGE_JS = String.raw`(function () {
       a.appendChild(el("span", countsText(gr.counts, gr.recs.length, gr.uncounted), "sv-qa-tile-c"));
       li.appendChild(a);
       tiles.appendChild(li);
+      // A tile opens its section as well as jumping to it; the browser fires "toggle".
+      secs.push(section(src, hit, gr));
+      a.addEventListener("click", opener(secs[secs.length - 1]));
     }
-    for (i = 0; i < names.length; i++) box.appendChild(section(src, hit, groups[names[i]]));
+    for (i = 0; i < secs.length; i++) box.appendChild(secs[i]);
+  }
+
+  function opener(d) {
+    return function () {
+      d.open = true;
+    };
   }
 
   /** One axis: a summary line, and its table drawn on first open. */
