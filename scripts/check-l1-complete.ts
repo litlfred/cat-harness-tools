@@ -215,7 +215,11 @@ export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "record
 // `transcript/` is a recording's transcripts, one file per language (bean `1r0p`).
 // `figure-data/` is a figure transcribed as data for a redrawing (owner, 2026-10-31).
 // `tables/` is the CSV files of tables transcribed from a PDF's pages, named by `tabular.csvw.json` (who-iris#224).
-export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR, TABULAR_TABLES_DIR];
+// `source/` is an arXiv paper's LaTeX source: `arxiv-source.py` writes
+// `<entry>/source/` (`e-print`, `source.json`, the unpacked `files/`) and
+// `latex-math-overlay.py` reads it from there. The arm's own output was
+// reported as a stray (measured on qou 2026-11-24: 521 entries).
+export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", "source", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR, TABULAR_TABLES_DIR];
 
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
