@@ -500,6 +500,9 @@ jobs:
       # The fast tier's advisory verdict, `green` or `red`; empty on the full
       # tier (header, "ADVISORY FAST TIER").
       fast-verdict: ${{ steps.fast-verdict.outputs.verdict }}
+      # `true` when the PR was merged or closed as this run started, so its
+      # merge ref is gone and nothing was judged (cat-harness-tools#2391).
+      gone: ${{ steps.pr-open.outputs.gone == 'true' || steps.pr-open-late.outputs.gone == 'true' }}
     steps:
       # ---- Which tier (the PR's live labels) ----
       # Which tier this run is, from the PR's labels AS THEY ARE NOW (owner, card
@@ -934,10 +937,36 @@ jobs:
           path: ${{ runner.temp }}/judged
           retention-days: 7
           overwrite: true
+      # ---- Is the PR still open? (cat-harness-tools#2391) ----
+      # A `pull_request` run checks out `refs/pull/N/merge`, which GitHub
+      # deletes once the PR merges or closes. A run that starts as the PR
+      # merges (the merge flow's own label and ready-for-review events) then
+      # failed red at the checkout and judged nothing (WHO dth-phc run
+      # 44031440302: started 06:28:15Z, merged 06:28:16Z). `pr-gone.py` asks
+      # the API. Gone sets GONE: the checkouts and every later step of this
+      # job are skipped (`skip-prep`), and compare, prepare-base, layers-ref
+      # and lock-coherence report nothing to judge. Open, or unread, changes
+      # nothing. A checkout of the merge ref that fails anyway is asked again
+      # below (`pr-open-late`): gone is the same skip, open stays a failure.
+      - name: Is the PR still open?
+        id: pr-open
+        if: github.event_name == 'pull_request' && env.SIDE == 'head'
+        continue-on-error: true  # unread is open: the run goes on as before
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          script=ci/.github/scripts/layer-pr-checks/pr-gone.py
+          if [ ! -f "$script" ]; then echo "judging scripts without pr-gone.py: taken as open"; echo "gone=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          python3 -I "$script"
       - &checkout-index
-        continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
+        # On the PR side a failure is judged by `pr-open-late` below: a PR
+        # merged meanwhile is skipped, an open one still fails the job.
+        continue-on-error: ${{ steps.tier.outputs.full == 'false' || (github.event_name == 'pull_request' && env.SIDE == 'head') }}
         id: fa-checkout-index
         name: Check out the root (the folio-assistant index, or the caller in index mode)
+        if: env.GONE != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || format('{0}/folio-assistant', env.HARNESS_OWNER) }}
@@ -1002,14 +1031,29 @@ jobs:
         with:
           bun-version: 1.4.4
       - &caller
-        continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
+        continue-on-error: ${{ steps.tier.outputs.full == 'false' || (github.event_name == 'pull_request' && env.SIDE == 'head') }}
         id: fa-caller
         name: Check out the caller
-        if: inputs.mode == 'layer'
+        if: inputs.mode == 'layer' && env.GONE != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
           fetch-depth: 2
+      # A checkout of the PR side failed: merged or closed since the step
+      # above asked is the same skip; open (or unread) fails the job here, as
+      # the checkout itself did before (cat-harness-tools#2391).
+      - name: Is the PR still open? (a checkout failed)
+        id: pr-open-late
+        if: github.event_name == 'pull_request' && env.SIDE == 'head' && env.GONE != 'true' && (steps.fa-checkout-index.outcome == 'failure' || steps.fa-caller.outcome == 'failure')
+        continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          script=ci/.github/scripts/layer-pr-checks/pr-gone.py
+          if [ ! -f "$script" ]; then echo "::error::a checkout of the PR side failed (judging scripts without pr-gone.py)"; exit 1; fi
+          python3 -I "$script" --late
       # Layer mode mounts the folio-assistant index's lock, never the
       # caller's own, so a PR that changes only the caller's pins
       # (`index.lock.json`, `index.config.json`) changes nothing these checks
@@ -1019,7 +1063,7 @@ jobs:
         continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
         name: Does this PR change only the caller's own pins?
         id: lock-only
-        if: inputs.mode == 'layer'
+        if: inputs.mode == 'layer' && env.GONE != 'true'
         run: |
           set -euo pipefail
           skip=false
@@ -1040,7 +1084,7 @@ jobs:
         continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
         name: Does this PR change only the quick-lane paths?
         id: quick
-        if: inputs.mode == 'layer' && inputs.quick-paths != '' && github.event_name == 'pull_request'
+        if: inputs.mode == 'layer' && inputs.quick-paths != '' && github.event_name == 'pull_request' && env.GONE != 'true'
         env:
           PATHS: ${{ inputs.quick-paths }}
           TEST: ${{ inputs.quick-test }}
@@ -1110,7 +1154,7 @@ jobs:
       - name: Is there anything to prepare?
         continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
         id: skip-prep
-        run: echo "hit=${{ steps.lock-only.outputs.skip == 'true' || env.REUSED == 'true' }}" >> "$GITHUB_OUTPUT"
+        run: echo "hit=${{ steps.lock-only.outputs.skip == 'true' || env.REUSED == 'true' || env.GONE == 'true' }}" >> "$GITHUB_OUTPUT"
       - name: Keep the caller's git checkout aside, for the README report
         continue-on-error: ${{ steps.tier.outputs.full == 'false' }}
         id: fa-caller-git-aside
@@ -1769,16 +1813,25 @@ jobs:
           QUICK: ${{ steps.quick.outputs.quick == 'true' }}
           TESTS: ${{ steps.quick-test.outcome }}
           TYPECHECK: ${{ steps.tsc.outcome }}
+          GONE: ${{ steps.pr-open.outputs.gone == 'true' || steps.pr-open-late.outputs.gone == 'true' }}
+          STATE: ${{ steps.pr-open-late.outputs.state || steps.pr-open.outputs.state }}
         run: |
           say() { echo "$1"; echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
           red=()
           echo "### Fast tier only (advisory; the full checks gate a release)" >> "$GITHUB_STEP_SUMMARY"
+          # Merged or closed as this run started (cat-harness-tools#2391): its
+          # merge ref is gone, nothing was prepared, and nothing is judged.
+          if [ "$GONE" = "true" ]; then
+            echo "verdict=green" >> "$GITHUB_OUTPUT"
+            say "SKIPPED — the PR was ${STATE:-closed} as this run started: its merge ref is gone, so there is nothing to judge."
+            exit 0
+          fi
           # The steps that went red under the fast tier's continue-on-error.
           # The typecheck, the quick-lane tests and the lock pins are named
           # below; the tier step and the never-a-gate records are not read.
           [ -n "${STEPS:-}" ] || STEPS='{}'
           failed="$(printf '%s' "$STEPS" | python3 -Ic 'import json,sys
-          skip = {"tier", "lock-coherence", "judged-key", "tsc", "quick-test", "fast-verdict"}
+          skip = {"tier", "lock-coherence", "judged-key", "tsc", "quick-test", "fast-verdict", "pr-open"}
           d = json.load(sys.stdin)
           print(" ".join(k for k, v in d.items() if k not in skip and isinstance(v, dict) and v.get("outcome") == "failure"))' 2>/dev/null)" || failed="(the steps could not be read)"
           prepared="$PREPARED"
@@ -1821,7 +1874,7 @@ jobs:
     # 2026-11-13, "A. Collapse into one job"). A push has no prepare-head and
     # is always the full tier.
     needs: [prepare-head]
-    if: ${{ !cancelled() && needs.prepare-head.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview') && (github.event_name == 'push' || needs.prepare-head.outputs.full == 'true') }}
+    if: ${{ !cancelled() && needs.prepare-head.outputs.reuse != 'true' && needs.prepare-head.outputs.gone != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview') && (github.event_name == 'push' || needs.prepare-head.outputs.full == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -2632,8 +2685,14 @@ jobs:
           QUICK: ${{ needs.prepare-head.outputs.quick == 'true' }}
           REUSED: ${{ needs.prepare-head.result == 'success' && needs.prepare-head.outputs.reuse == 'true' }}
           REUSED_RUN: ${{ needs.prepare-head.outputs.run-url }}
+          GONE: ${{ needs.prepare-head.result == 'success' && needs.prepare-head.outputs.gone == 'true' }}
         run: |
-          if [ "$REUSED" = "true" ]; then
+          if [ "$GONE" = "true" ]; then
+            # cat-harness-tools#2391: merged or closed as the run started.
+            msg="SKIPPED — the PR was merged or closed as this run started: its merge ref is gone, so there is nothing to judge."
+            echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "only=true" >> "$GITHUB_OUTPUT"
+          elif [ "$REUSED" = "true" ]; then
             msg="SKIPPED — already passed as judged in run $REUSED_RUN (same head, base and pins; marked ready for review)."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             echo "only=true" >> "$GITHUB_OUTPUT"
@@ -3120,7 +3179,9 @@ jobs:
   layers-ref:
     name: Layers cache ref for a re-pinned lock
     needs: [prepare-head]
-    if: ${{ !cancelled() && inputs.mode == 'index' && github.event_name == 'pull_request' }}
+    # Not for a PR merged or closed as the run started: its checkout below
+    # is the merge ref, which is gone (cat-harness-tools#2391).
+    if: ${{ !cancelled() && inputs.mode == 'index' && github.event_name == 'pull_request' && needs.prepare-head.outputs.gone != 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -3211,7 +3272,7 @@ jobs:
   lock-coherence:
     name: Lock pins agree with each other and are at main
     needs: [prepare-head]
-    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.prepare-head.outputs.lock-coherence != 'success' && needs.prepare-head.outputs.full != 'false' }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.prepare-head.outputs.lock-coherence != 'success' && needs.prepare-head.outputs.full != 'false' && needs.prepare-head.outputs.gone != 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

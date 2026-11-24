@@ -209,13 +209,19 @@ describe("the advisory fast tier", () => {
   // Steps whose red never failed the job (`continue-on-error: true` before
   // this rule), and the lock step, which the lock-coherence job reports.
   const ALWAYS = new Set(["true", "${{ github.job == 'prepare-head' }}"]);
+  // The two checkouts of the PR side's merge ref also continue on a PR's
+  // full tier: `pr-open-late` then judges the failure, skipping a PR merged
+  // meanwhile and failing the job for an open one (cat-harness-tools#2391).
+  const PR_SIDE_COE = "${{ steps.tier.outputs.full == 'false' || (github.event_name == 'pull_request' && env.SIDE == 'head') }}";
+  const PR_SIDE_CHECKOUTS = new Set(["fa-checkout-index", "fa-caller"]);
 
   test("every prepare-head step after the tier is continue-on-error on the fast tier only", () => {
     const after = head.slice(1, -1);
     expect(after.length).toBeGreaterThan(40);
     for (const s of after) {
       const coe = String(s["continue-on-error"] ?? "");
-      expect(coe === FAST_COE || ALWAYS.has(coe), `${s.id ?? s.name}: ${coe}`).toBe(true);
+      const pr = PR_SIDE_CHECKOUTS.has(s.id ?? "") && coe === PR_SIDE_COE;
+      expect(coe === FAST_COE || ALWAYS.has(coe) || pr, `${s.id ?? s.name}: ${coe}`).toBe(true);
     }
     // The tier step itself and the verdict are never continue-on-error.
     expect(head[0]!["continue-on-error"]).toBeUndefined();
