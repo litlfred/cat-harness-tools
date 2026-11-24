@@ -22,17 +22,16 @@ function out of that file by path, and the separate spelling inside `ocr_pages`
 right instinct and the wrong mechanism. Underscore-prefixed because a module with
 a hyphen cannot be imported; same reason as `scripts/_pypdf_compat.py`.
 
-## Why `pdf-ocr` can compute the doc-id without reading the PDF
+## Why `pdf-ocr` asks the PDF too
 
 {@link derive_doc_id} returns `arxiv-<id>[v<n>]` when arXiv metadata is present,
-and the basename slug otherwise. The arXiv id is found by regex over **page one's
-extracted text** — so it requires a usable text layer, and the ABSENCE of one is
-the precondition for running OCR at all. For every document `pdf-ocr` is ever
-used on, the doc-id is therefore the basename slug, reachable from the filename
-alone with no `pypdf` dependency and no metadata pass.
-
-That is a measured property, not a convenience, and it is why `meta` is optional
-here rather than required.
+and the basename slug otherwise. This docstring used to argue that `pdf-ocr`
+could skip the PDF, since OCR runs only where there is no usable text layer and
+so no stamp to find. That was wrong (#2326): a text layer can be unusable for
+the body (mojibake) and still carry the arXiv stamp in the margin. `9901120v3.pdf`
+is the case: the plan named it `arxiv-math-9901120v3` from page one and chose an
+OCR rung, and the OCR staged under `9901120v3/`. So {@link doc_dir} (and the OCR
+cache paths built on it) asks the PDF whenever it is given no `meta`.
 """
 from __future__ import annotations
 
@@ -137,8 +136,15 @@ def derive_doc_id(path: str, meta: dict[str, Any] | None = None) -> str:
 
 
 def doc_dir(root: str, path: str, meta: dict[str, Any] | None = None) -> str:
-    """`root/<doc-id>` — what `-o` means, in EVERY script that takes it."""
-    return os.path.join(root, derive_doc_id(path, meta))
+    """`root/<doc-id>` — what `-o` means, in EVERY script that takes it.
+
+    With no `meta` the PDF is asked ({@link derive_doc_id_from_pdf}), the same
+    question `ingest-document.ts` `bibSlug()` asks when it names the entry.
+    `derive_doc_id(path)` alone answered the file stem, so an arXiv PDF routed
+    to an OCR rung staged under `9901120v3/` while the plan expected
+    `arxiv-math-9901120v3/`, and `--promote` found no structure.json (#2326).
+    """
+    return os.path.join(root, derive_doc_id(path, meta) if meta else derive_doc_id_from_pdf(path))
 
 
 def ocr_cache_dir(root: str, path: str, meta: dict[str, Any] | None = None) -> str:
