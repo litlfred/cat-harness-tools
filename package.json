@@ -131,6 +131,7 @@
     "ajv": "^6.15.0",
     "bun-types": "latest",
     "eslint": "^10.8.0",
+    "happy-dom": "^21.0.4",
     "playwright": "1.63.0",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.66.0",
