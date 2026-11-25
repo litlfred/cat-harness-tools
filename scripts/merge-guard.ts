@@ -1279,8 +1279,13 @@ export const SHARD = /(?:shard |, )(\d+)\/(\d+)\b/i;
  * and some without it, as `needs.<job>.outputs.full == 'false' && '…' || '…'`
  * (dth-hrh#133, 2026-11-14: a run cancelled before its tier was decided). The
  * run that followed it was green, and this cancelled one kept check 5 red.
+ * A name written over `github.event…` reaches the API the same way, bare
+ * (folio-assistant-sci#222, 2026-11-25: `(github.event_name == 'pull_request'
+ * && !contains(github.event.pull_request.labels.*.name, 'release')) && '…' ||
+ * '…'`, cancelled by the next run on the head), so that form is template text
+ * too.
  */
-const UNRENDERED = /\$\{\{|\bneeds\.[\w-]+\.outputs\./;
+const UNRENDERED = /\$\{\{|\bneeds\.[\w-]+\.outputs\.|\bgithub\.event(?:_name\b|\.)/;
 
 function judgedNothing(c: GhCheckRun): boolean {
   return c.conclusion === "skipped" || UNRENDERED.test(c.name);
