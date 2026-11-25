@@ -1312,6 +1312,14 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
     expect(ci(s).status).toBe("pass");
   });
 
+  test("a cancelled judge whose bare name is written over `github.event…` judged nothing (folio-assistant-sci#222)", () => {
+    const s = real(1960);
+    // a407fce on folio-assistant-sci#222, 2026-11-25: cancelled by the next run on the head, then the green one.
+    const bare = "checks / (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)'";
+    s.checkRuns = [cr(bare, "completed", "cancelled"), cr(`checks / ${JUDGE}`, "completed", "success"), cr(`checks / ${SHARD_RAN}`, "completed", "success")];
+    expect(ci(s).status).toBe("pass");
+  });
+
   test("a green judge with every test shard skipped is the fast tier (#2103's real head): not-ready", () => {
     const s = real(1960);
     // ad8dff8 on #2103, 2026-11-13: pr-tests.yml's fast tier.
