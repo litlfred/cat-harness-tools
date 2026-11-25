@@ -33,7 +33,8 @@ import {
   ArchiveContentsSchema,
   isArchiveMimetype,
 } from "../schemas/library/archive-contents.ts";
-import { LIBRARY_BLOCK_ORIGIN, ProvenanceSchema, isIngested } from "../schemas/content/attribution.ts";
+import { ProvenanceSchema, isIngested, libraryOriginOf, type DeclaredLibraryOrigin } from "../schemas/content/attribution.ts";
+import { blockKindNode } from "../schemas/content/block-kinds.ts";
 import { NarrativeSlotSchema, narrativesOfSlot, type NarrativeSlot } from "../schemas/content/narrative.ts";
 import { STRUCTURE_FILENAME, structureOf } from "../schemas/content/document-structure.ts";
 import {
@@ -214,7 +215,11 @@ export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "record
 // `transcript/` is a recording's transcripts, one file per language (bean `1r0p`).
 // `figure-data/` is a figure transcribed as data for a redrawing (owner, 2026-10-31).
 // `tables/` is the CSV files of tables transcribed from a PDF's pages, named by `tabular.csvw.json` (who-iris#224).
-export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR, TABULAR_TABLES_DIR];
+// `source/` is an arXiv paper's LaTeX source: `arxiv-source.py` writes
+// `<entry>/source/` (`e-print`, `source.json`, the unpacked `files/`) and
+// `latex-math-overlay.py` reads it from there. The arm's own output was
+// reported as a stray (measured on qou 2026-11-24: 521 entries).
+export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", "source", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR, TABULAR_TABLES_DIR];
 
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
@@ -728,6 +733,14 @@ export function sourceBlockOf(dir: string): Record<string, unknown> | undefined 
   return undefined;
 }
 
+/**
+ * The `libraryOrigin` a kind's own block-kind node declares — the kinds a
+ * higher layer owns (a paper's `lemma`, `remark`, ...), found by
+ * `block-kinds.ts`'s discovery of every layer's declared `block-kinds` graph.
+ */
+export const nodeLibraryOrigin: DeclaredLibraryOrigin = (kind) => blockKindNode(kind)?.libraryOrigin;
+const declaredOrigin = nodeLibraryOrigin;
+
 function derivableRequirements(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): Requirement[] {
   const out: Requirement[] = [];
   const has = (p: string) => existsSync(join(dir, p));
@@ -1215,10 +1228,13 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
           continue;
         }
         const kind = typeof b.kind === "string" ? b.kind : "";
-        const origin = LIBRARY_BLOCK_ORIGIN[kind];
+        const origin = libraryOriginOf(kind, declaredOrigin);
         if (origin === undefined) {
           unclassified++;
-          bad.push(`${f}: kind \`${kind || "(absent)"}\` is not classified in LIBRARY_BLOCK_ORIGIN`);
+          bad.push(
+            `${f}: kind \`${kind || "(absent)"}\` is not classified in LIBRARY_BLOCK_ORIGIN ` +
+              `or by a \`libraryOrigin\` on its block-kind node`,
+          );
           continue;
         }
         if (!ProvenanceSchema.safeParse(b.provenance).success) {

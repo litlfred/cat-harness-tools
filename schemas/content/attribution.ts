@@ -193,7 +193,26 @@ export const LIBRARY_BLOCK_ORIGIN: Record<string, "extracted" | "authored"> = {
   indicator: "extracted",
 };
 
+/** What a layer's block-kind node says about the kind's library origin, if anything. */
+export type DeclaredLibraryOrigin = (kind: string) => "extracted" | "authored" | undefined;
+
+/**
+ * How a library block of this kind came to be: {@link LIBRARY_BLOCK_ORIGIN}
+ * first, then the `libraryOrigin` the kind's OWN block-kind node declares
+ * (`folio-block-kind/v1`, read through `declared`). `undefined` when neither
+ * classifies it.
+ *
+ * The table names the kinds this layer's own arms write. A kind a higher
+ * layer owns — a paper's `lemma`, `theorem`, `remark` — is classified on that
+ * layer's node, which `block-kinds.ts` discovers, so this layer does not have
+ * to name it and the dependency runs downwards only. The table wins where both
+ * speak, so a node cannot reclassify a kind this layer's arms produce.
+ */
+export function libraryOriginOf(kind: string, declared?: DeclaredLibraryOrigin): "extracted" | "authored" | undefined {
+  return LIBRARY_BLOCK_ORIGIN[kind] ?? declared?.(kind);
+}
+
 /** True when blocks of this kind are somebody's account rather than the source's text. */
-export function isNarrativeKind(kind: string): boolean {
-  return LIBRARY_BLOCK_ORIGIN[kind] === "authored";
+export function isNarrativeKind(kind: string, declared?: DeclaredLibraryOrigin): boolean {
+  return libraryOriginOf(kind, declared) === "authored";
 }
