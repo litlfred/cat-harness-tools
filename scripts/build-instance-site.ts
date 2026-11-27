@@ -990,6 +990,58 @@ export function linkedDataSteps(tools: string, instance: string, site: string): 
 }
 
 /**
+ * The layer's OWN graph document and Tool documents, at the IRIs it mints,
+ * when this site is the layer's own canonical site (cat-harness-tools#638,
+ * phase 2 for the layer's own site).
+ *
+ * A layer that declares its own `canonicalUrl` mints its document at
+ * `<canonicalUrl>/<stub>.jsonld` and each Tool at `<canonicalUrl>/tools/<id>.jsonld`
+ * (`publishedIdentity`, `toolIri`), and the tools page links both (owner,
+ * 2026-11-13: "link existing IRIs"). Until this step nothing wrote them on the
+ * layer's own site: `instance-exports.ts` stages an own-canonical layer's copy
+ * under `<name>/` with `--served-at`, and only when `site.build.rootIndex` is
+ * on. Measured on qou 2026-11-24: 1,470 links from `en/cat-harness/tools/` to
+ * `https://litlfred.github.io/qou/tools/<id>.jsonld` and `…/qou/qou.jsonld`,
+ * none served, so a `links: refuse` build refused.
+ *
+ * So the IRIs stay as minted and the site serves them: `kg-export` with no
+ * `--base-url` (the layer mints against its own canonical, as the deploy does
+ * for it) and `--out` at the document's own path, which also writes each Tool
+ * document beside it. Undefined unless the declaration names a `canonicalUrl`
+ * equal to `siteAddress` (the site's own address, `selfAddressOf`): on any
+ * other site those IRIs belong to another site, and writing them here would
+ * claim documents this site does not own.
+ */
+export function ownDocumentStep(
+  tools: string,
+  root: string,
+  declFile: string,
+  docPath: string,
+  site: string,
+  siteAddress: string,
+): { label: string; argv: string[]; out: string; qaRoot: string } | undefined {
+  let canonical: unknown;
+  try {
+    canonical = (JSON.parse(readFileSync(join(root, declFile), "utf-8")) as { canonicalUrl?: unknown }).canonicalUrl;
+  } catch {
+    return undefined;
+  }
+  if (typeof canonical !== "string" || canonical === "") return undefined;
+  const norm = (u: string): string => u.replace(/\/+$/, "").toLowerCase();
+  if (norm(canonical) !== norm(siteAddress)) return undefined;
+  if (docPath === "" || docPath.startsWith("/") || docPath.split("/").includes("..") || !docPath.endsWith(".jsonld")) return undefined;
+  const instanceDir = dirname(declFile) === "." ? "." : `./${dirname(declFile)}`;
+  const out = join(site, ...docPath.split("/"));
+  const qaRoot = join(tmpdir(), `own-document-qa-${process.pid}`);
+  return {
+    label: "own graph document and Tool documents",
+    argv: ["run", join(tools, "kg-export.ts"), "--instance", instanceDir, "--scope", "instance", "--out", out, "--qa-root", qaRoot],
+    out,
+    qaRoot,
+  };
+}
+
+/**
  * The QA step that holds a built site to the IRIs it mints (IRI fix 1A, f):
  * `check:site-iris` over the tree, against the layer's declared `iriBase`.
  * The tree has the same layout wherever it is uploaded (main, or a preview
@@ -1407,6 +1459,19 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // After every page writer, so the documents never shadow a page; before the
     // guards below, which see the documents as part of the site.
     if (o.rootIndex) run("graph documents and root index", `bun run ${TOOLS}/publish-root-index.ts --site ${s} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}`)}`, root);
+    // A layer on its own canonical site: its document and Tool documents at the IRIs it
+    // mints, which the tools page links (cat-harness-tools#638). Before the IRI check and
+    // the link check, which see them as part of the site.
+    if (declared && declFile !== undefined) {
+      const { publishedIdentity } = await import("./kg-export.ts");
+      const docPath = publishedIdentity(join(root, dirname(declFile))).docPath;
+      const st = ownDocumentStep(TOOLS, root, declFile, docPath, site, selfAddressOf(gh.owner, gh.repo));
+      if (st !== undefined) {
+        // The `.json` alias beside it, as instance-exports writes: Pages serves `.jsonld` as octet-stream.
+        if (softRun(st.label, st.argv, root) && existsSync(st.out)) copyFileSync(st.out, st.out.replace(/\.jsonld$/, ".json"));
+        rmSync(st.qaRoot, { recursive: true, force: true });
+      }
+    }
     // Every declared layer's site: the IRIs it mints resolve on it (IRI fix 1A, f).
     const iriBase = declFile === undefined ? undefined : declaredIriBase(join(root, declFile));
     if (iriBase !== undefined) {

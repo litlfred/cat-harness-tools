@@ -25,8 +25,10 @@ import {
   attributionOf,
   isIngested,
   isNarrativeKind,
+  libraryOriginOf,
 } from "../../schemas/content/attribution.ts";
-import { checkAll, checkEntry } from "../check-l1-complete.ts";
+import { BlockKindNodeSchema } from "../../schemas/kg/block-kind-node.ts";
+import { checkAll, checkEntry, nodeLibraryOrigin } from "../check-l1-complete.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -129,7 +131,9 @@ describe("the origin registry is total over what actually exists", () => {
       if (typeof k === "string") kinds.add(k);
     }
     expect(kinds.size).toBeGreaterThan(0);
-    for (const k of kinds) expect(LIBRARY_BLOCK_ORIGIN[k]).toBeDefined();
+    // The table, or the kind's own block-kind node (`libraryOrigin`) for a
+    // kind a higher layer owns: either classifies it; neither does not.
+    for (const k of kinds) expect(`${k}: ${libraryOriginOf(k, nodeLibraryOrigin) ?? "unclassified"}`).not.toContain("unclassified");
   });
 
   test("today's corpus is all extracted, and that is a determined answer", () => {
@@ -271,5 +275,40 @@ describe("MODEL_NOT_DISCLOSED — the declared non-identifier (owner, 2026-09-30
   test("model stays REQUIRED for an agent: not-disclosed is an answer, silence is not", async () => {
     const { AttributionSchema } = await import("../../schemas/content/attribution.ts");
     expect(AttributionSchema.safeParse({ kind: "agent", id: "a", session: "s" }).success).toBe(false);
+  });
+});
+
+describe("a kind a higher layer owns is classified on its own block-kind node", () => {
+  const node = (kind: string, libraryOrigin?: string) =>
+    BlockKindNodeSchema.safeParse({
+      $schema: "folio-block-kind/v1",
+      kind,
+      adapter: "mathpaper",
+      labelPrefix: "lem",
+      folioType: "x:Lemma",
+      ...(libraryOrigin === undefined ? {} : { libraryOrigin }),
+    });
+
+  test("`libraryOrigin` is a field of the node, and only its two values", () => {
+    expect(node("lemma", "extracted").success).toBe(true);
+    expect(node("lemma", "authored").success).toBe(true);
+    expect(node("lemma").success).toBe(true);
+    expect(node("lemma", "ingested").success).toBe(false);
+  });
+
+  test("the table first, then the node; neither is unclassified", () => {
+    const declared = (k: string) => (k === "lemma" ? ("extracted" as const) : k === "prose" ? ("authored" as const) : undefined);
+    expect(libraryOriginOf("lemma", declared)).toBe("extracted");
+    expect(libraryOriginOf("lemma")).toBeUndefined();
+    // A node cannot reclassify a kind this layer's own arms write.
+    expect(libraryOriginOf("prose", declared)).toBe(LIBRARY_BLOCK_ORIGIN.prose);
+    expect(libraryOriginOf("no-such-kind", declared)).toBeUndefined();
+    expect(isNarrativeKind("lemma", () => "authored")).toBe(true);
+  });
+
+  test("an ingested block whose kind no table or node classifies is UNMET, and says where to classify it", () => {
+    const r = provState(entryWith("no-such-kind-xyz", INGESTED));
+    expect(r?.state).toBe("unmet");
+    expect(r?.detail).toContain("libraryOrigin");
   });
 });

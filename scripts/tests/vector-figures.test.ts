@@ -236,6 +236,12 @@ describe("the entry may carry the arm's outputs", () => {
     expect(ENTRY_DIRECTORIES).toContain("sheets");
     expect(ENTRY_DIRECTORIES).toContain("figure-data");
     expect(ENTRY_DIRECTORIES).toContain("tables");
+    // The arXiv LaTeX source arm's own directory: read its name from the arm,
+    // so a rename there cannot leave this list behind.
+    const arm = readFileSync(join(import.meta.dir, "..", "arxiv-source.py"), "utf-8");
+    const dirname = /^SOURCE_DIRNAME = "([^"]+)"/m.exec(arm)?.[1];
+    expect(dirname).toBe("source");
+    expect(ENTRY_DIRECTORIES).toContain(dirname!);
   });
 });
 
