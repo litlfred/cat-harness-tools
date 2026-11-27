@@ -681,6 +681,17 @@ export function parseMergeMainDispatches(text: string): string[] | undefined {
   return files.length > 0 && files.every((f) => /^[\w.-]+\.ya?ml$/.test(f)) ? files : undefined;
 }
 
+/**
+ * The merged PRs that spent a branch: those that merged it INTO `BASE`. A PR
+ * that merged `BASE` into some feature branch (a "get main" sync, e.g. qou#408,
+ * main -> claude/nf-transition-projection-aZ3MH) does not make `BASE` a branch
+ * that "lands nowhere anyone reads"; counting it refused every PR into main of
+ * any repository that ever had such a sync PR.
+ */
+export function spentAsHeadOf(closed: { number: number; merged_at: string | null; base: { ref: string } }[]): number[] {
+  return closed.filter((p) => p.merged_at && p.base.ref === BASE).map((p) => p.number);
+}
+
 // ─── the checks ──────────────────────────────────────────────────────
 
 const R = (n: number, id: CheckId, status: CheckStatus, detail: string, kind?: RefusalKind): CheckResult =>
@@ -1512,10 +1523,10 @@ export async function fetchSnapshot(repo: string, n: number, root: string): Prom
   const owner = repo.split("/")[0];
   let baseMergedAsHeadOf: GuardSnapshot["baseMergedAsHeadOf"];
   try {
-    const closed = await getAll<{ number: number; merged_at: string | null }>(
+    const closed = await getAll<{ number: number; merged_at: string | null; base: { ref: string } }>(
       `repos/${repo}/pulls?state=closed&head=${encodeURIComponent(`${owner}:${pr.base.ref}`)}&per_page=100`,
     );
-    baseMergedAsHeadOf = closed.filter((p) => p.merged_at).map((p) => p.number);
+    baseMergedAsHeadOf = spentAsHeadOf(closed);
   } catch (e) {
     baseMergedAsHeadOf = { unknown: e instanceof Error ? e.message : String(e) };
   }

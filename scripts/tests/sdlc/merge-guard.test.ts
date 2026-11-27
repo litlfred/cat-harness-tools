@@ -26,6 +26,7 @@ import { join } from "node:path";
 
 import {
   CannotAsk,
+  spentAsHeadOf,
   evaluate as evaluateAny,
   advisoryCi,
   isRelease,
@@ -140,6 +141,12 @@ describe("check 1 — base", () => {
     const s = real(1957);
     s.baseMergedAsHeadOf = [1];
     expect(status(s, "base").status).toBe("refuse");
+  });
+
+  test("a sync PR that merged main into a feature branch does not spend main (qou#408)", () => {
+    expect(spentAsHeadOf([{ number: 408, merged_at: "2026-04-25T14:10:47Z", base: { ref: "claude/nf-transition-projection-aZ3MH" } }])).toEqual([]);
+    expect(spentAsHeadOf([{ number: 7, merged_at: "2026-01-01T00:00:00Z", base: { ref: "main" } }])).toEqual([7]);
+    expect(spentAsHeadOf([{ number: 8, merged_at: null, base: { ref: "main" } }])).toEqual([]);
   });
 
   test("could not ask about the base is unknown, not a pass", () => {
