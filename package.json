@@ -647,6 +647,7 @@
     "site-publish-caller": "bun run cat-harness-tools/scripts/site-publish-caller.ts --write",
     "mount:repin:standing": "bun run cat-harness-tools/scripts/repin-standing.ts",
     "mount:repin:cone": "bun run cat-harness-tools/scripts/repin-cone.ts",
+    "beans:board": "bun run cat-harness-tools/scripts/beans-board.ts",
     "state:visualizer": "bun run cat-harness-tools/scripts/state-visualizer.ts",
     "survey:owed": "bun run cat-harness-tools/scripts/survey.ts",
     "survey:publish": "bun run cat-harness-tools/scripts/survey.ts --publish",
