@@ -790,3 +790,19 @@ Feature: Merge guard
     Given a ready PR with red CI
     When it is judged under the fast gate
     Then check 5 passes as advisory, gates as on a release with `--release`, and refuses with `--full-tier`
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::auto-merge_—_the_push_workflows_of_main_it_dispatches::a_push-to-main_workflow_with_workflow_dispatch_is_dispatched;_one_without_it_is_named;_others_are_left
+  Scenario: Auto-merge dispatches main's push workflows
+    Given workflows that run on push to main, with and without workflow_dispatch, and others
+    When the post-merge workflows are listed
+    Then those with workflow_dispatch are dispatched, those without are named, and the rest are left
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::auto-merge_—_the_push_workflows_of_main_it_dispatches::this_repository's_own_push_workflow_is_found
+  Scenario: This repository's push workflow is dispatched after an auto-merge
+    Given this repository
+    Then pr-tests.yml is among the workflows dispatched after an auto-merge
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::auto-merge_—_the_push_workflows_of_main_it_dispatches::a_root_with_no_workflows_dispatches_nothing
+  Scenario: A root with no workflows dispatches nothing
+    Given a root with no .github/workflows
+    Then nothing is dispatched and nothing is named

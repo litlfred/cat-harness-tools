@@ -16,13 +16,15 @@
 # gates on CI. A caller that wants the old behaviour passes `gate: strict`
 # and `full-tier: true`, which the rest of this header describes.
 #
-# AUTO-MERGE (owner, 2026-11-27, decision card "Fast gate + auto-merge"): with
-# `auto-merge` on (the default) and a `merge-token` secret, a PR the fast gate
-# passes is merged here at once, pinned to the head that was judged
-# (`merge-guard.ts --auto-merge`), so a merge no longer waits for the merge
-# manager. The token, not GITHUB_TOKEN, makes the merge, so `push` workflows
-# on main (the post-merge QA and KG publication) still run. Without the
-# secret nothing is merged, and the merge manager lands the PR as before.
+# AUTO-MERGE (owner, 2026-11-27, decision card "Fast gate + auto-merge"; no
+# repository secrets): with `auto-merge` on (the default), a PR the fast gate
+# passes is merged here at once with the workflow's own token, pinned to the
+# head that was judged (`merge-guard.ts --auto-merge`), so a merge no longer
+# waits for the merge manager. GitHub starts no `push` workflow for a merge
+# made with that token, so the guard then dispatches, on main, every workflow
+# of the caller that runs on a push to main and has `workflow_dispatch`: the
+# post-merge QA and KG publication still run. A caller that grants only read
+# gets no merge (the run says so) and the merge manager lands the PR.
 #
 # Under `gate: strict` the status posts `success` only when all nine checks of
 # `scripts/merge-guard.ts` pass, run with `--full-tier`:
@@ -38,7 +40,7 @@
 # An unfinished PR posts `pending`, a defect `failure`, a fact that could not
 # be read `error`.
 #
-# Under `gate: strict`, or without the merge token, it never merges: the merge
+# Under `gate: strict`, or when the caller grants no write, it never merges: the merge
 # manager merges (owner, 2026-11-13, cat-harness#1313), with
 # `merge:guard --merge`, and this only posts the status that merge must agree
 # with.
@@ -74,9 +76,9 @@
 # `merge-guard` status (or keeps the old one, which was posted for an older
 # head), and a required check blocks on that. The privileged side never checks
 # out, installs or runs anything from the PR head: it checks out main, clones
-# cat-harness-tools at `tools-ref`, and reads the PR through the API. Its one
-# secret, the optional `merge-token` (auto-merge, 2026-11-27), reaches only
-# the post step, which runs that code and never the head's.
+# cat-harness-tools at `tools-ref`, and reads the PR through the API. It holds
+# no secret; under auto-merge its token can write, which is safe because
+# nothing it runs comes from the PR head.
 #
 # Rejected: computing the verdict in the `pull_request` job and posting it from
 # `workflow_run` (that job runs a file the PR controls, so its verdict could
@@ -104,7 +106,7 @@
 #       types: [completed]
 #     workflow_dispatch:
 #       inputs: { pr: { type: string, required: false, description: "PR number; empty: every open PR" } }
-#   permissions: { contents: read, pull-requests: read, issues: read, actions: read, checks: read, statuses: write }
+#   permissions: { contents: write, pull-requests: write, issues: read, actions: write, checks: read, statuses: write }   # read-only contents/pull-requests/actions: no auto-merge
 #   jobs:
 #     guard:
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-merge-guard.yml@main
@@ -145,7 +147,7 @@ on:
         type: boolean
         default: false
       auto-merge:
-        description: "Land a PR the fast gate passes (--auto-merge), pinned to the judged head (owner, 2026-11-27). Only with the `merge-token` secret; without it the step says so and merges nothing."
+        description: "Land a PR the fast gate passes (--auto-merge), pinned to the judged head, then dispatch the push workflows of main (owner, 2026-11-27). Needs contents, pull-requests and actions write from the caller; without them nothing is merged."
         required: false
         type: boolean
         default: true
@@ -155,18 +157,11 @@ on:
         type: string
         default: "fast"
 
-    secrets:
-      merge-token:
-        description: "Token that lands a PR under auto-merge: an App or fine-grained token with contents + pull-requests write. Not the workflow's GITHUB_TOKEN, whose merges start no `push` workflow, so post-merge QA would never run."
-        required: false
-
-permissions:
-  contents: read
-  pull-requests: read
-  issues: read
-  actions: read
-  checks: read
-  statuses: write
+# No `permissions` here or on the job: the job runs with what the CALLER
+# grants (a called workflow that asks for more than its caller grants fails to
+# start, so a layer whose caller grants only read keeps working, without
+# auto-merge). Auto-merge needs the caller to grant `contents: write`,
+# `pull-requests: write` and `actions: write` (owner, 2026-11-27).
 
 concurrency:
   group: merge-guard-${{ github.repository }}-${{ inputs.pr || github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.head_sha || github.run_id }}
@@ -177,13 +172,6 @@ jobs:
     name: Post the merge-guard status
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    permissions:
-      contents: read
-      pull-requests: read
-      issues: read
-      actions: read
-      checks: read
-      statuses: write
     steps:
       - name: Which PRs
         id: prs
@@ -270,15 +258,11 @@ jobs:
           FULL_TIER: ${{ inputs.full-tier }}
           GATE: ${{ inputs.gate || 'fast' }}
           AUTO_MERGE: ${{ inputs.auto-merge }}
-          MERGE_TOKEN: ${{ secrets.merge-token }}
         run: |
           set -uo pipefail
           tier=(--gate "${GATE:-fast}")
           [ "$FULL_TIER" = "true" ] && tier+=(--full-tier)
-          if [ "${AUTO_MERGE:-false}" = "true" ] && [ "${GATE:-fast}" = "fast" ]; then
-            if [ -n "${MERGE_TOKEN:-}" ]; then tier+=(--auto-merge)
-            else echo "auto-merge is on but no merge-token secret was passed: nothing is merged here; the merge manager lands the PR" | tee -a "$GITHUB_STEP_SUMMARY"; fi
-          fi
+          [ "${AUTO_MERGE:-false}" = "true" ] && [ "${GATE:-fast}" = "fast" ] && tier+=(--auto-merge)
           failed=""
           for n in $PRS; do
             # Exit 1 (refused) and 2 (unknown) are verdicts, posted as the

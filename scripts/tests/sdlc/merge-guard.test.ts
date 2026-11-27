@@ -21,7 +21,8 @@
  * `ho66`): standing alone, cat-harness has no such root to read.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
@@ -30,6 +31,7 @@ import {
   advisoryCi,
   isRelease,
   fastAdvisory,
+  postMergeWorkflows,
   RELEASE_LABEL,
   fetchPull,
   getAll,
@@ -1480,5 +1482,33 @@ describe("the fast gate — only base, draft, labels and conflicts block", () =>
     expect(evaluateAny(s, { gate: "fast" }).checks.find((c) => c.id === "ci")!.status).toBe("pass");
     expect(evaluateAny(s, { gate: "fast", release: true }).checks.find((c) => c.id === "ci")).toEqual(status(real(1937), "ci", { release: true }));
     expect(evaluateAny(s, { gate: "fast", fullTier: true }).checks.find((c) => c.id === "ci")!.status).not.toBe("pass");
+  });
+});
+
+/** Auto-merge with the workflow's token starts no `push` run, so the guard dispatches them (owner, 2026-11-27: no repo secrets). */
+describe("auto-merge — the push workflows of main it dispatches", () => {
+  const tmp = () => {
+    const root = mkdtempSync(join(tmpdir(), "mg-"));
+    mkdirSync(join(root, ".github", "workflows"), { recursive: true });
+    return root;
+  };
+  const wf = (root: string, name: string, text: string) => writeFileSync(join(root, ".github", "workflows", name), text);
+
+  test("a push-to-main workflow with workflow_dispatch is dispatched; one without it is named; others are left", () => {
+    const root = tmp();
+    wf(root, "qa.yml", "on:\n  push:\n    branches: [main]\n  workflow_dispatch:\n");
+    wf(root, "kg.yml", "on: [push, workflow_dispatch]\n");
+    wf(root, "nodispatch.yml", "on:\n  push:\n    branches: [main]\n");
+    wf(root, "other-branch.yml", "on:\n  push:\n    branches: [gh-pages]\n  workflow_dispatch:\n");
+    wf(root, "pr.yml", "on:\n  pull_request:\n");
+    expect(postMergeWorkflows(root)).toEqual({ dispatch: ["kg.yml", "qa.yml"], undispatchable: ["nodispatch.yml"] });
+  });
+
+  test("this repository's own push workflow is found", () => {
+    expect(postMergeWorkflows(join(import.meta.dir, "..", "..", "..")).dispatch).toContain("pr-tests.yml");
+  });
+
+  test("a root with no workflows dispatches nothing", () => {
+    expect(postMergeWorkflows(join(tmpdir(), "no-such-root-mg"))).toEqual({ dispatch: [], undispatchable: [] });
   });
 });

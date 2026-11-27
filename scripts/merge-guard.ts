@@ -161,7 +161,8 @@
  * cannot edit the judge; the threat model is in the header of
  * `.github/workflows/layer-merge-guard.yml`.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
 import { join, resolve } from "node:path";
 
 import { coverageFor, runsForHead, NOT_EXECUTED, type HeadRunVerdict, type RunRow } from "./check-head-has-run.ts";
@@ -1638,29 +1639,81 @@ export async function mergePinned(repo: string, n: number, sha: string, auth?: s
 }
 
 /**
- * `--auto-merge` (owner, 2026-11-27, decision card "Fast gate + auto-merge"):
- * the guard itself lands a PR the fast gate passed, so a merge no longer
- * waits for the merge manager to wake. The PUT is pinned to the head that was
- * judged ({@link mergePinned}): a push after the verdict makes GitHub refuse
- * it, and the next guard run judges the new head.
+ * The workflows a merge to `base` would start on `push` and that can be
+ * dispatched: each `.github/workflows/*.yml` under `root` whose `on` has
+ * `push` (with no `branches` filter, or one naming `base`) and
+ * `workflow_dispatch`. `undispatchable` lists the `push` ones with no
+ * `workflow_dispatch`, which an auto-merge cannot start.
+ */
+export function postMergeWorkflows(root: string, base = "main"): { dispatch: string[]; undispatchable: string[] } {
+  const dir = join(root, ".github", "workflows");
+  const dispatch: string[] = [];
+  const undispatchable: string[] = [];
+  let files: string[] = [];
+  try {
+    files = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).sort();
+  } catch {
+    return { dispatch, undispatchable };
+  }
+  for (const file of files) {
+    let on: unknown;
+    try {
+      const doc = parseYaml(readFileSync(join(dir, file), "utf8")) as Record<string, unknown> | null;
+      on = doc?.on ?? doc?.[true as unknown as string];
+    } catch {
+      continue;
+    }
+    const events: Record<string, unknown> =
+      typeof on === "string" ? { [on]: null } : Array.isArray(on) ? Object.fromEntries(on.map((e) => [String(e), null])) : ((on as Record<string, unknown>) ?? {});
+    if (!("push" in events)) continue;
+    const push = events.push as { branches?: string[] } | null;
+    const branches = push?.branches;
+    if (branches && !branches.includes(base)) continue;
+    ("workflow_dispatch" in events ? dispatch : undispatchable).push(file);
+  }
+  return { dispatch, undispatchable };
+}
+
+/**
+ * `--auto-merge` (owner, 2026-11-27, decision card "Fast gate + auto-merge";
+ * "no repo secrets"): the guard itself lands a PR the fast gate passed, so a
+ * merge no longer waits for the merge manager to wake. The PUT is pinned to
+ * the head that was judged ({@link mergePinned}): a push after the verdict
+ * makes GitHub refuse it, and the next guard run judges the new head.
  *
- * It merges with `MERGE_TOKEN` when set, else the workflow's token. A merge
- * made with the workflow's own `GITHUB_TOKEN` does not start `push`
- * workflows on `main` (GitHub's rule against recursive runs), so a layer whose
- * post-merge QA runs on `push` passes a `merge-token` secret.
+ * It merges with the workflow's own token, which needs `contents: write` from
+ * the caller. GitHub starts no `push` workflow for a merge made with that
+ * token, so it then DISPATCHES on the base each workflow a push to it would
+ * have started ({@link postMergeWorkflows}; needs `actions: write`): the
+ * post-merge QA and the KG publication still run. A `push` workflow with no
+ * `workflow_dispatch` is named as a warning.
  *
  * A refusal is not a failure of the run: the status is already posted, and
- * the merge manager can still land the PR. It returns 0 when merged or
- * refused, 2 when the merge could not be determined.
+ * the merge manager can still land the PR. A token without the write
+ * permission (HTTP 403, a caller that grants only read) is the same. It
+ * returns 0 when merged or refused, 2 when the merge could not be determined.
  */
-export async function autoLand(repo: string, n: number, head: string): Promise<number> {
-  const out = await mergePinned(repo, n, head, process.env.MERGE_TOKEN || undefined);
-  if (out.merged) {
-    console.log(`auto-merged #${n} at ${short(head)} -> ${short(out.sha)}`);
-    return 0;
+export async function autoLand(repo: string, n: number, head: string, root: string, base = "main"): Promise<number> {
+  const out = await mergePinned(repo, n, head);
+  if (!out.merged) {
+    const denied = out.reason.startsWith("HTTP 403");
+    console.error(
+      `auto-merge of #${n} ${out.refused || denied ? "not done" : "COULD NOT BE DETERMINED"}: ${out.reason}${denied ? " (the caller grants no contents: write; the merge manager lands it)" : ""}`,
+    );
+    return out.refused || denied ? 0 : 2;
   }
-  console.error(`auto-merge of #${n} ${out.refused ? "refused by GitHub" : "COULD NOT BE DETERMINED"}: ${out.reason}`);
-  return out.refused ? 0 : 2;
+  console.log(`auto-merged #${n} at ${short(head)} -> ${short(out.sha)}`);
+  const { dispatch, undispatchable } = postMergeWorkflows(root, base);
+  for (const file of dispatch) {
+    try {
+      const r = await gh(`repos/${repo}/actions/workflows/${file}/dispatches`, { method: "POST", body: JSON.stringify({ ref: base }) });
+      console.log(r.ok ? `  dispatched ${file} on ${base} (post-merge)` : `  ::warning::could not dispatch ${file} on ${base}: HTTP ${r.status}`);
+    } catch (e) {
+      console.log(`  ::warning::could not dispatch ${file} on ${base}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  for (const file of undispatchable) console.log(`  ::warning::${file} runs on push to ${base} but has no workflow_dispatch: it does not run after this auto-merge`);
+  return 0;
 }
 
 /** Post the verdict as the `merge-guard` commit status on the head. */
@@ -1766,7 +1819,7 @@ async function main(argv: string[]): Promise<number> {
       return 2;
     }
   }
-  if (autoMerge && v.exitCode === 0) return await autoLand(repo, n, v.head);
+  if (autoMerge && v.exitCode === 0) return await autoLand(repo, n, v.head, root);
   if (!doMerge || v.exitCode !== 0) return v.exitCode;
 
   const out = await mergePinned(repo, n, v.head);

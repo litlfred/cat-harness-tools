@@ -36,7 +36,7 @@ interface Step {
   with?: Record<string, string>;
   if?: string;
 }
-const wf = parse(text) as { on: { workflow_call: unknown }; jobs: { guard: { permissions: Record<string, string>; steps: Step[] } } };
+const wf = parse(text) as { permissions?: unknown; on: { workflow_call: unknown }; jobs: { guard: { permissions?: Record<string, string>; steps: Step[] } } };
 const steps = wf.jobs.guard.steps;
 const named = (n: string) => steps.find((s) => s.name?.startsWith(n))!;
 
@@ -134,7 +134,7 @@ describe("layer-merge-guard: what it runs", () => {
     expect(install).toBeGreaterThan(seed);
   });
 
-  test("it posts the `merge-guard` status under the fast gate (--full-tier only when asked), from the caller's default branch, and merges only with the merge token", () => {
+  test("it posts the `merge-guard` status under the fast gate (--full-tier only when asked), from the caller's default branch, and lands a passing PR itself", () => {
     expect(STATUS_CONTEXT).toBe("merge-guard");
     const post = named("Post the merge-guard status").run!;
     expect(post).toContain("scripts/merge-guard.ts \"$n\" --repo \"$REPO\" --root site --status");
@@ -143,16 +143,18 @@ describe("layer-merge-guard: what it runs", () => {
     const inputs = (wf as unknown as { on: { workflow_call: { inputs: Record<string, { default?: unknown }> } } }).on.workflow_call.inputs;
     expect(inputs["full-tier"]!.default).toBe(false);
     expect(inputs.gate!.default).toBe("fast");
-    // The one merge path is `--auto-merge`, and only with the merge-token secret (owner, 2026-11-27).
+    // The one merge path is `--auto-merge`, under the fast gate (owner, 2026-11-27).
     for (const s of steps) expect((s.run ?? "").replaceAll("--auto-merge", "")).not.toMatch(/--merge\b|gh pr merge|--auto\b/);
-    expect(post).toContain('if [ -n "${MERGE_TOKEN:-}" ]; then tier+=(--auto-merge)');
-    expect(named("Post the merge-guard status").env?.MERGE_TOKEN).toBe("${{ secrets.merge-token }}");
+    expect(post).toContain('[ "${AUTO_MERGE:-false}" = "true" ] && [ "${GATE:-fast}" = "fast" ] && tier+=(--auto-merge)');
     expect(inputs["auto-merge"]!.default).toBe(true);
     const checkout = steps.find((s) => s.uses?.startsWith("actions/checkout"))!;
     expect(checkout.with?.ref).toBe("${{ github.event.repository.default_branch }}");
     expect(checkout.with?.path).toBe("site");
-    expect(wf.jobs.guard.permissions.statuses).toBe("write");
-    expect(wf.jobs.guard.permissions.contents).toBe("read");
+    // No permissions of its own: the job runs with the caller's grant, so a read-only caller still starts (no auto-merge).
+    expect(wf.permissions).toBeUndefined();
+    expect(wf.jobs.guard.permissions).toBeUndefined();
+    const caller = parse(readFileSync(join(WF, "merge-guard.yml"), "utf8")) as { permissions: Record<string, string> };
+    expect(caller.permissions).toMatchObject({ statuses: "write", contents: "write", "pull-requests": "write", actions: "write" });
   });
 
   test("this layer's caller is `merge-guard.yml`, from the default branch only: comments, the PR checks' runs and the signal's", () => {
@@ -166,7 +168,7 @@ describe("layer-merge-guard: what it runs", () => {
     expect(caller.on.workflow_run!.workflows).toEqual([prChecks.name, MERGE_GUARD_TRIGGER_NAME]);
   });
 
-  test("the privileged side never takes code from the PR head, and its one secret is the merge token in the post step", () => {
+  test("the privileged side never takes code from the PR head and holds no secret", () => {
     // Only the caller's default branch is checked out, and nothing names the head as a ref.
     expect(steps.filter((s) => s.uses?.startsWith("actions/checkout"))).toHaveLength(1);
     // The head sha is only a concurrency key and an API lookup; nothing fetches the head's tree.
@@ -175,10 +177,7 @@ describe("layer-merge-guard: what it runs", () => {
       expect(JSON.stringify(s.with ?? {})).not.toMatch(/head|secrets\./);
       expect(s.run ?? "").not.toMatch(/head_ref|head\.ref|secrets\./);
     }
-    // The merge token (owner, 2026-11-27) reaches only the post step's env, which runs
-    // cat-harness-tools at tools-ref against the caller's main, never the PR head.
-    expect(text.replaceAll("${{ secrets.merge-token }}", "")).not.toContain("secrets.");
-    expect(steps.filter((s) => JSON.stringify(s.env ?? {}).includes("secrets.")).map((s) => s.name)).toEqual(["Post the merge-guard status on each PR head"]);
+    expect(text).not.toContain("secrets.");
   });
 });
 
