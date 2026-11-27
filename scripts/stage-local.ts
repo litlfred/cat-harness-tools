@@ -166,6 +166,49 @@ export function notTipError(repo: string, sha: string, tip: string, branch: stri
 }
 
 /**
+ * The commit the live publish root was built from, read from the publish
+ * branch's history: a root publish by build-instance-site is
+ * `Publish <instance> <sha>` (no "preview of"), one by publish-main-site.ts is
+ * `main-site: from <sha>`. `undefined` when none of the last 200 commits says.
+ */
+export function liveRootCommit(repo: string, pagesBranch = "gh-pages"): string | undefined {
+  if (spawnSync("git", ["-C", repo, "fetch", "-q", "--depth", "200", "origin", pagesBranch]).status !== 0) return undefined;
+  const log = spawnSync("git", ["-C", repo, "log", "--format=%s", "-n", "200", "FETCH_HEAD"], { encoding: "utf-8" });
+  if (log.status !== 0) return undefined;
+  return liveRootCommitIn(log.stdout.split("\n"));
+}
+
+/** {@link liveRootCommit} over the subjects, newest first. Pure. */
+export function liveRootCommitIn(subjects: readonly string[]): string | undefined {
+  for (const s of subjects) {
+    const m = /^main-site: from ([0-9a-f]{7,40})\b/.exec(s) ?? (/ preview of /.test(s) ? null : /^Publish \S+ ([0-9a-f]{7,40})$/.exec(s));
+    if (m) return m[1];
+  }
+  return undefined;
+}
+
+/**
+ * Should a SUPERSEDED main run publish anyway? Yes when the live root is
+ * strictly older than this commit (an ancestor of it), because the newer
+ * push's own run may never get to publish: GitHub keeps one PENDING run per
+ * concurrency group and cancels the rest, and the one that does start finds
+ * main moved again whenever merges land faster than a build takes. Measured on
+ * litlfred/qou, 2026-11-27: 0 root publishes in 40 minutes and 20 runs, every
+ * one cancelled or superseded, while the PDF workflow published each merge.
+ * Publishing an older-than-tip commit that is newer than the live root keeps
+ * the site moving forward and never moves it back. Unknown (no record, or the
+ * commit is not in this clone) keeps the old answer: superseded, skip.
+ */
+export function publishSupersededAnyway(repo: string, sha: string, live: string | undefined): boolean {
+  if (!live) return false;
+  const full = spawnSync("git", ["-C", repo, "rev-parse", "--verify", "-q", `${live}^{commit}`], { encoding: "utf-8" });
+  if (full.status !== 0) return false;
+  const liveSha = full.stdout.trim();
+  if (liveSha === sha) return false;
+  return spawnSync("git", ["-C", repo, "merge-base", "--is-ancestor", liveSha, sha]).status === 0;
+}
+
+/**
  * The commit asked for is no longer the pushed default branch's tip: a newer
  * push replaced it while this run waited or built. The main site is that newer
  * commit's, and its own push runs the publish (`folio-site-publish.yml` queues
@@ -1003,7 +1046,12 @@ export async function stageDeclared(
   if (target === "main" && !o.plan) {
     git(repo, ["fetch", "-q", "origin", defaultBranch ?? branch]);
     const tip = git(repo, ["rev-parse", "FETCH_HEAD"]);
-    if (tip !== sha) throw notTipError(repo, sha, tip, defaultBranch ?? branch);
+    if (tip !== sha) {
+      const err = notTipError(repo, sha, tip, defaultBranch ?? branch);
+      const live = err instanceof SupersededError ? liveRootCommit(repo) : undefined;
+      if (!(err instanceof SupersededError) || !publishSupersededAnyway(repo, sha, live)) throw err;
+      log(`· superseded by ${tip.slice(0, 7)}, but the live root (${live!.slice(0, 7)}) is older than ${sha.slice(0, 7)}: publishing ${sha.slice(0, 7)} so the site moves forward while merges keep landing`);
+    }
   }
   const url = `https://${owner}.github.io/${name}/${target === "preview" ? `${PREVIEW_PREFIX}/${branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")}/` : ""}`;
   const publish = !o.plan && !o.dryRun;
