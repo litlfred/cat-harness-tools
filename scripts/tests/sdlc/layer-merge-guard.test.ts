@@ -31,11 +31,12 @@ const text = readFileSync(join(WF, "layer-merge-guard.yml"), "utf8");
 interface Step {
   name?: string;
   run?: string;
+  env?: Record<string, string>;
   uses?: string;
   with?: Record<string, string>;
   if?: string;
 }
-const wf = parse(text) as { on: { workflow_call: unknown }; jobs: { guard: { permissions: Record<string, string>; steps: Step[] } } };
+const wf = parse(text) as { permissions?: unknown; on: { workflow_call: unknown }; jobs: { guard: { permissions?: Record<string, string>; steps: Step[] } } };
 const steps = wf.jobs.guard.steps;
 const named = (n: string) => steps.find((s) => s.name?.startsWith(n))!;
 
@@ -133,17 +134,27 @@ describe("layer-merge-guard: what it runs", () => {
     expect(install).toBeGreaterThan(seed);
   });
 
-  test("it posts the `merge-guard` status with --full-tier, from the caller's default branch, and never merges", () => {
+  test("it posts the `merge-guard` status under the fast gate (--full-tier only when asked), from the caller's default branch, and lands a passing PR itself", () => {
     expect(STATUS_CONTEXT).toBe("merge-guard");
     const post = named("Post the merge-guard status").run!;
     expect(post).toContain("scripts/merge-guard.ts \"$n\" --repo \"$REPO\" --root site --status");
-    expect(post).toContain("tier=(--full-tier)");
-    for (const s of steps) expect(s.run ?? "").not.toMatch(/--merge\b|gh pr merge|--auto\b/);
+    expect(post).toContain('tier=(--gate "${GATE:-fast}")');
+    expect(post).toContain('[ "$FULL_TIER" = "true" ] && tier+=(--full-tier)');
+    const inputs = (wf as unknown as { on: { workflow_call: { inputs: Record<string, { default?: unknown }> } } }).on.workflow_call.inputs;
+    expect(inputs["full-tier"]!.default).toBe(false);
+    expect(inputs.gate!.default).toBe("fast");
+    // The one merge path is `--auto-merge`, under the fast gate (owner, 2026-11-27).
+    for (const s of steps) expect((s.run ?? "").replaceAll("--auto-merge", "")).not.toMatch(/--merge\b|gh pr merge|--auto\b/);
+    expect(post).toContain('[ "${AUTO_MERGE:-false}" = "true" ] && [ "${GATE:-fast}" = "fast" ] && tier+=(--auto-merge)');
+    expect(inputs["auto-merge"]!.default).toBe(true);
     const checkout = steps.find((s) => s.uses?.startsWith("actions/checkout"))!;
     expect(checkout.with?.ref).toBe("${{ github.event.repository.default_branch }}");
     expect(checkout.with?.path).toBe("site");
-    expect(wf.jobs.guard.permissions.statuses).toBe("write");
-    expect(wf.jobs.guard.permissions.contents).toBe("read");
+    // No permissions of its own: the job runs with the caller's grant, so a read-only caller still starts (no auto-merge).
+    expect(wf.permissions).toBeUndefined();
+    expect(wf.jobs.guard.permissions).toBeUndefined();
+    const caller = parse(readFileSync(join(WF, "merge-guard.yml"), "utf8")) as { permissions: Record<string, string> };
+    expect(caller.permissions).toMatchObject({ statuses: "write", contents: "write", "pull-requests": "write", actions: "write" });
   });
 
   test("this layer's caller is `merge-guard.yml`, from the default branch only: comments, the PR checks' runs and the signal's", () => {

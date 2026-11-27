@@ -59,14 +59,15 @@ Feature: The merge-guard status on every layer PR
     When its "Compose the guard" step is read
     Then it copies cat-harness-tools' bun.lock into tools/ before "bun install"
 
-  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::it_posts_the_`merge-guard`_status_with_--full-tier,_from_the_caller's_default_branch,_and_never_merges
-  Scenario: The workflow posts the merge-guard status with --full-tier from the caller's default branch and never merges
+  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::it_posts_the_`merge-guard`_status_under_the_fast_gate_(--full-tier_only_when_asked),_from_the_caller's_default_branch,_and_lands_a_passing_PR_itself
+  Scenario: The workflow posts the merge-guard status under the fast gate from the caller's default branch and lands a passing PR itself
     Given layer-merge-guard.yml
     When its steps are read
-    Then the guard runs with "--root site --status" and "--full-tier"
+    Then the guard runs with "--root site --status" and "--gate fast" by default
+    And "--full-tier" only when the caller sets full-tier, which is off by default
     And the caller is checked out at its default branch into "site"
-    And no step merges or asks for auto-merge
-    And the job may write statuses and only read contents
+    And the only merge is "--auto-merge", under the fast gate
+    And the job declares no permissions, so it runs with what the caller grants
 
   @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::this_layer's_caller_is_`merge-guard.yml`,_from_the_default_branch_only:_comments,_the_PR_checks'_runs_and_the_signal's
   Scenario: This layer's caller runs from the default branch only
