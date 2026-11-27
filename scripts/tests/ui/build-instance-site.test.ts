@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, isGraphData, writeBuildQa, BUILD_QA_REPORT, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages, linkedDataSteps, softRun, siteIriCheckStep, declaredIriBase } from "../../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, isGraphData, writeBuildQa, BUILD_QA_REPORT, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages, linkedDataSteps, softRun, siteIriCheckStep, declaredIriBase, ownDocumentStep } from "../../build-instance-site.ts";
 import type { DeclaredArtefact } from "../../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -452,6 +452,46 @@ describe("build-instance-site — every layer's site serves its JSON-LD context 
   test("the build runs the steps for every declared layer, whatever its recipe", () => {
     const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
     expect(src).toContain("if (declared) for (const st of linkedDataSteps(TOOLS, o.instance, site)) softRun(st.label, st.argv, root);");
+  });
+});
+
+describe("build-instance-site — a layer's own site serves its document and Tool documents (#638)", () => {
+  const layer = (decl: Record<string, unknown>, file = "layer.json"): string => {
+    const d = mkdtempSync(join(tmpdir(), "own-doc-"));
+    mkdirSync(dirname(join(d, file)), { recursive: true });
+    writeFileSync(join(d, file), JSON.stringify(decl));
+    return d;
+  };
+
+  test("on the layer's own canonical site, kg-export writes the document at its own path with no --base-url", () => {
+    const root = layer({ name: "qou", canonicalUrl: "https://litlfred.github.io/qou" }, "qou.json");
+    const st = ownDocumentStep("t", root, "qou.json", "qou.jsonld", "/tmp/site", "https://litlfred.github.io/qou/")!;
+    expect(st.out).toBe(join("/tmp/site", "qou.jsonld"));
+    expect(st.argv.slice(0, 8)).toEqual(["run", join("t", "kg-export.ts"), "--instance", ".", "--scope", "instance", "--out", st.out]);
+    expect(st.argv).not.toContain("--base-url");
+    expect(st.argv).toContain("--qa-root");
+  });
+
+  test("the address comparison ignores a trailing slash and case; a layer in a subdirectory is named by it", () => {
+    const root = layer({ name: "x", canonicalUrl: "https://Owner.github.io/repo/" }, "sub/x.json");
+    const st = ownDocumentStep("t", root, "sub/x.json", "x.jsonld", "/s", "https://owner.github.io/repo")!;
+    expect(st.argv[3]).toBe("./sub");
+  });
+
+  test("no step on another site, without a canonicalUrl, or for a path outside the site", () => {
+    const own = layer({ name: "qou", canonicalUrl: "https://litlfred.github.io/qou" });
+    expect(ownDocumentStep("t", own, "layer.json", "qou.jsonld", "/s", "https://litlfred.github.io/folio-assistant/")).toBeUndefined();
+    expect(ownDocumentStep("t", layer({ name: "a" }), "layer.json", "a.jsonld", "/s", "https://litlfred.github.io/a/")).toBeUndefined();
+    expect(ownDocumentStep("t", own, "layer.json", "../qou.jsonld", "/s", "https://litlfred.github.io/qou/")).toBeUndefined();
+    expect(ownDocumentStep("t", own, "missing.json", "qou.jsonld", "/s", "https://litlfred.github.io/qou/")).toBeUndefined();
+  });
+
+  test("the build runs it for a declared layer, before the IRI and link checks", () => {
+    const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
+    const at = src.indexOf("ownDocumentStep(TOOLS, root, declFile, docPath, site, selfAddressOf(gh.owner, gh.repo))");
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(src.indexOf("siteIriCheckStep(TOOLS, site, iriBase)"));
+    expect(at).toBeLessThan(src.indexOf("const links = await checkLinks("));
   });
 });
 

@@ -26,15 +26,19 @@
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-qa-publish.yml@main
 #
 # What it does, in the layout `layer-publish-context.yml` uses:
-#   1. Check out the folio-assistant index at `index-ref` (main) and mount
-#      every instance from its lock.
+#   1. Check out the index (`index-repository`, else the `QA_INDEX_REPOSITORY`
+#      variable, else `<owner>/folio-assistant`) at `index-ref` (main) and
+#      mount every instance from its lock.
 #   2. Put THE CALLER, at the pushed commit and without its `.git`, in place
 #      of its locked mount, so its results are computed over what it pushed.
 #   3. Run the knowledge-graph audit for that ONE instance
 #      (`kg-audit.ts --instance ./<instance>`), which writes its sidecars into
 #      the instance's own declared `qa` home (`kgQaHomeFor` "own").
-#   4. Run the caller's own QA `writers`, if it lists any (derived reports
-#      only the layer knows how to compute), into the same home.
+#   4. Run the QA writers the instance DECLARES (`qa.writers` in its
+#      `<instance>.json`, each with the QA axis it answers for — rendering,
+#      Lean, compute, …; schemas/sdlc/qa-axis.ts), then any `writers` input,
+#      into the same home. The integrated QA page (scripts/qa-page.ts) draws
+#      one section per axis from the published entry's listing.
 #   4b. Report node-view coverage against the layer's published site
 #      (`node-views:report --instance ./<instance> --base <site>`), into
 #      `<home>/node-views/`, so the layer's QA page shows it (owner,
@@ -65,18 +69,23 @@ on:
         required: false
         type: string
         default: "."
+      index-repository:
+        description: "`owner/name` of the index the caller is mounted in (its `index.lock.json` pins every layer). Empty: the caller's repository or organisation variable `QA_INDEX_REPOSITORY`, then `<caller's owner>/folio-assistant` with a notice. An input, so the workflow names no owner of its own."
+        required: false
+        type: string
+        default: ""
       index-ref:
-        description: "The folio-assistant ref to check out."
+        description: "The index ref to check out."
         required: false
         type: string
         default: "main"
       writers:
-        description: "The instance's OWN QA writers, one command per line, run from the index checkout after kg-audit (e.g. `bun run <instance>/scripts/<writer>.ts`). Each must write under the instance's qa home; a failing writer fails the job, so a partial record is never published."
+        description: "Extra QA writers, one command per line, run from the index checkout after the writers the instance DECLARES (`qa.writers` in `<instance>.json`, schemas/sdlc/qa-axis.ts), which are the preferred home. Each must write under the instance's qa home (exported as QA_HOME); a failing writer fails the job, so a partial record is never published."
         required: false
         type: string
         default: ""
       site-base:
-        description: "The layer's published site, probed by the node-view coverage report. Empty means GitHub Pages for the calling repository (https://<owner>.github.io/<repo>/)."
+        description: "The layer's published site, probed by the node-view coverage report. Empty: the variable `QA_SITE_BASE`, then the instance's declared `canonicalUrl`, then GitHub Pages for the calling repository (https://<owner>.github.io/<repo>/)."
         required: false
         type: string
         default: ""
@@ -135,11 +144,27 @@ jobs:
             exit 0
           fi
           echo "skip=false" >> "$GITHUB_OUTPUT"
-      - name: Check out the folio-assistant index
+      - name: Decide the index repository
+        if: steps.key.outputs.skip != 'true'
+        id: index
+        env:
+          GIVEN: ${{ inputs.index-repository }}
+          VAR: ${{ vars.QA_INDEX_REPOSITORY }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          repo="${GIVEN:-$VAR}"
+          if [ -z "$repo" ]; then
+            repo="$OWNER/folio-assistant"
+            echo "::notice::no index-repository input and no QA_INDEX_REPOSITORY variable: using $repo"
+          fi
+          [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "::error::index repository '$repo' is not owner/name"; exit 2; }
+          echo "repository=$repo" >> "$GITHUB_OUTPUT"
+      - name: Check out the index
         if: steps.key.outputs.skip != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          repository: litlfred/folio-assistant
+          repository: ${{ steps.index.outputs.repository }}
           ref: ${{ inputs.index-ref }}
           path: fa
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -230,29 +255,55 @@ jobs:
           echo "kg-audit sidecars written: $n"
           [ "$n" -gt 0 ] || { echo "::error::kg-audit wrote no sidecar under $home or $twin: nothing to publish"; exit 1; }
       - name: Run the instance's own QA writers
-        if: steps.key.outputs.skip != 'true' && steps.home.outputs.skip != 'true' && inputs.writers != ''
+        if: steps.key.outputs.skip != 'true' && steps.home.outputs.skip != 'true'
         working-directory: fa
         env:
           WRITERS: ${{ inputs.writers }}
+          QA_HOME: ${{ steps.home.outputs.home }}
         run: |
           set -euo pipefail
-          # Derived results a layer computes itself (a report over its own
-          # attestations, say). Listed by the caller, because only the layer
-          # knows them; run in order, each to exit 0.
+          # Derived results a layer computes itself, one per QA axis it answers
+          # for (rendering, Lean, compute, …). DECLARED in its own
+          # `<instance>.json` (`qa.writers`, schemas/sdlc/qa-axis.ts), so the
+          # integrated QA page knows each writer's axis; the `writers` input
+          # still runs after them. In order, each to exit 0.
+          export QA_HOME INSTANCE
+          declared="$(bun -e '
+            const { readFileSync } = await import("node:fs");
+            const inst = process.argv[1];
+            let d = {};
+            try { d = JSON.parse(readFileSync(`${inst}/${inst}.json`, "utf8")); } catch {}
+            for (const w of (d.qa && d.qa.writers) || []) console.log(String(w.run).replace(/\n/g, " "));
+          ' "$INSTANCE")"
+          n=0
           while IFS= read -r cmd; do
             [ -n "${cmd// }" ] || continue
             echo "::group::$cmd"
             bash -c "$cmd"
             echo "::endgroup::"
-          done <<< "$WRITERS"
+            n=$((n + 1))
+          done <<< "$declared"$'\n'"$WRITERS"
+          echo "QA writers run: $n"
       - name: Report node-view coverage (a QA report, not a gate)
         if: steps.key.outputs.skip != 'true' && steps.home.outputs.skip != 'true' && inputs.node-views
         continue-on-error: true
         working-directory: fa
         env:
-          BASE: ${{ inputs.site-base != '' && inputs.site-base || format('https://{0}.github.io/{1}/', github.repository_owner, github.event.repository.name) }}
+          GIVEN: ${{ inputs.site-base != '' && inputs.site-base || vars.QA_SITE_BASE }}
+          PAGES: ${{ format('https://{0}.github.io/{1}/', github.repository_owner, github.event.repository.name) }}
         run: |
           set -uo pipefail
+          # The input, then the variable, then the instance's own declared
+          # canonicalUrl, then the forge's pages address.
+          BASE="$GIVEN"
+          if [ -z "$BASE" ]; then
+            BASE="$(bun -e '
+              const { readFileSync } = await import("node:fs");
+              const inst = process.argv[1];
+              try { const d = JSON.parse(readFileSync(`${inst}/${inst}.json`, "utf8")); if (d.canonicalUrl) console.log(d.canonicalUrl); } catch {}
+            ' "$INSTANCE")"
+          fi
+          BASE="${BASE:-$PAGES}"
           # Per folder and kind: which of this layer's nodes have an IRI, a
           # .jsonld, a page and a row on the published site. It writes
           # <home>/node-views/<instance>.node-views.qa.json and always exits

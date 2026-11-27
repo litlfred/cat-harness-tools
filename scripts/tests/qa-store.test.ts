@@ -175,6 +175,13 @@ describe("the four read states", () => {
 
     const m = readQaManifest("main", o);
     expect(m.state === "hit" && m.manifest.files).toBe(4);
+    // The listing: every JSON record, summarised, so a browser reads one file
+    // instead of the forge's tree API (owner, 2026-11-24, the integrated QA page).
+    const listing = m.state === "hit" ? m.manifest.listing ?? [] : [];
+    expect(listing.map((x) => x.path).sort()).toEqual(
+      [`${RESULTS}/audit-coverage.qa-results.json`, `${RESULTS}/kg-qa/skills/a.kg-qa.json`, `${RESULTS}/kg-qa/skills/b.kg-qa.json`, ...listing.filter((x) => x.path.startsWith("other/")).map((x) => x.path)].sort(),
+    );
+    expect(listing.find((x) => x.path.endsWith("a.kg-qa.json"))?.axis).toBe("kg");
     expect(m.state === "hit" && m.manifest.roots).toEqual([RESULTS, "other/test/results"]);
 
     const into = join(f.base, "into");
