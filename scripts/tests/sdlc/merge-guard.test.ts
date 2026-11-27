@@ -29,6 +29,7 @@ import {
   evaluate as evaluateAny,
   advisoryCi,
   isRelease,
+  fastAdvisory,
   RELEASE_LABEL,
   fetchPull,
   getAll,
@@ -1409,5 +1410,75 @@ describe("check 9 — content-review (owner, 2026-11-15)", () => {
 
   test("a section with prose but no pointer is refused", () => {
     expect(contentReviewRecord("### Content review\nThe committee looked at it.").ok).toBe(false);
+  });
+});
+
+/**
+ * The fast gate (owner, 2026-11-27: "no slow merges, no red gates except
+ * JSON-LD KG publication; all QA runs after"): only base, draft, labels and
+ * conflicts block; the rest is judged and reported as advisory.
+ */
+describe("the fast gate — only base, draft, labels and conflicts block", () => {
+  const BLOCKING = new Set(["base", "ready-for-review", "labels", "mergeable"]);
+  const ready = (s: GuardSnapshot) => {
+    s.pr.draft = false;
+    s.pr.labels = [{ name: "ready-to-merge" }] as GuardSnapshot["pr"]["labels"];
+    s.pr.mergeable = true;
+    s.pr.base = { ...s.pr.base, ref: "main" };
+    return s;
+  };
+
+  test("an advisory check never refuses: its finding stays in the detail", () => {
+    const f = fastAdvisory({ n: 6, id: "checklist", status: "refuse", detail: "1 unticked box", kind: "not-ready" });
+    expect(f.status).toBe("pass");
+    expect(f.kind).toBeUndefined();
+    expect(f.detail).toContain("advisory under the fast gate: did not pass (1 unticked box)");
+    expect(fastAdvisory({ n: 7, id: "open-question", status: "unknown", detail: "x" }).detail).toContain("could not be judged");
+    const ok = { n: 1, id: "base" as const, status: "pass" as const, detail: "fine" };
+    expect(fastAdvisory(ok)).toEqual(ok);
+  });
+
+  test("for every real fixture, only the blocking checks may refuse or be unknown", () => {
+    for (const n of [1937, 1957, 1960] as const) {
+      const v = evaluateAny(real(n), { gate: "fast" });
+      for (const c of v.checks) if (!BLOCKING.has(c.id) && c.id !== "ci") expect(["pass", "skip"]).toContain(c.status);
+    }
+  });
+
+  test("a ready, labelled, clean PR passes with no marker, red CI, an unticked box or a missing content review", () => {
+    // #1937's base is the head of a merged PR: a base defect, which still blocks.
+    expect(evaluateAny(ready(real(1937)), { gate: "fast" }).checks.find((c) => c.id === "base")!.status).toBe("refuse");
+    for (const n of [1957, 1960] as const) {
+      const s = ready(real(n));
+      s.pr.body = `${s.pr.body ?? ""}\n- [ ] not done`;
+      const strict = evaluateAny(s, {});
+      const fast = evaluateAny(s, { gate: "fast" });
+      expect(fast.checks.filter((c) => c.status !== "pass" && c.status !== "skip")).toEqual([]);
+      expect(fast.verdict).toBe("pass");
+      expect(fast.state).toBe("success");
+      if (strict.verdict !== "pass") expect(fast.checks.some((c) => c.detail.includes("advisory under the fast gate"))).toBe(true);
+    }
+  });
+
+  test("a draft, a missing ready-to-merge, needs-merge-human or a conflict still block", () => {
+    const draft = ready(real(1960));
+    draft.pr.draft = true;
+    expect(evaluateAny(draft, { gate: "fast" }).checks.find((c) => c.id === "ready-for-review")).toMatchObject({ status: "refuse", kind: "not-ready" });
+    const unlabelled = ready(real(1960));
+    unlabelled.pr.labels = [];
+    expect(evaluateAny(unlabelled, { gate: "fast" }).state).toBe("pending");
+    const human = ready(real(1960));
+    human.pr.labels = [{ name: "ready-to-merge" }, { name: "needs-merge-human" }] as GuardSnapshot["pr"]["labels"];
+    expect(evaluateAny(human, { gate: "fast" }).state).toBe("failure");
+    const conflict = ready(real(1960));
+    conflict.pr.mergeable = false;
+    expect(evaluateAny(conflict, { gate: "fast" }).checks.find((c) => c.id === "mergeable")!.status).toBe("refuse");
+  });
+
+  test("a release, or an explicit --full-tier, still gates check 5", () => {
+    const s = ready(real(1937));
+    expect(evaluateAny(s, { gate: "fast" }).checks.find((c) => c.id === "ci")!.status).toBe("pass");
+    expect(evaluateAny(s, { gate: "fast", release: true }).checks.find((c) => c.id === "ci")).toEqual(status(real(1937), "ci", { release: true }));
+    expect(evaluateAny(s, { gate: "fast", fullTier: true }).checks.find((c) => c.id === "ci")!.status).not.toBe("pass");
   });
 });

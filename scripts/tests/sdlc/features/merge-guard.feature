@@ -759,3 +759,34 @@ Feature: Merge guard
     Given PR #1957 with a workflow whose only run was cancelled
     When the "ci" check is read
     Then it refuses, naming that workflow as cancelled
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::the_fast_gate_—_only_base,_draft,_labels_and_conflicts_block::an_advisory_check_never_refuses:_its_finding_stays_in_the_detail
+  Scenario: An advisory check never refuses and keeps its finding
+    Given a check that refused, or could not be judged
+    When it is read under the fast gate
+    Then it passes, and its detail says what it found and that QA runs after the merge
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::the_fast_gate_—_only_base,_draft,_labels_and_conflicts_block::for_every_real_fixture,_only_the_blocking_checks_may_refuse_or_be_unknown
+  Scenario: Under the fast gate only base, draft, labels, conflicts and CI may refuse
+    Given PRs #1937, #1957 and #1960
+    When they are judged under the fast gate
+    Then checks 3, 6, 7 and 9 pass or are skipped
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::the_fast_gate_—_only_base,_draft,_labels_and_conflicts_block::a_ready,_labelled,_clean_PR_passes_with_no_marker,_red_CI,_an_unticked_box_or_a_missing_content_review
+  Scenario: A ready, labelled, clean PR passes the fast gate
+    Given a non-draft PR on main with `ready-to-merge`, that merges cleanly, with no ready marker, red CI and an unticked box
+    When it is judged under the fast gate
+    Then the verdict is pass and the status success
+    And a base that is a merged PR's head still refuses
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::the_fast_gate_—_only_base,_draft,_labels_and_conflicts_block::a_draft,_a_missing_ready-to-merge,_needs-merge-human_or_a_conflict_still_block
+  Scenario: Draft, labels and conflicts still block under the fast gate
+    Given a ready, labelled, clean PR
+    When it is a draft, loses `ready-to-merge`, gains `needs-merge-human` or conflicts with main
+    Then the fast gate refuses: not-ready, pending, failure and a refused check 8
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::the_fast_gate_—_only_base,_draft,_labels_and_conflicts_block::a_release,_or_an_explicit_--full-tier,_still_gates_check_5
+  Scenario: A release or --full-tier still gates CI under the fast gate
+    Given a ready PR with red CI
+    When it is judged under the fast gate
+    Then check 5 passes as advisory, gates as on a release with `--release`, and refuses with `--full-tier`

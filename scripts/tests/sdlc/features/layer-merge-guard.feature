@@ -59,13 +59,14 @@ Feature: The merge-guard status on every layer PR
     When its "Compose the guard" step is read
     Then it copies cat-harness-tools' bun.lock into tools/ before "bun install"
 
-  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::it_posts_the_`merge-guard`_status_with_--full-tier,_from_the_caller's_default_branch,_and_never_merges
-  Scenario: The workflow posts the merge-guard status with --full-tier from the caller's default branch and never merges
+  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::it_posts_the_`merge-guard`_status_under_the_fast_gate_(--full-tier_only_when_asked),_from_the_caller's_default_branch,_and_merges_only_with_the_merge_token
+  Scenario: The workflow posts the merge-guard status under the fast gate from the caller's default branch and merges only with the merge token
     Given layer-merge-guard.yml
     When its steps are read
-    Then the guard runs with "--root site --status" and "--full-tier"
+    Then the guard runs with "--root site --status" and "--gate fast" by default
+    And "--full-tier" only when the caller sets full-tier, which is off by default
     And the caller is checked out at its default branch into "site"
-    And no step merges or asks for auto-merge
+    And the only merge is "--auto-merge", added only when the merge-token secret is set
     And the job may write statuses and only read contents
 
   @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::this_layer's_caller_is_`merge-guard.yml`,_from_the_default_branch_only:_comments,_the_PR_checks'_runs_and_the_signal's
@@ -75,11 +76,12 @@ Feature: The merge-guard status on every layer PR
     Then it calls layer-merge-guard.yml on issue_comment, workflow_run and workflow_dispatch, and not on pull_request_target
     And its workflow_run follows the PR checks workflow and "Merge guard trigger" by name
 
-  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::the_privileged_side_never_takes_code_from_the_PR_head_and_holds_no_secret
+  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_what_it_runs::the_privileged_side_never_takes_code_from_the_PR_head,_and_its_one_secret_is_the_merge_token_in_the_post_step
   Scenario: The privileged side runs nothing from the PR head
     Given layer-merge-guard.yml
     When its steps are read
-    Then it checks out only the caller's default branch, names no head ref, branch or repository, and reads no secret
+    Then it checks out only the caller's default branch and names no head ref, branch or repository
+    And its one secret is the merge token, read only by the post step
 
   @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_the_signal_(`Merge_guard_trigger`)::this_layer's_copy_is_the_one_workflow-pins_writes,_at_the_file_merge-guard_ignores
   Scenario: This layer's signal is the canonical one

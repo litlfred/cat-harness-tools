@@ -1,7 +1,9 @@
 # This layer's own caller of `layer-merge-guard.yml`: the `merge-guard`
 # commit status on every PR head here (owner, 2026-11-13, card "A.
 # merge-guard required status"). The header of `layer-merge-guard.yml` says
-# what the status means. It never merges: only the merge manager does.
+# what the status means. With the MERGE_TOKEN secret it also lands a PR the
+# fast gate passes (owner, 2026-11-27); without it only the merge manager
+# merges.
 #
 # Keep this file's name: `scripts/merge-guard.ts` ignores runs of
 # `.github/workflows/merge-guard.yml` (and of its signal,
@@ -40,3 +42,7 @@ jobs:
     uses: ./.github/workflows/layer-merge-guard.yml
     with:
       pr: ${{ inputs.pr || '' }}
+    # Auto-merge (owner, 2026-11-27): lands a PR the fast gate passes. Without
+    # the MERGE_TOKEN secret nothing is merged and the merge manager lands it.
+    secrets:
+      merge-token: ${{ secrets.MERGE_TOKEN }}
